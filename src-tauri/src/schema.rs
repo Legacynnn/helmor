@@ -598,7 +598,7 @@ fn run_migrations(connection: &Connection) -> Result<()> {
             if !has_column(connection, "repos", flag_col) {
                 connection
                     .execute_batch(&format!(
-                        "ALTER TABLE repos ADD COLUMN {flag_col} INTEGER NOT NULL DEFAULT 0"
+                        "ALTER TABLE repos ADD COLUMN {flag_col} INTEGER DEFAULT 0"
                     ))
                     .with_context(|| format!("Failed to add repos.{flag_col} column"))?;
                 // Rule B backfill: set flag=1 where the override is absent.
@@ -636,12 +636,12 @@ CREATE TABLE IF NOT EXISTS repos (
     hidden INTEGER DEFAULT 0,
     custom_prompt_fix_errors TEXT,
     custom_prompt_resolve_merge_conflicts TEXT,
-    inherit_global_create_pr INTEGER NOT NULL DEFAULT 0,
-    inherit_global_review INTEGER NOT NULL DEFAULT 0,
-    inherit_global_fix_errors INTEGER NOT NULL DEFAULT 0,
-    inherit_global_resolve_conflicts INTEGER NOT NULL DEFAULT 0,
-    inherit_global_rename_branch INTEGER NOT NULL DEFAULT 0,
-    inherit_global_general INTEGER NOT NULL DEFAULT 0,
+    inherit_global_create_pr INTEGER DEFAULT 0,
+    inherit_global_review INTEGER DEFAULT 0,
+    inherit_global_fix_errors INTEGER DEFAULT 0,
+    inherit_global_resolve_conflicts INTEGER DEFAULT 0,
+    inherit_global_rename_branch INTEGER DEFAULT 0,
+    inherit_global_general INTEGER DEFAULT 0,
     auto_run_setup INTEGER DEFAULT 1,
     forge_provider TEXT,
     forge_login TEXT,

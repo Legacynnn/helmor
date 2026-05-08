@@ -948,12 +948,12 @@ pub fn load_repo_preferences(repo_id: &str) -> Result<RepoPreferencesResolved> {
                 general: row.get(5)?,
             };
             let inherit = InheritFlags {
-                create_pr: row.get::<_, i64>(6).unwrap_or(0) != 0,
-                review: row.get::<_, i64>(7).unwrap_or(0) != 0,
-                fix_errors: row.get::<_, i64>(8).unwrap_or(0) != 0,
-                resolve_conflicts: row.get::<_, i64>(9).unwrap_or(0) != 0,
-                branch_rename: row.get::<_, i64>(10).unwrap_or(0) != 0,
-                general: row.get::<_, i64>(11).unwrap_or(0) != 0,
+                create_pr: row.get::<_, Option<i64>>(6)?.unwrap_or(0) != 0,
+                review: row.get::<_, Option<i64>>(7)?.unwrap_or(0) != 0,
+                fix_errors: row.get::<_, Option<i64>>(8)?.unwrap_or(0) != 0,
+                resolve_conflicts: row.get::<_, Option<i64>>(9)?.unwrap_or(0) != 0,
+                branch_rename: row.get::<_, Option<i64>>(10)?.unwrap_or(0) != 0,
+                general: row.get::<_, Option<i64>>(11)?.unwrap_or(0) != 0,
             };
             Ok((overrides, inherit))
         })
