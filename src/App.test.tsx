@@ -70,10 +70,10 @@ describe("App", () => {
 			'[data-slot="workspace-groups-scroll"]',
 		);
 
-		expect(shell).toHaveClass("bg-background");
+		expect(shell).toHaveClass("bg-[var(--app-shell-bg)]");
 		expect(shell).toHaveClass("h-screen");
 		expect(shell).toHaveClass("overflow-hidden");
-		expect(sidebar).toHaveClass("bg-sidebar");
+		expect(sidebar).toHaveClass("bg-[var(--sidebar-tint)]");
 		expect(sidebar).toHaveClass("overflow-hidden");
 		expect(sidebar).toHaveStyle({ width: "336px" });
 		expect(inspector).toHaveClass("bg-sidebar");
@@ -111,7 +111,9 @@ describe("App", () => {
 		expect(safeAreas).toHaveLength(1);
 		expect(groupsScrollRegion).toHaveClass("overflow-y-auto");
 		expect(groupsScrollRegion).toHaveClass("flex-1");
-		expect(screen.getByText("Workspaces")).toBeInTheDocument();
+		expect(
+			screen.getByRole("button", { name: "Change sidebar grouping" }),
+		).toHaveTextContent("Status");
 		expect(doneGroup).toBeInTheDocument();
 		expect(progressGroup).toBeInTheDocument();
 

@@ -59,6 +59,7 @@ import {
 import {
 	type PendingArchiveEntry,
 	type PendingCreationEntry,
+	projectRepositoryGroups,
 	projectSidebarLists,
 	shouldReconcilePendingArchive,
 	shouldReconcilePendingCreation,
@@ -182,6 +183,22 @@ export function useWorkspacesSidebarController({
 	const archivedRows = useMemo(
 		() => projectedSidebar.archivedRows,
 		[projectedSidebar.archivedRows],
+	);
+	const repositoryGroups = useMemo(
+		() =>
+			projectRepositoryGroups({
+				repositories: repositoriesQuery.data ?? [],
+				groups,
+				pendingCreations: new Map(
+					Array.from(pendingCreations.entries()).map(
+						([workspaceId, pendingCreation]) => [
+							workspaceId,
+							pendingCreation.entry,
+						],
+					),
+				),
+			}),
+		[groups, pendingCreations, repositoriesQuery.data],
 	);
 
 	const updateArchivingWorkspaceId = useCallback(
@@ -1567,6 +1584,7 @@ export function useWorkspacesSidebarController({
 		creatingWorkspaceRepoId,
 		cloneDefaultDirectory,
 		groups,
+		repositoryGroups,
 		handleAddRepository,
 		handleArchiveWorkspace,
 		handleCloneFromUrl,
@@ -1600,6 +1618,7 @@ function createPreparedWorkspaceRow(
 		// already in its terminal shape — no placeholder → real swap.
 		title: `${repository.name} workspace`,
 		directoryName: prepared.directoryName,
+		repoId: repository.id,
 		repoName: repository.name,
 		repoIconSrc: repository.repoIconSrc ?? null,
 		repoInitials: repository.repoInitials ?? null,

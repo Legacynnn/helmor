@@ -39,7 +39,16 @@ body,
 
 body {
 	min-height: 100vh;
-	background-color: var(--background);
+	background-color: var(--app-shell-bg);
+}
+
+/* On macOS the window has NSVisualEffectMaterial applied, so html / body / #root
+   must all be fully transparent; otherwise WebKit paints an opaque clear color
+   on top of the AppKit blur and the sidebar looks like the old opaque version. */
+html[data-os="macos"],
+html[data-os="macos"] body,
+html[data-os="macos"] #root {
+	background-color: transparent;
 }
 
 .conversation-scroll-viewport {

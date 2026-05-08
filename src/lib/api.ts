@@ -64,6 +64,7 @@ export type WorkspaceRow = {
 	title: string;
 	avatar?: string;
 	directoryName?: string;
+	repoId?: string;
 	repoName?: string;
 	repoIconSrc?: string | null;
 	repoInitials?: string | null;
@@ -166,6 +167,7 @@ export type WorkspaceSummary = {
 	id: string;
 	title: string;
 	directoryName: string;
+	repoId?: string;
 	repoName: string;
 	repoIconSrc?: string | null;
 	repoInitials?: string | null;

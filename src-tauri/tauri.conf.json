@@ -35,7 +35,11 @@
 				},
 				"hiddenTitle": true,
 				"center": true,
-				"backgroundColor": "#0E0E0E"
+				"transparent": true,
+				"windowEffects": {
+					"effects": ["underWindowBackground"],
+					"state": "followsWindowActiveState"
+				}
 			}
 		],
 		"security": {

@@ -83,6 +83,77 @@ pub fn run() {
             let logs_dir = data_dir::logs_dir()?;
             logging::init(&logs_dir)?;
 
+            // Belt-and-suspenders for native macOS vibrancy. The conf-level
+            // `windowEffects` should already apply the under-window material at
+            // window creation, but we redundantly re-apply here so that any
+            // future config drift (e.g. transient setting that doesn't stick
+            // on the user's macOS) still gets the blur. The call is idempotent:
+            // re-applying the same material no-ops on AppKit's side.
+            #[cfg(target_os = "macos")]
+            {
+                use window_vibrancy::{
+                    apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
+                };
+                if let Some(window) = app.get_webview_window("main") {
+                    // On macOS Tahoe (26.x), Tauri's `transparent: true` and
+                    // `set_background_color(None)` no longer propagate down to
+                    // the WKWebView's CALayer; the webview keeps painting an
+                    // opaque clearColor, hiding the NSVisualEffectView under
+                    // it. Force every layer in the chain transparent natively.
+                    if let Err(error) = window.with_webview(|webview| {
+                        // Cocoa crate is deprecated in favor of objc2, but the
+                        // surface here is tiny and stable; suppressing inline
+                        // beats migrating just for these calls.
+                        #[allow(deprecated, unexpected_cfgs)]
+                        unsafe {
+                            use cocoa::base::{id, nil};
+                            use cocoa::foundation::NSString;
+                            use objc::{class, msg_send, sel, sel_impl};
+                            let wk: id = webview.inner() as id;
+                            let _: () = msg_send![wk, setOpaque: false];
+                            let clear: id = msg_send![class!(NSColor), clearColor];
+                            let _: () = msg_send![wk, setBackgroundColor: clear];
+                            let key = NSString::alloc(nil).init_str("drawsBackground");
+                            let no: id = msg_send![
+                                class!(NSNumber),
+                                numberWithBool: false
+                            ];
+                            let _: () = msg_send![wk, setValue: no forKey: key];
+                            let layer: id = msg_send![wk, layer];
+                            if layer != nil {
+                                let cg: id = msg_send![clear, CGColor];
+                                let _: () = msg_send![layer, setBackgroundColor: cg];
+                                let _: () = msg_send![layer, setOpaque: false];
+                            }
+                        }
+                    }) {
+                        tracing::warn!(
+                            error = %format!("{error:?}"),
+                            "Failed to clear WKWebView layer background"
+                        );
+                    }
+
+                    match apply_vibrancy(
+                        &window,
+                        NSVisualEffectMaterial::UnderWindowBackground,
+                        Some(NSVisualEffectState::FollowsWindowActiveState),
+                        None,
+                    ) {
+                        Ok(()) => {
+                            tracing::info!("Applied macOS window vibrancy (UnderWindowBackground)");
+                        }
+                        Err(error) => {
+                            tracing::warn!(
+                                error = %format!("{error:?}"),
+                                "Failed to apply macOS window vibrancy"
+                            );
+                        }
+                    }
+                } else {
+                    tracing::warn!("Main window not found when applying vibrancy");
+                }
+            }
+
             // Initialize database schema. We apply the same PRAGMA init as
             // the pools to get WAL mode persisted to the file before any
             // pool connection opens.

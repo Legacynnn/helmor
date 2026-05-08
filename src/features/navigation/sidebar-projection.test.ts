@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { WorkspaceGroup, WorkspaceSummary } from "@/lib/api";
+import type {
+	RepositoryCreateOption,
+	WorkspaceGroup,
+	WorkspaceSummary,
+} from "@/lib/api";
 import {
 	type PendingArchiveEntry,
 	type PendingCreationEntry,
+	projectRepositoryGroups,
 	projectSidebarLists,
 	shouldReconcilePendingArchive,
 	shouldReconcilePendingCreation,
@@ -219,5 +224,209 @@ describe("shouldReconcilePendingCreation", () => {
 				],
 			),
 		).toBe(true);
+	});
+});
+
+function makeRepo(id: string, name: string = id): RepositoryCreateOption {
+	return {
+		id,
+		name,
+		repoIconSrc: null,
+		repoInitials: name.slice(0, 2).toUpperCase(),
+	};
+}
+
+describe("projectRepositoryGroups", () => {
+	const repoA = makeRepo("repo-a", "alpha");
+	const repoB = makeRepo("repo-b", "bravo");
+	const repoC = makeRepo("repo-c", "charlie");
+
+	it("groups active workspaces by repoId", () => {
+		const result = projectRepositoryGroups({
+			repositories: [repoA, repoB],
+			groups: [
+				{
+					id: "progress",
+					label: "In progress",
+					tone: "progress",
+					rows: [
+						{
+							id: "w-1",
+							title: "W1",
+							state: "ready",
+							status: "in-progress",
+							repoId: "repo-a",
+						},
+						{
+							id: "w-2",
+							title: "W2",
+							state: "ready",
+							status: "in-progress",
+							repoId: "repo-b",
+						},
+					],
+				},
+			],
+			pendingCreations: new Map(),
+		});
+
+		expect(result.map((r) => r.id)).toEqual(["repo-a", "repo-b"]);
+		expect(result[0].rows.map((r) => r.id)).toEqual(["w-1"]);
+		expect(result[1].rows.map((r) => r.id)).toEqual(["w-2"]);
+	});
+
+	it("includes saved repos with zero workspaces", () => {
+		const result = projectRepositoryGroups({
+			repositories: [repoA, repoB, repoC],
+			groups: [
+				{
+					id: "progress",
+					label: "In progress",
+					tone: "progress",
+					rows: [
+						{
+							id: "w-1",
+							title: "W1",
+							state: "ready",
+							status: "in-progress",
+							repoId: "repo-a",
+						},
+					],
+				},
+			],
+			pendingCreations: new Map(),
+		});
+
+		expect(result.map((r) => r.id)).toEqual(["repo-a", "repo-b", "repo-c"]);
+		expect(result[1].rows).toEqual([]);
+		expect(result[2].rows).toEqual([]);
+	});
+
+	it("sorts pinned rows before unpinned within a repo", () => {
+		const result = projectRepositoryGroups({
+			repositories: [repoA],
+			groups: [
+				{
+					id: "progress",
+					label: "In progress",
+					tone: "progress",
+					rows: [
+						{
+							id: "w-1",
+							title: "W1",
+							state: "ready",
+							status: "in-progress",
+							repoId: "repo-a",
+							pinnedAt: null,
+						},
+						{
+							id: "w-2",
+							title: "W2",
+							state: "ready",
+							status: "in-progress",
+							repoId: "repo-a",
+							pinnedAt: "2024-01-01T00:00:00Z",
+						},
+					],
+				},
+			],
+			pendingCreations: new Map(),
+		});
+
+		expect(result[0].rows.map((r) => r.id)).toEqual(["w-2", "w-1"]);
+	});
+
+	it("places pending creations under the correct repo", () => {
+		const result = projectRepositoryGroups({
+			repositories: [repoA, repoB],
+			groups: [],
+			pendingCreations: new Map([
+				[
+					"optimistic-1",
+					{
+						repoId: "repo-b",
+						row: {
+							id: "optimistic-1",
+							title: "Creating",
+							state: "initializing",
+							status: "in-progress",
+							repoId: "repo-b",
+						},
+						stage: "creating",
+						resolvedWorkspaceId: null,
+					},
+				],
+			]),
+		});
+
+		expect(result[0].rows).toEqual([]);
+		expect(result[1].rows.map((r) => r.id)).toEqual(["optimistic-1"]);
+	});
+
+	it("does not duplicate a pending creation that has resolved into the live groups", () => {
+		const result = projectRepositoryGroups({
+			repositories: [repoA],
+			groups: [
+				{
+					id: "progress",
+					label: "In progress",
+					tone: "progress",
+					rows: [
+						{
+							id: "ws-real",
+							title: "Real",
+							state: "ready",
+							status: "in-progress",
+							repoId: "repo-a",
+						},
+					],
+				},
+			],
+			pendingCreations: new Map([
+				[
+					"optimistic-1",
+					{
+						repoId: "repo-a",
+						row: {
+							id: "ws-real",
+							title: "Creating",
+							state: "initializing",
+							status: "in-progress",
+							repoId: "repo-a",
+						},
+						stage: "confirmed",
+						resolvedWorkspaceId: "ws-real",
+					},
+				],
+			]),
+		});
+
+		expect(result[0].rows.map((r) => r.id)).toEqual(["ws-real"]);
+	});
+
+	it("falls back to an Other bucket when a row references an unknown repo", () => {
+		const result = projectRepositoryGroups({
+			repositories: [repoA],
+			groups: [
+				{
+					id: "progress",
+					label: "In progress",
+					tone: "progress",
+					rows: [
+						{
+							id: "w-orphan",
+							title: "Orphan",
+							state: "ready",
+							status: "in-progress",
+							repoId: "ghost",
+						},
+					],
+				},
+			],
+			pendingCreations: new Map(),
+		});
+
+		expect(result.map((r) => r.id)).toEqual(["repo-a", "__unknown__"]);
+		expect(result[1].rows.map((r) => r.id)).toEqual(["w-orphan"]);
 	});
 });

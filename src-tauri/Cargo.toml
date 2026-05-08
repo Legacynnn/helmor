@@ -57,6 +57,23 @@ version = "0.2"
 core-foundation = "0.10"
 security-framework = "3"
 security-framework-sys = "2"
+window-vibrancy = "0.6"
+# `cocoa` + `objc` are formally deprecated in favor of `objc2`, but we use
+# them in a tiny well-isolated block (lib.rs setup hook) to force the macOS
+# WKWebView fully transparent — Tauri 2.10 + macOS Tahoe don't honor the
+# config-level `transparent: true` flag down to the webview's CALayer.
+# Migrating just for these calls isn't worth the churn; the deprecation
+# warnings are silenced inline. See `lints.rust` below for the
+# `cargo-clippy` cfg pinning macros from these crates.
+objc = "0.2"
+cocoa = "0.26"
+
+[lints.rust]
+# `objc`/`cocoa` macros (`msg_send!`, `sel!`) emit `cfg(cargo-clippy)` checks
+# that surface as `unexpected_cfgs` warnings starting in recent rustc. They're
+# expanded at the call site, so an inline `#[allow(unexpected_cfgs)]` doesn't
+# reach them. Allow the lint crate-wide to keep clippy clean.
+unexpected_cfgs = "allow"
 
 [[bin]]
 name = "helmor-cli"

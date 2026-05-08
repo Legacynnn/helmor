@@ -49,6 +49,7 @@ export const WorkspacesSidebarContainer = memo(
 			creatingWorkspaceRepoId,
 			cloneDefaultDirectory,
 			groups,
+			repositoryGroups,
 			handleAddRepository,
 			handleArchiveWorkspace,
 			handleCloneFromUrl,
@@ -74,6 +75,7 @@ export const WorkspacesSidebarContainer = memo(
 		return (
 			<WorkspacesSidebar
 				groups={groups}
+				repositoryGroups={repositoryGroups}
 				archivedRows={archivedRows}
 				addingRepository={addingRepository}
 				archivingWorkspaceIds={archivingWorkspaceIds}
