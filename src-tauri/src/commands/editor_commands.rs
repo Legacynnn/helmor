@@ -155,3 +155,25 @@ pub async fn write_editor_file(
 pub async fn stat_editor_file(path: String) -> CmdResult<editor_files::EditorFileStatResponse> {
     run_blocking(move || editor_files::stat_editor_file(&path)).await
 }
+
+#[tauri::command]
+pub async fn list_workspace_directory(
+    workspace_root_path: String,
+    relative_path: String,
+) -> CmdResult<Vec<editor_files::DirEntry>> {
+    run_blocking(move || {
+        crate::workspace::files::listing::list_directory(&workspace_root_path, &relative_path)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn search_workspace_paths(
+    workspace_root_path: String,
+    query: String,
+) -> CmdResult<Vec<editor_files::PathSearchHit>> {
+    run_blocking(move || {
+        crate::workspace::files::search::search_paths(&workspace_root_path, &query)
+    })
+    .await
+}

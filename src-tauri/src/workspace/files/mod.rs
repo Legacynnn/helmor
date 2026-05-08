@@ -14,8 +14,8 @@ pub use editor::{
     read_file_at_ref, stat_editor_file, write_editor_file, EditorFileWriteOptions,
 };
 pub use types::{
-    EditorFileListItem, EditorFilePrefetchItem, EditorFileReadResponse, EditorFileStatResponse,
-    EditorFileWriteOutcome, EditorFilesWithContentResponse,
+    DirEntry, DirEntryKind, EditorFileListItem, EditorFilePrefetchItem, EditorFileReadResponse,
+    EditorFileStatResponse, EditorFileWriteOutcome, EditorFilesWithContentResponse, PathSearchHit,
 };
 
 #[cfg(test)]
