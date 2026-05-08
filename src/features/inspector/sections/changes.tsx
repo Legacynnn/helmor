@@ -287,6 +287,42 @@ export function ChangesSection({
 		},
 		[invalidateChanges, surfaceChangeError, workspaceRootPath],
 	);
+	const stageAll = useCallback(async () => {
+		if (!workspaceRootPath) {
+			return;
+		}
+		const paths = unstagedChanges.map((change) => change.path);
+		try {
+			for (const path of paths) {
+				await stageWorkspaceFile(workspaceRootPath, path);
+			}
+		} catch (error) {
+			surfaceChangeError("stage files", error);
+		} finally {
+			invalidateChanges();
+		}
+	}, [
+		invalidateChanges,
+		surfaceChangeError,
+		unstagedChanges,
+		workspaceRootPath,
+	]);
+	const unstageAll = useCallback(async () => {
+		if (!workspaceRootPath) {
+			return;
+		}
+		const paths = stagedChanges.map((change) => change.path);
+		try {
+			for (const path of paths) {
+				await unstageWorkspaceFile(workspaceRootPath, path);
+			}
+		} catch (error) {
+			surfaceChangeError("unstage files", error);
+		} finally {
+			invalidateChanges();
+		}
+	}, [invalidateChanges, stagedChanges, surfaceChangeError, workspaceRootPath]);
+
 	const discardFile = useCallback(
 		async (relativePath: string) => {
 			if (!workspaceRootPath) {
@@ -466,6 +502,10 @@ export function ChangesSection({
 				workspaceId={workspaceId}
 				hasChanges={hasChanges}
 				changeCount={entries.length}
+				hasUnstaged={unstagedChanges.length > 0}
+				hasStaged={stagedChanges.length > 0}
+				onStageAll={stageAll}
+				onUnstageAll={unstageAll}
 				isRefreshing={isForgeRefreshing}
 				isContinuingWorkspace={isContinuingWorkspace}
 				onChangeRequestClick={

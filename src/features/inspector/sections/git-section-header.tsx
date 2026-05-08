@@ -1,4 +1,4 @@
-import { ChevronsRight, ExternalLink } from "lucide-react";
+import { ChevronsRight, ExternalLink, MinusIcon, PlusIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { GithubBrandIcon, GitlabBrandIcon } from "@/components/brand-icon";
 import { Button } from "@/components/ui/button";
@@ -75,6 +75,12 @@ export type GitSectionHeaderProps = {
 	 * in place of the "Git" label when no PR is shown.
 	 */
 	changeCount?: number;
+	/** True when at least one row is unstaged — enables the Stage all icon. */
+	hasUnstaged?: boolean;
+	/** True when at least one row is staged — enables the Unstage all icon. */
+	hasStaged?: boolean;
+	onStageAll?: () => void | Promise<void>;
+	onUnstageAll?: () => void | Promise<void>;
 	/**
 	 * Whether change request data is currently being (re)fetched. Drives the
 	 * bottom shimmer bar (combined with `commitButtonState === "disabled"`).
@@ -105,6 +111,10 @@ export function GitSectionHeader({
 	changeRequest,
 	hasChanges = false,
 	changeCount = 0,
+	hasUnstaged = false,
+	hasStaged = false,
+	onStageAll,
+	onUnstageAll,
 	isRefreshing = false,
 	changeRequestName = "PR",
 	forgeRemoteState = null,
@@ -280,9 +290,51 @@ export function GitSectionHeader({
 				className="flex shrink-0 items-center gap-1.5"
 			>
 				{!showChangeRequest ? (
-					<span className={cn(INSPECTOR_SECTION_TITLE_CLASS, "translate-y-px")}>
-						{changeCount} change{changeCount === 1 ? "" : "s"}
-					</span>
+					<>
+						<span
+							className={cn(INSPECTOR_SECTION_TITLE_CLASS, "translate-y-px")}
+						>
+							{changeCount} change{changeCount === 1 ? "" : "s"}
+						</span>
+						{hasUnstaged && onStageAll && (
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-xs"
+										aria-label="Stage all"
+										onClick={() => void onStageAll()}
+										className="size-4 rounded-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+									>
+										<PlusIcon className="size-3.5" strokeWidth={2} />
+									</Button>
+								</TooltipTrigger>
+								<TooltipContent side="bottom" sideOffset={4}>
+									Stage all
+								</TooltipContent>
+							</Tooltip>
+						)}
+						{hasStaged && onUnstageAll && (
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-xs"
+										aria-label="Unstage all"
+										onClick={() => void onUnstageAll()}
+										className="size-4 rounded-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+									>
+										<MinusIcon className="size-3.5" strokeWidth={2} />
+									</Button>
+								</TooltipTrigger>
+								<TooltipContent side="bottom" sideOffset={4}>
+									Unstage all
+								</TooltipContent>
+							</Tooltip>
+						)}
+					</>
 				) : (
 					(() => {
 						const button = (
