@@ -2739,9 +2739,9 @@ function AppShell({
 					<ComposerInsertProvider value={handleInsertIntoComposer}>
 						<main
 							aria-label="Application shell"
-							className="relative h-screen overflow-hidden bg-background font-sans text-foreground antialiased"
+							className="relative h-screen overflow-hidden bg-[var(--app-shell-bg)] font-sans text-foreground antialiased"
 						>
-							<div className="relative flex h-full min-h-0 bg-background">
+							<div className="relative flex h-full min-h-0 bg-[var(--app-shell-bg)]">
 								{workspaceViewMode !== "editor" && (
 									<>
 										<aside
@@ -2749,7 +2749,7 @@ function AppShell({
 											aria-label="Workspace sidebar"
 											data-helmor-sidebar-root
 											className={cn(
-												"relative flex h-full shrink-0 flex-col overflow-hidden bg-sidebar",
+												"relative flex h-full shrink-0 flex-col overflow-hidden bg-[var(--sidebar-tint)]",
 												isSidebarResizing
 													? "transition-none"
 													: "transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",

@@ -534,4 +534,112 @@ describe("WorkspacesSidebar", () => {
 		expect(actionOverlay).not.toBeNull();
 		expect(actionOverlay).not.toHaveClass("transition-opacity");
 	});
+
+	describe("view mode", () => {
+		const openViewModeMenu = async (
+			user: ReturnType<typeof userEvent.setup>,
+		) => {
+			await user.click(
+				screen.getByRole("button", { name: "Change sidebar grouping" }),
+			);
+		};
+
+		it("defaults to status mode and switches to repository mode on toggle", async () => {
+			const user = userEvent.setup();
+			render(
+				<TooltipProvider delayDuration={0}>
+					<WorkspacesSidebar
+						groups={workspaceGroups}
+						repositoryGroups={[
+							{
+								id: "repo-a",
+								name: "alpha",
+								repoIconSrc: null,
+								repoInitials: "AL",
+								rows: [
+									{
+										id: "workspace-1",
+										title: "Workspace 1",
+										state: "ready",
+										repoId: "repo-a",
+									},
+								],
+							},
+							{
+								id: "repo-b",
+								name: "bravo",
+								repoIconSrc: null,
+								repoInitials: "BR",
+								rows: [],
+							},
+						]}
+						archivedRows={[]}
+					/>
+				</TooltipProvider>,
+			);
+
+			expect(
+				screen.getByRole("button", { name: "Change sidebar grouping" }),
+			).toHaveTextContent("Status");
+			expect(screen.getByText("In Progress")).toBeInTheDocument();
+			expect(screen.queryByText("alpha")).toBeNull();
+
+			await openViewModeMenu(user);
+			await user.click(
+				screen.getByRole("menuitemradio", { name: /Repositories/ }),
+			);
+
+			expect(screen.getByText("alpha")).toBeInTheDocument();
+			expect(screen.getByText("bravo")).toBeInTheDocument();
+			expect(screen.getByText("Empty")).toBeInTheDocument();
+			expect(
+				screen.getByRole("button", { name: "Change sidebar grouping" }),
+			).toHaveTextContent("Repositories");
+		});
+
+		it("collapses a repository when its header is clicked", async () => {
+			const user = userEvent.setup();
+			render(
+				<TooltipProvider delayDuration={0}>
+					<WorkspacesSidebar
+						groups={[]}
+						repositoryGroups={[
+							{
+								id: "repo-a",
+								name: "alpha",
+								repoIconSrc: null,
+								repoInitials: "AL",
+								rows: [
+									{
+										id: "workspace-1",
+										title: "Workspace 1",
+										state: "ready",
+										repoId: "repo-a",
+									},
+								],
+							},
+						]}
+						archivedRows={[]}
+					/>
+				</TooltipProvider>,
+			);
+
+			await openViewModeMenu(user);
+			await user.click(
+				screen.getByRole("menuitemradio", { name: /Repositories/ }),
+			);
+
+			expect(
+				screen.getByRole("button", { name: "Workspace 1" }),
+			).toBeInTheDocument();
+
+			const repoHeader = screen
+				.getAllByRole("button")
+				.find((btn) => btn.getAttribute("data-repo-id") === "repo-a");
+			expect(repoHeader).toBeDefined();
+			await user.click(repoHeader!);
+
+			expect(screen.queryByRole("button", { name: "Workspace 1" })).toBeNull();
+		});
+	});
 });

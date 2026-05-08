@@ -117,6 +117,11 @@
 	--terminal-bright-cyan: oklch(0.55 0.09 192);
 	--terminal-bright-white: oklch(0.95 0 0);
 	--radius: 0.625rem;
+	/* Vibrancy tokens: opaque defaults; macOS override later in this file
+	   flips these to transparent so AppKit NSVisualEffectView shows through.
+	   Non-macOS platforms keep these and look identical to before. */
+	--app-shell-bg: var(--background);
+	--sidebar-tint: var(--sidebar);
 }
 
 .dark {
@@ -232,6 +237,22 @@
 	--terminal-bright-magenta: oklch(0.78 0.12 310);
 	--terminal-bright-cyan: oklch(0.84 0.07 192);
 	--terminal-bright-white: oklch(0.985 0 0);
+}
+
+/* Native macOS vibrancy
+   When the app is running on macOS we apply native under-window vibrancy
+   to the whole window (see src-tauri/src/lib.rs). Two tokens flip to let
+   the AppKit blur show through:
+
+   --app-shell-bg: transparent  (so `<main>` / shell wrapper don't paint)
+   --sidebar-tint: transparent  (so the sidebar uses the same native
+                      material instead of painting an extra webview layer)
+
+   On Windows/Linux the tokens stay opaque (defined per theme above) so the
+   sidebar looks identical to today. */
+html[data-os="macos"] {
+	--app-shell-bg: transparent;
+	--sidebar-tint: transparent;
 }
 
 /* ── Midnight (light) ─────────────────────────────────────────────────────────

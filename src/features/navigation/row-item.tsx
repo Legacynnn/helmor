@@ -84,6 +84,9 @@ export type WorkspaceRowItemProps = {
 	markingUnreadWorkspaceId?: string | null;
 	restoringWorkspaceId?: string | null;
 	workspaceActionsDisabled?: boolean;
+	/** "repo" hides the repo avatar — used inside the Repositories view where
+	 * the parent accordion header already shows the repo icon. */
+	variant?: "default" | "repo";
 };
 
 /**
@@ -127,6 +130,7 @@ export const WorkspaceRowItem = memo(
 		markingUnreadWorkspaceId,
 		restoringWorkspaceId,
 		workspaceActionsDisabled,
+		variant = "default",
 	}: WorkspaceRowItemProps) {
 		useEffect(() => {
 			recordSidebarRowRender(row.id);
@@ -240,15 +244,17 @@ export const WorkspaceRowItem = memo(
 				)}
 			>
 				<div className="flex min-w-0 flex-1 items-center gap-2">
-					<WorkspaceAvatar
-						repoIconSrc={row.repoIconSrc}
-						repoInitials={row.repoInitials ?? row.avatar ?? null}
-						repoName={row.repoName}
-						title={displayTitle}
-						badgeClassName={showStatusDot ? statusDotClassName : null}
-						badgeAriaLabel={statusDotLabel ?? undefined}
-						isRunning={isRunScriptRunning}
-					/>
+					{variant === "repo" ? null : (
+						<WorkspaceAvatar
+							repoIconSrc={row.repoIconSrc}
+							repoInitials={row.repoInitials ?? row.avatar ?? null}
+							repoName={row.repoName}
+							title={displayTitle}
+							badgeClassName={showStatusDot ? statusDotClassName : null}
+							badgeAriaLabel={statusDotLabel ?? undefined}
+							isRunning={isRunScriptRunning}
+						/>
+					)}
 					{/* Fade is on an inner wrapper so the avatar's overflowing badge isn't clipped by mask-image. */}
 					<div className="row-content-fade flex min-w-0 flex-1 items-center gap-2">
 						{isSending && !isInteractionRequired ? (
