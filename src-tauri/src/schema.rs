@@ -602,11 +602,14 @@ fn run_migrations(connection: &Connection) -> Result<()> {
                     ))
                     .with_context(|| format!("Failed to add repos.{flag_col} column"))?;
                 // Rule B backfill: set flag=1 where the override is absent.
-                connection
-                    .execute_batch(&format!(
-                        "UPDATE repos SET {flag_col} = 1 WHERE {prompt_col} IS NULL OR {prompt_col} = ''"
-                    ))
-                    .with_context(|| format!("Failed to backfill repos.{flag_col}"))?;
+                // Guard on the prompt column existing — legacy schemas may not have it yet.
+                if has_column(connection, "repos", prompt_col) {
+                    connection
+                        .execute_batch(&format!(
+                            "UPDATE repos SET {flag_col} = 1 WHERE {prompt_col} IS NULL OR {prompt_col} = ''"
+                        ))
+                        .with_context(|| format!("Failed to backfill repos.{flag_col}"))?;
+                }
             }
         }
     }
