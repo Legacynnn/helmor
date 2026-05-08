@@ -71,6 +71,12 @@ type ChangeSide = "staged" | "unstaged" | "remote";
 type ChangeEntry = {
 	change: InspectorFileItem;
 	side: ChangeSide;
+	// Line counts projected from this entry's area. `InspectorFileItem`
+	// carries per-area counts (staged / unstaged / committed) — a single
+	// file may appear in more than one area, so we resolve them at build
+	// time instead of letting the row read off `change` directly.
+	insertions: number;
+	deletions: number;
 	action?: StageActionKind;
 	onStageAction?: (path: string) => void;
 	onDiscard?: (path: string) => void;
@@ -399,6 +405,8 @@ export function ChangesSection({
 			list.push({
 				change,
 				side: "staged",
+				insertions: change.stagedInsertions,
+				deletions: change.stagedDeletions,
 				action: "unstage",
 				onStageAction: unstageFile,
 			});
@@ -407,13 +415,20 @@ export function ChangesSection({
 			list.push({
 				change,
 				side: "unstaged",
+				insertions: change.unstagedInsertions,
+				deletions: change.unstagedDeletions,
 				action: "stage",
 				onStageAction: stageFile,
 				onDiscard: discardFile,
 			});
 		}
 		for (const change of committedChanges) {
-			list.push({ change, side: "remote" });
+			list.push({
+				change,
+				side: "remote",
+				insertions: change.committedInsertions,
+				deletions: change.committedDeletions,
+			});
 		}
 		return list;
 	}, [
@@ -624,7 +639,14 @@ function ChangesFlatView({
 	return (
 		<div className="py-1">
 			{entries.map((entry) => {
-				const { change, action, onStageAction, onDiscard } = entry;
+				const {
+					change,
+					insertions,
+					deletions,
+					action,
+					onStageAction,
+					onDiscard,
+				} = entry;
 				const lastSlash = change.path.lastIndexOf("/");
 				const dir = lastSlash >= 0 ? change.path.slice(0, lastSlash + 1) : "";
 				const name =
@@ -691,10 +713,7 @@ function ChangesFlatView({
 								>
 									{change.status}
 								</span>
-								<LineStats
-									insertions={change.insertions}
-									deletions={change.deletions}
-								/>
+								<LineStats insertions={insertions} deletions={deletions} />
 							</span>
 							{hasAction && (
 								<RowHoverActions

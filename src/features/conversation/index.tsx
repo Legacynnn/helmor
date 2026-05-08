@@ -7,6 +7,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WorkspaceComposerContainer } from "@/features/composer/container";
+import type { StartSubmitMode } from "@/features/composer/start-submit-mode";
 import type { UserInputResponseHandler } from "@/features/composer/user-input";
 import { WorkspacePanelContainer } from "@/features/panel/container";
 import { FileLinkProvider } from "@/features/panel/message-components/file-link-context";
@@ -49,7 +50,7 @@ export type ComposerCreateContext = {
 	 *  workspace before routing the prompt into the freshly-created session. */
 	prepare: (
 		payload: ComposerSubmitPayload,
-		options?: { startSubmitMode?: "startNow" | "saveForLater" },
+		options?: { startSubmitMode?: StartSubmitMode },
 	) => Promise<ComposerCreatePrepareOutcome>;
 };
 
@@ -75,11 +76,6 @@ type WorkspaceConversationContainerProps = {
 	sessionSelectionHistory?: string[];
 	onSelectSession: (sessionId: string | null) => void;
 	onResolveDisplayedSession: (sessionId: string | null) => void;
-	onSessionRunStateChange?: (
-		sessionId: string,
-		workspaceId: string | null,
-		sending: boolean,
-	) => void;
 	onInteractionSessionsChange?: (
 		sessionWorkspaceMap: Map<string, string>,
 		interactionCounts: Map<string, number>,
@@ -176,7 +172,6 @@ export const WorkspaceConversationContainer = memo(
 		sessionSelectionHistory = [],
 		onSelectSession,
 		onResolveDisplayedSession,
-		onSessionRunStateChange,
 		onInteractionSessionsChange,
 		busySessionIds,
 		stoppableSessionIds,
@@ -232,7 +227,6 @@ export const WorkspaceConversationContainer = memo(
 		const [composerFastModes, setComposerFastModes] = useState<
 			Record<string, boolean>
 		>({});
-
 		const composerContextKey =
 			composerContextKeyOverride ??
 			getComposerContextKey(displayedWorkspaceId, displayedSessionId);
@@ -276,7 +270,6 @@ export const WorkspaceConversationContainer = memo(
 			selectionPending,
 			followUpBehavior: settings.followUpBehavior,
 			submitQueue: submitQueueApi,
-			onSessionRunStateChange,
 			onInteractionSessionsChange,
 			onSessionCompleted,
 			onSessionAborted,

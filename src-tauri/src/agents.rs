@@ -29,7 +29,8 @@ pub use self::slash_commands::SlashCommandCache;
 pub use self::streaming::{
     abort_all_active_streams_blocking, bridge_aborted_event, bridge_done_event, bridge_error_event,
     bridge_permission_request_event, bridge_user_input_request_event, build_send_message_params,
-    lookup_workspace_linked_directories, ActiveStreams, BuildSendMessageParamsInput,
+    lookup_workspace_linked_directories, ActiveStreamSummary, ActiveStreams,
+    BuildSendMessageParamsInput,
 };
 
 use self::persistence::{
@@ -197,6 +198,15 @@ pub async fn list_agent_model_sections() -> CmdResult<Vec<AgentModelSection>> {
 }
 
 #[tauri::command]
+pub async fn list_cursor_models(
+    sidecar: tauri::State<'_, crate::sidecar::ManagedSidecar>,
+    api_key: Option<String>,
+) -> CmdResult<Vec<queries::CursorModelEntry>> {
+    // Inline blocking — same pattern as `list_slash_commands`.
+    queries::fetch_cursor_models(sidecar.inner(), api_key)
+}
+
+#[tauri::command]
 pub async fn send_agent_message_stream(
     app: AppHandle,
     sidecar: tauri::State<'_, crate::sidecar::ManagedSidecar>,
@@ -208,7 +218,7 @@ pub async fn send_agent_message_stream(
         return Err(anyhow::anyhow!("Prompt cannot be empty.").into());
     }
 
-    let model = resolve_model(&request.model_id);
+    let model = resolve_model(&request.model_id, Some(request.provider.as_str()));
 
     if request.provider != model.provider {
         return Err(anyhow::anyhow!(
@@ -247,6 +257,19 @@ fn resolve_stream_working_directory(
 pub struct AgentStopRequest {
     pub session_id: String,
     pub provider: Option<String>,
+}
+
+/// Snapshot of currently in-flight agent streams for the UI. Source of
+/// truth is `ActiveStreams`; the UI re-fetches this whenever a
+/// `UiMutationEvent::ActiveStreamsChanged` arrives. The frontend uses
+/// it to drive the abort button visibility and per-session busy badges
+/// — replacing the prior hook-local `sessionRunStates` that drifted on
+/// container unmount/remount.
+#[tauri::command]
+pub async fn list_active_streams(
+    active_streams: tauri::State<'_, ActiveStreams>,
+) -> CmdResult<Vec<ActiveStreamSummary>> {
+    Ok(active_streams.snapshot_for_ui())
 }
 
 #[tauri::command]
@@ -648,14 +671,14 @@ mod tests {
 
     #[test]
     fn resolve_model_infers_provider() {
-        let claude = resolve_model("default");
+        let claude = resolve_model("default", None);
         assert_eq!(claude.provider, "claude");
         assert_eq!(claude.cli_model, "default");
 
-        let codex = resolve_model("gpt-5.4");
+        let codex = resolve_model("gpt-5.4", None);
         assert_eq!(codex.provider, "codex");
 
-        let unknown_claude = resolve_model("sonnet[1m]");
+        let unknown_claude = resolve_model("sonnet[1m]", None);
         assert_eq!(unknown_claude.provider, "claude");
     }
 

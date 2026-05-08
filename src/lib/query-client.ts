@@ -18,6 +18,7 @@ import {
 	getSessionContextUsage,
 	getWorkspaceAccountProfile,
 	getWorkspaceForge,
+	listActiveStreams,
 	listForgeAccounts,
 	listGithubLabels,
 	listRepositories,
@@ -117,6 +118,7 @@ export const helmorQueryKeys = {
 	repoScripts: (repoId: string, workspaceId: string | null) =>
 		["repoScripts", repoId, workspaceId ?? ""] as const,
 	repoPreferences: (repoId: string) => ["repoPreferences", repoId] as const,
+	globalPreferences: () => ["global-preferences"] as const,
 	autoCloseActionKinds: ["autoCloseActionKinds"] as const,
 	autoCloseOptInAsked: ["autoCloseOptInAsked"] as const,
 	detectedEditors: ["detectedEditors"] as const,
@@ -135,6 +137,7 @@ export const helmorQueryKeys = {
 		["workspaceLinkedDirectories", workspaceId] as const,
 	workspaceCandidateDirectories: (excludeWorkspaceId: string | null) =>
 		["workspaceCandidateDirectories", excludeWorkspaceId ?? ""] as const,
+	activeStreams: ["activeStreams"] as const,
 };
 
 /** Persistence is opt-in per `queryOptions` via `meta: { persist: true }`.
@@ -320,6 +323,21 @@ export function repositoriesQueryOptions() {
 	});
 }
 
+/** Snapshot of in-flight agent streams (source of truth = Rust
+ *  `ActiveStreams`). Drives abort-button visibility + busy badges; the
+ *  ui-sync bridge invalidates this on `activeStreamsChanged`. NOT
+ *  persisted — running streams are by definition tied to this app run,
+ *  rehydrating stale state across restarts would mislead the UI. */
+export function activeStreamsQueryOptions() {
+	return queryOptions({
+		queryKey: helmorQueryKeys.activeStreams,
+		queryFn: listActiveStreams,
+		initialData: [],
+		initialDataUpdatedAt: 0,
+		staleTime: 0,
+	});
+}
+
 export function githubLabelsQueryOptions(login: string, repos: string[]) {
 	const sortedRepos = [...repos].sort();
 	return queryOptions({
@@ -336,7 +354,15 @@ export function agentModelSectionsQueryOptions() {
 	return queryOptions({
 		queryKey: helmorQueryKeys.agentModelSections,
 		queryFn: loadAgentModelSections,
-		staleTime: Infinity,
+		// Catalog is cheap (synchronous Rust read of static + settings).
+		// `staleTime: 0` means every mount re-fetches; the persisted disk
+		// cache still gives an instant first paint on app boot, but ANY
+		// remount validates against the live catalog. This matters because
+		// the catalog SHAPE can change across releases (e.g. cursor model
+		// id namespacing) — a long staleTime + on-disk persistence
+		// previously stuck users on a pre-upgrade shape until they
+		// happened to invalidate the query manually.
+		staleTime: 0,
 		refetchOnWindowFocus: false,
 		retry: false,
 		meta: PERSIST_META,

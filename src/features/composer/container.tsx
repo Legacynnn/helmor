@@ -56,6 +56,7 @@ import { CodexGoalBanner } from "../panel/codex-goal-banner";
 import type { AddDirPickerEntry } from "./editor/add-dir/typeahead-plugin";
 import { WorkspaceComposer } from "./index";
 import type { PermissionPanelProps } from "./permission-panel";
+import type { StartSubmitMode } from "./start-submit-mode";
 import { SubmitQueueList } from "./submit-queue-list";
 import type { UserInputResponseHandler } from "./user-input";
 
@@ -64,7 +65,6 @@ const EMPTY_SLASH_COMMANDS: SlashCommandEntry[] = [];
 const EMPTY_LINKED_DIRECTORIES: readonly string[] = [];
 const EMPTY_CANDIDATE_DIRECTORIES: readonly CandidateDirectory[] = [];
 const EMPTY_QUEUE_ITEMS: readonly QueuedSubmit[] = [];
-type StartSubmitMode = "startNow" | "saveForLater";
 
 /**
  * Host-app slash commands. Prepended to the agent-supplied list so they
@@ -158,7 +158,7 @@ type WorkspaceComposerContainerProps = {
 		 *  one submit (queue ↔ steer). Used by the "send with opposite
 		 *  follow-up" composer shortcut. Ignored when `forceQueue` is true. */
 		followUpBehaviorOverride?: "queue" | "steer";
-		startSubmitMode?: "startNow" | "saveForLater";
+		startSubmitMode?: StartSubmitMode;
 		/** Snapshot of the editor's full Lexical state at submit time, so
 		 *  callers that need to round-trip chips/text/images (e.g. the kanban
 		 *  "backlog" handler that copies the draft into a freshly-created
@@ -624,9 +624,13 @@ export const WorkspaceComposerContainer = memo(
 
 		// Narrow `provider` (which can be the loosely-typed agentType from a
 		// historical session) to a real AgentProvider before keying the
-		// query — anything else degrades to claude so we never miss the popup.
+		// query. Anything outside the known set degrades to claude so we
+		// never miss the popup. NOTE: the prior version of this branch
+		// collapsed everything except codex into claude, which masked
+		// cursor sessions as claude — the Rust cache then served cached
+		// claude skills back to the cursor popup. Keep cursor explicit.
 		const slashProvider: AgentProvider =
-			provider === "codex" ? "codex" : "claude";
+			provider === "codex" || provider === "cursor" ? provider : "claude";
 		// Prefer the repoId from a real workspace; on the start page there's no
 		// workspace yet, so fall back to the caller-supplied repoId hint.
 		const effectiveRepoId =
@@ -698,7 +702,7 @@ export const WorkspaceComposerContainer = memo(
 				options?: {
 					permissionModeOverride?: string;
 					oppositeFollowUp?: boolean;
-					startSubmitMode?: "startNow" | "saveForLater";
+					startSubmitMode?: StartSubmitMode;
 					editorStateSnapshot?: SerializedEditorState;
 				},
 			) => {
@@ -996,7 +1000,11 @@ export const WorkspaceComposerContainer = memo(
 						placeholder={placeholder}
 						providerSessionId={currentSession?.providerSessionId ?? null}
 						agentType={
-							effectiveModel?.provider === "codex" ? "codex" : "claude"
+							effectiveModel?.provider === "codex"
+								? "codex"
+								: effectiveModel?.provider === "cursor"
+									? "cursor"
+									: "claude"
 						}
 						focusShortcut={focusShortcut}
 						togglePlanShortcut={togglePlanShortcut}

@@ -82,6 +82,7 @@ import { $appendComposerInsertItems } from "./editor-ops";
 import { FastModeLottieIcon } from "./fast-mode-lottie-icon";
 import { GoalReplaceConfirm } from "./goal-replace-confirm";
 import { PermissionPanel, type PermissionPanelProps } from "./permission-panel";
+import type { StartSubmitMode } from "./start-submit-mode";
 import { UsageStatsIndicator } from "./usage-stats-indicator";
 import type { UserInputResponseHandler } from "./user-input";
 import { UserInputPanel } from "./user-input-panel";
@@ -169,8 +170,11 @@ type WorkspaceComposerProps = {
 	/** Provider's own session id (Claude Code UUID). Threaded into the
 	 *  context-usage ring for its hover-triggered live fetch. */
 	providerSessionId?: string | null;
-	/** Agent provider for this session — gates the Claude-only rich fetch. */
-	agentType?: "claude" | "codex" | null;
+	/** Agent provider for this session — gates the Claude-only rich fetch
+	 *  and selects which rate-limits API to query. `"cursor"` exists but
+	 *  Cursor's SDK doesn't expose rate-limit / context-usage endpoints
+	 *  yet, so the indicators just hide for cursor sessions. */
+	agentType?: "claude" | "codex" | "cursor" | null;
 	focusShortcut?: string | null;
 	togglePlanShortcut?: string | null;
 	/** Hotkey that submits the current draft with the opposite follow-up
@@ -196,7 +200,6 @@ const noopUserInputResponse: UserInputResponseHandler = () => {};
 const noopPermissionResponse: NonNullable<
 	WorkspaceComposerProps["onPermissionResponse"]
 > = () => {};
-type StartSubmitMode = "startNow" | "saveForLater";
 // ---------------------------------------------------------------------------
 // Lexical editor config (stable reference — defined outside component)
 // ---------------------------------------------------------------------------
@@ -323,6 +326,8 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 	const supportsEffort = availableEffortLevels.length > 0;
 	const supportsFastMode = selectedModel?.supportsFastMode === true;
 	const supportsContextUsage = selectedModel?.supportsContextUsage !== false;
+	// Cursor SDK auto-handles plans internally — no toggle to expose.
+	const supportsPlanMode = selectedModel?.provider !== "cursor";
 	const effectiveEffort = useMemo(
 		() => clampEffort(effortLevel, availableEffortLevels),
 		[effortLevel, availableEffortLevels],
@@ -381,7 +386,7 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 		!submitDisabled &&
 		!hasPendingInteraction &&
 		Boolean(selectedModel) &&
-		hasContent;
+		(hasContent || startSubmitMenu);
 	const sendDisabled = !submitEnabled || sending;
 	const steerDisabled = !submitEnabled || !sending;
 	const submitDisabledForPlugin = !submitEnabled;
@@ -492,7 +497,7 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 				files.length === 0 &&
 				customTags.length === 0
 			)
-				return;
+				if (!startSubmitMenu) return;
 			// Snapshot the editor's full Lexical state BEFORE the clear below
 			// wipes it. Synchronous capture is critical because callers that
 			// want to round-trip the draft (e.g. kanban "backlog" submit
@@ -504,7 +509,13 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 				.toJSON() as SerializedEditorState;
 			onSubmit(prompt, images, files, customTags, {
 				oppositeFollowUp: options?.oppositeFollowUp,
-				startSubmitMode: options?.startSubmitMode,
+				startSubmitMode:
+					prompt ||
+					images.length > 0 ||
+					files.length > 0 ||
+					customTags.length > 0
+						? options?.startSubmitMode
+						: "createOnly",
 				editorStateSnapshot,
 			});
 			editor.update(() => {
@@ -513,7 +524,7 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 			clearPersistedDraft(contextKey);
 			setHasContent(false);
 		},
-		[onSubmit, contextKey],
+		[onSubmit, contextKey, startSubmitMenu],
 	);
 
 	const handleSubmit = useCallback(() => {
@@ -540,8 +551,11 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 	);
 	const alternateStartSubmitMode: StartSubmitMode =
 		startSubmitMode === "saveForLater" ? "startNow" : "saveForLater";
-	const preferredStartSubmitLabel =
-		startSubmitMode === "saveForLater" ? "Save for later" : "Start now";
+	const preferredStartSubmitLabel = !hasContent
+		? "New Workspace"
+		: startSubmitMode === "saveForLater"
+			? "Save for later"
+			: "Start now";
 	const alternateStartSubmitLabel =
 		alternateStartSubmitMode === "saveForLater"
 			? "Save for later"
@@ -567,7 +581,11 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 				return;
 			}
 
-			if (togglePlanShortcut && hotkey === togglePlanShortcut) {
+			if (
+				togglePlanShortcut &&
+				hotkey === togglePlanShortcut &&
+				supportsPlanMode
+			) {
 				event.preventDefault();
 				event.stopPropagation();
 				onChangePermissionMode(permissionMode === "plan" ? "default" : "plan");
@@ -577,6 +595,7 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 			inputDisabled,
 			onChangePermissionMode,
 			permissionMode,
+			supportsPlanMode,
 			togglePlanShortcut,
 			toggleFollowUpShortcut,
 			handleSubmitOpposite,
@@ -885,14 +904,21 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 										<DropdownMenu>
 											<DropdownMenuTrigger
 												disabled={toolbarDisabled}
+												// Always-on muted baseline: `effort-max-text`
+												// paints via `-webkit-text-fill-color: transparent`
+												// without setting `color`, so without this
+												// removing the gradient class would briefly expose
+												// `text-foreground` and `transition-colors`
+												// animates the flash. Hover stays muted to avoid
+												// a second flash on dropdown close.
 												className={cn(
 													`flex items-center gap-0.5 ${composerToolbarTriggerClassName}`,
-													effectiveEffort === "max" ||
-														effectiveEffort === "xhigh"
-														? "effort-max-text"
-														: "text-muted-foreground",
+													"text-muted-foreground hover:text-muted-foreground",
+													(effectiveEffort === "max" ||
+														effectiveEffort === "xhigh") &&
+														"effort-max-text",
 													toolbarDisabled
-														? "cursor-not-allowed opacity-45 hover:bg-transparent hover:text-muted-foreground"
+														? "cursor-not-allowed opacity-45 hover:bg-transparent"
 														: null,
 												)}
 											>
@@ -938,26 +964,31 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 											</DropdownMenuContent>
 										</DropdownMenu>
 									)}
-									<ComposerButton
-										aria-label="Plan mode"
-										disabled={toolbarDisabled}
-										className={cn(
-											`gap-1 px-1.5 text-[11px] ${composerToolbarTriggerClassName}`,
-											permissionMode === "plan"
-												? "text-plan hover:text-plan"
-												: "text-muted-foreground/70 hover:text-muted-foreground/70",
-										)}
-										onClick={() =>
-											onChangePermissionMode(
+									{supportsPlanMode ? (
+										<ComposerButton
+											aria-label="Plan mode"
+											disabled={toolbarDisabled}
+											className={cn(
+												`gap-1 px-1.5 text-[11px] ${composerToolbarTriggerClassName}`,
 												permissionMode === "plan"
-													? "bypassPermissions"
-													: "plan",
-											)
-										}
-									>
-										<ClipboardList className="size-[13px]" strokeWidth={1.8} />
-										<span>Plan</span>
-									</ComposerButton>
+													? "text-plan hover:text-plan"
+													: "text-muted-foreground/70 hover:text-muted-foreground/70",
+											)}
+											onClick={() =>
+												onChangePermissionMode(
+													permissionMode === "plan"
+														? "bypassPermissions"
+														: "plan",
+												)
+											}
+										>
+											<ClipboardList
+												className="size-[13px]"
+												strokeWidth={1.8}
+											/>
+											<span>Plan</span>
+										</ComposerButton>
+									) : null}
 									{onToggleContextPanel ? (
 										<Tooltip>
 											<TooltipTrigger asChild>

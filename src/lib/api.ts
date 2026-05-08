@@ -116,7 +116,7 @@ export type DataInfo = {
 	archiveRoot: string;
 };
 
-export type AgentProvider = "claude" | "codex";
+export type AgentProvider = "claude" | "codex" | "cursor";
 
 export type AgentModelOption = {
 	id: string;
@@ -767,11 +767,12 @@ export async function exitOnboardingWindowMode(): Promise<void> {
 	await invoke("exit_onboarding_window_mode");
 }
 
-export type AgentLoginProvider = "claude" | "codex";
+export type AgentLoginProvider = "claude" | "codex" | "cursor";
 
 export type AgentLoginStatusResult = {
 	claude: boolean;
 	codex: boolean;
+	cursor: boolean;
 };
 
 export async function getAgentLoginStatus(): Promise<AgentLoginStatusResult> {
@@ -929,6 +930,40 @@ export async function loadAgentModelSections(): Promise<AgentModelSection[]> {
 		return await invoke<AgentModelSection[]>("list_agent_model_sections");
 	} catch (error) {
 		throw new Error(describeInvokeError(error, "Unable to load agent models."));
+	}
+}
+
+export type CursorModelParameterValue = {
+	value: string;
+	displayName?: string;
+};
+
+export type CursorModelParameter = {
+	id: string;
+	displayName?: string;
+	values: CursorModelParameterValue[];
+};
+
+export type CursorModelEntry = {
+	id: string;
+	label: string;
+	/** Raw `parameters[]` — persisted into `cursorProvider.cachedModels`. */
+	parameters?: CursorModelParameter[];
+};
+
+/// Live `Cursor.models.list` via sidecar. Optional `apiKey` overrides
+/// the stored key for one-off probes (e.g. onboarding validation).
+export async function listCursorModels(
+	apiKey?: string,
+): Promise<CursorModelEntry[]> {
+	try {
+		return await invoke<CursorModelEntry[]>("list_cursor_models", {
+			apiKey: apiKey ?? null,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to list Cursor models."),
+		);
 	}
 }
 
@@ -1410,7 +1445,8 @@ export type UiMutationEvent =
 			prompt: string;
 			modelId: string | null;
 			permissionMode: string | null;
-	  };
+	  }
+	| { type: "activeStreamsChanged" };
 
 export async function listenGitBranchChanged(
 	callback: (payload: GitBranchChangedPayload) => void,
@@ -2470,6 +2506,22 @@ export async function stopAgentStream(
 	});
 }
 
+/** UI projection of a registered, in-flight agent stream. Mirror of
+ *  `agents::streaming::ActiveStreamSummary` on the Rust side. */
+export type ActiveStreamSummary = {
+	sessionId: string;
+	workspaceId: string | null;
+	provider: string;
+};
+
+/** Snapshot of currently in-flight agent streams. The frontend derives
+ *  `busy / stoppable / busy-workspace` Sets from this list. Refetched
+ *  whenever a `UiMutationEvent::ActiveStreamsChanged` lands via the
+ *  ui-sync bridge. */
+export async function listActiveStreams(): Promise<ActiveStreamSummary[]> {
+	return await invoke<ActiveStreamSummary[]>("list_active_streams");
+}
+
 export type AgentSteerRequest = {
 	sessionId: string;
 	provider?: string;
@@ -2850,6 +2902,35 @@ export type RepoPreferences = {
 	general?: string | null;
 };
 
+export type InheritFlags = {
+	createPr: boolean;
+	review: boolean;
+	fixErrors: boolean;
+	resolveConflicts: boolean;
+	branchRename: boolean;
+	general: boolean;
+};
+
+export type RepoPreferencesResolved = {
+	overrides: RepoPreferences;
+	inherit: InheritFlags;
+	global: RepoPreferences;
+	effective: RepoPreferences;
+};
+
+export type GlobalPreferencesUpdateSummary = {
+	reposAffected: number;
+};
+
+export const EMPTY_INHERIT_FLAGS: InheritFlags = {
+	createPr: false,
+	review: false,
+	fixErrors: false,
+	resolveConflicts: false,
+	branchRename: false,
+	general: false,
+};
+
 export type ScriptEvent =
 	| { type: "started"; pid: number; command: string }
 	| { type: "stdout"; data: string }
@@ -2910,18 +2991,32 @@ export async function updateRepoRunScriptMode(
 
 export async function loadRepoPreferences(
 	repoId: string,
-): Promise<RepoPreferences> {
-	return invoke<RepoPreferences>("load_repo_preferences", {
+): Promise<RepoPreferencesResolved> {
+	return invoke<RepoPreferencesResolved>("load_repo_preferences", {
 		repoId,
 	});
 }
 
 export async function updateRepoPreferences(
 	repoId: string,
-	preferences: RepoPreferences,
+	overrides: RepoPreferences,
+	inherit: InheritFlags,
 ): Promise<void> {
 	await invoke("update_repo_preferences", {
 		repoId,
+		overrides,
+		inherit,
+	});
+}
+
+export async function loadGlobalPreferences(): Promise<RepoPreferences> {
+	return invoke<RepoPreferences>("load_global_preferences");
+}
+
+export async function updateGlobalPreferences(
+	preferences: RepoPreferences,
+): Promise<GlobalPreferencesUpdateSummary> {
+	return invoke<GlobalPreferencesUpdateSummary>("update_global_preferences", {
 		preferences,
 	});
 }

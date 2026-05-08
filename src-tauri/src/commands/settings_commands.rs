@@ -1,6 +1,10 @@
 use anyhow::Context;
+use serde::Serialize;
+use tauri::State;
 
-use crate::{agents::ActionKind, db, rate_limits::throttle::Throttle, settings};
+use crate::{
+    agents::ActionKind, db, rate_limits::throttle::Throttle, settings, sidecar::ManagedSidecar,
+};
 
 use super::common::{run_blocking, CmdResult};
 
@@ -40,8 +44,10 @@ pub async fn get_app_settings() -> CmdResult<std::collections::HashMap<String, S
 
 #[tauri::command]
 pub async fn update_app_settings(
+    sidecar: State<'_, ManagedSidecar>,
     settings_map: std::collections::HashMap<String, String>,
 ) -> CmdResult<()> {
+    let touched_cursor_key = settings_map.contains_key("app.cursor_provider");
     run_blocking(move || {
         for (key, value) in &settings_map {
             if !key.starts_with("app.") && !key.starts_with("branch_prefix_") {
@@ -51,7 +57,13 @@ pub async fn update_app_settings(
         }
         Ok(())
     })
-    .await
+    .await?;
+
+    // Hot-push the key — restart would interrupt other providers.
+    if touched_cursor_key {
+        sidecar.push_cursor_api_key(crate::sidecar::load_cursor_api_key());
+    }
+    Ok(())
 }
 
 /// Read the account-global Codex rate-limit snapshot. Each call attempts
@@ -138,4 +150,33 @@ pub async fn load_auto_close_opt_in_asked() -> CmdResult<Vec<ActionKind>> {
 #[tauri::command]
 pub async fn save_auto_close_opt_in_asked(kinds: Vec<ActionKind>) -> CmdResult<()> {
     run_blocking(move || settings::save_auto_close_opt_in_asked(&kinds)).await
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalPreferencesUpdateSummary {
+    /// Number of repos that inherit at least one of the fields whose
+    /// value changed in this save.
+    pub repos_affected: u32,
+}
+
+#[tauri::command]
+pub async fn load_global_preferences() -> CmdResult<crate::models::repos::RepoPreferences> {
+    run_blocking(crate::models::settings::load_global_repo_preferences).await
+}
+
+#[tauri::command]
+pub async fn update_global_preferences(
+    preferences: crate::models::repos::RepoPreferences,
+) -> CmdResult<GlobalPreferencesUpdateSummary> {
+    run_blocking(move || -> anyhow::Result<GlobalPreferencesUpdateSummary> {
+        let previous = crate::models::settings::load_global_repo_preferences()?;
+        crate::models::settings::save_global_repo_preferences(&preferences)?;
+        let repos_affected = crate::models::repos::count_repos_following_changed_global_fields(
+            &previous,
+            &preferences,
+        )?;
+        Ok(GlobalPreferencesUpdateSummary { repos_affected })
+    })
+    .await
 }

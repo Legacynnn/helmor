@@ -54,7 +54,9 @@ import { AccountPanel } from "./panels/account";
 import { AppUpdatesPanel } from "./panels/app-updates";
 import { CliInstallPanel } from "./panels/cli-install";
 import { ConductorImportPanel } from "./panels/conductor-import";
+import { CursorProviderPanel } from "./panels/cursor-provider";
 import { DevToolsPanel } from "./panels/dev-tools";
+import { GlobalPreferencesPanel } from "./panels/global-preferences";
 import { InboxSettingsPanel } from "./panels/inbox";
 import { ClaudeCustomProvidersPanel } from "./panels/model-providers";
 import { RepositorySettingsPanel } from "./panels/repository-settings";
@@ -117,6 +119,7 @@ const DARK_THEME_OPTIONS: Array<{
 
 export type SettingsSection =
 	| "general"
+	| "globalPreferences"
 	| "shortcuts"
 	| "appearance"
 	| "model"
@@ -132,6 +135,7 @@ export type SettingsSection =
 /// don't pluralise nicely under that rule — keep the overrides explicit.
 const SECTION_LABEL_OVERRIDES: Partial<Record<SettingsSection, string>> = {
 	account: "Accounts",
+	globalPreferences: "Global preferences",
 	inbox: "Contexts",
 };
 
@@ -140,6 +144,8 @@ const SECTION_LABEL_OVERRIDES: Partial<Record<SettingsSection, string>> = {
 /// row (which otherwise duplicates the section name).
 const SECTION_TITLE_CAPTIONS: Partial<Record<SettingsSection, string>> = {
 	account: "Synced with your local gh / glab CLI.",
+	globalPreferences:
+		"Default prompts inherited by every repo unless overridden.",
 	inbox: "Pick which items each connected account contributes to Contexts.",
 };
 
@@ -291,6 +297,7 @@ export const SettingsDialog = memo(function SettingsDialog({
 
 	const fixedSections: SettingsSection[] = [
 		"general",
+		"globalPreferences",
 		"appearance",
 		"model",
 		"shortcuts",
@@ -488,6 +495,10 @@ export const SettingsDialog = memo(function SettingsDialog({
 									</SettingsRow>
 									<AppUpdatesPanel />
 								</SettingsGroup>
+							)}
+
+							{activeSection === "globalPreferences" && (
+								<GlobalPreferencesPanel />
 							)}
 
 							{activeSection === "shortcuts" && (
@@ -983,6 +994,7 @@ export const SettingsDialog = memo(function SettingsDialog({
 										</div>
 									</SettingsRow>
 									<ClaudeCustomProvidersPanel />
+									<CursorProviderPanel />
 								</SettingsGroup>
 							)}
 
