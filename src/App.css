@@ -429,6 +429,22 @@ html[data-os="macos"] #root {
 	display: none;
 }
 
+/*
+ * Monaco paints its own hardcoded editor backgrounds from the active theme.
+ * Keep the embedded file editor visually continuous with the chat surface by
+ * forcing the canvas, margin/gutter, and diff panes back to the app background.
+ */
+.helmor-editor-canvas,
+.helmor-editor-canvas .monaco-editor,
+.helmor-editor-canvas .monaco-editor-background,
+.helmor-editor-canvas .monaco-editor .margin,
+.helmor-editor-canvas .monaco-diff-editor,
+.helmor-editor-canvas .monaco-diff-editor .diffOverview,
+.helmor-editor-canvas .monaco-diff-editor .diffViewport {
+	background: var(--background) !important;
+	background-color: var(--background) !important;
+}
+
 .scrollbar-stable {
 	scrollbar-gutter: stable;
 }

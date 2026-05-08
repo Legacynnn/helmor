@@ -40,11 +40,7 @@ interface OpenFileInput {
 	absolutePath: string;
 	relativePath: string;
 	fileName: string;
-}
-
-function pathJoinAbsolute(root: string | null, rel: string): string {
-	if (!root) return rel;
-	return `${root.replace(/\/$/, "")}/${rel}`;
+	diffOptions?: DiffOpenOptions;
 }
 
 type WorkspaceInspectorSidebarProps = {
@@ -453,15 +449,13 @@ export function WorkspaceInspectorSidebar({
 						editorMode={editorMode}
 						activeEditorPath={activeEditorPath}
 						onOpenEditorFile={onOpenEditorFile}
-						onOpenChangedFile={(path, side) =>
+						onOpenChangedFile={(file, side, options) =>
 							handleOpenFileTab(
 								{
-									absolutePath: pathJoinAbsolute(
-										workspaceRootPath ?? null,
-										path,
-									),
-									relativePath: path,
-									fileName: path.split("/").pop() ?? path,
+									absolutePath: file.absolutePath,
+									relativePath: file.path,
+									fileName: file.name,
+									diffOptions: options,
 								},
 								{ kind: "changes", side },
 							)

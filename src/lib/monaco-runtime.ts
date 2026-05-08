@@ -9,6 +9,7 @@ import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker"
 type MonacoModule = typeof Monaco;
 type StandaloneEditor = Monaco.editor.IStandaloneCodeEditor;
 type StandaloneDiffEditor = Monaco.editor.IStandaloneDiffEditor;
+type TextModel = Monaco.editor.ITextModel;
 
 type MonacoRuntime = {
 	monaco: MonacoModule;
@@ -65,6 +66,30 @@ function themeId(theme: EditorTheme): string {
 	return theme === "dark" ? "helmor-editor-dark" : "helmor-editor-light";
 }
 
+function getOrCreateFileModel(
+	monaco: MonacoModule,
+	path: string,
+	content: string,
+	ownedModels: Set<TextModel>,
+): TextModel {
+	const uri = monaco.Uri.file(path);
+	const language = resolveLanguageId(monaco, path);
+	const existingModel = monaco.editor.getModel(uri);
+	if (existingModel) {
+		if (existingModel.getValue() !== content) {
+			existingModel.setValue(content);
+		}
+		if (language && existingModel.getLanguageId() !== language) {
+			monaco.editor.setModelLanguage(existingModel, language);
+		}
+		return existingModel;
+	}
+
+	const model = monaco.editor.createModel(content, language, uri);
+	ownedModels.add(model);
+	return model;
+}
+
 export async function createFileEditor(options: {
 	container: HTMLElement;
 	path: string;
@@ -75,11 +100,13 @@ export async function createFileEditor(options: {
 	const runtime = await ensureRuntime();
 	const { monaco } = runtime;
 
-	const language = resolveLanguageId(monaco, options.path);
-
-	// Single model shared across all file switches — avoids editor.setModel()
-	// which causes a blank frame during the detach→attach cycle.
-	const model = monaco.editor.createModel(options.content, language);
+	const ownedModels = new Set<TextModel>();
+	let currentModel = getOrCreateFileModel(
+		monaco,
+		options.path,
+		options.content,
+		ownedModels,
+	);
 
 	// Seed content cache for future switches
 	fileContentCache.set(options.path, options.content);
@@ -93,7 +120,7 @@ export async function createFileEditor(options: {
 		fontSize: 13,
 		lineHeight: 21,
 		minimap: { enabled: false },
-		model,
+		model: currentModel,
 		padding: { top: 14, bottom: 24 },
 		renderValidationDecorations: "editable",
 		scrollBeyondLastLine: false,
@@ -105,12 +132,16 @@ export async function createFileEditor(options: {
 
 	revealEditorPosition(editor, options.line, options.column);
 
-	const currentModel = model;
-
 	return {
 		editor,
 		dispose() {
 			editor.dispose();
+			for (const ownedModel of ownedModels) {
+				if (!ownedModel.isDisposed()) {
+					ownedModel.dispose();
+				}
+			}
+			ownedModels.clear();
 		},
 		getValue() {
 			return currentModel.getValue();
@@ -137,13 +168,15 @@ export async function createFileEditor(options: {
 				return false;
 			}
 
-			// In-place update: setValue + setModelLanguage on the SAME model.
-			// Unlike editor.setModel(), this never detaches the DOM → zero blank frames.
-			currentModel.setValue(resolvedContent);
-
-			const nextLanguage = resolveLanguageId(monaco, path);
-			if (nextLanguage && currentModel.getLanguageId() !== nextLanguage) {
-				monaco.editor.setModelLanguage(currentModel, nextLanguage);
+			const nextModel = getOrCreateFileModel(
+				monaco,
+				path,
+				resolvedContent,
+				ownedModels,
+			);
+			if (nextModel !== currentModel) {
+				currentModel = nextModel;
+				editor.setModel(currentModel);
 			}
 
 			// Keep cache fresh for future switches back to this file
@@ -254,6 +287,7 @@ async function ensureRuntime(): Promise<MonacoRuntime> {
 			const monaco = await import("monaco-editor");
 
 			installMonacoEnvironment();
+			installTypeScriptLanguageDefaults(monaco);
 			installEditorTheme(monaco);
 			installThemeObserver(monaco);
 
@@ -324,46 +358,86 @@ function installMonacoEnvironment() {
 	};
 }
 
+function installTypeScriptLanguageDefaults(monaco: MonacoModule) {
+	const defaults = [
+		monaco.typescript.typescriptDefaults,
+		monaco.typescript.javascriptDefaults,
+	];
+
+	for (const languageDefaults of defaults) {
+		languageDefaults.setDiagnosticsOptions({
+			noSemanticValidation: true,
+			noSyntaxValidation: false,
+			noSuggestionDiagnostics: true,
+		});
+		languageDefaults.setCompilerOptions({
+			allowJs: true,
+			allowNonTsExtensions: true,
+			allowSyntheticDefaultImports: true,
+			checkJs: false,
+			esModuleInterop: true,
+			jsx: monaco.typescript.JsxEmit.ReactJSX,
+			module: monaco.typescript.ModuleKind.ESNext,
+			moduleResolution: monaco.typescript.ModuleResolutionKind.NodeJs,
+			noEmit: true,
+			skipLibCheck: true,
+			target: monaco.typescript.ScriptTarget.ESNext,
+		});
+	}
+}
+
 function installEditorTheme(monaco: MonacoModule) {
 	monaco.editor.defineTheme("helmor-editor-dark", {
 		base: "vs-dark",
 		inherit: true,
 		rules: [
-			{ token: "comment", foreground: "868584" },
-			{ token: "string", foreground: "c9b18f" },
-			{ token: "keyword", foreground: "c5a3a8" },
-			{ token: "number", foreground: "c6b48a" },
-			{ token: "regexp", foreground: "9ea693" },
-			{ token: "type.identifier", foreground: "a9b0c6" },
-			{ token: "identifier", foreground: "faf9f6" },
-			{ token: "delimiter", foreground: "afaeac" },
+			{ token: "comment", foreground: "8A8580" },
+			{ token: "string", foreground: "D5C2B0" },
+			{ token: "keyword", foreground: "FF7B79" },
+			{ token: "number", foreground: "F0A552" },
+			{ token: "regexp", foreground: "7BD88F" },
+			{ token: "type.identifier", foreground: "E069FF" },
+			{ token: "identifier", foreground: "EAE5DF" },
+			{ token: "identifier.function", foreground: "EAE5DF" },
+			{ token: "delimiter", foreground: "BDB4AA" },
+			{ token: "delimiter.bracket", foreground: "D8D0C7" },
+			{ token: "operator", foreground: "FF8A84" },
+			{ token: "tag", foreground: "65D482" },
+			{ token: "metatag", foreground: "65D482" },
+			{ token: "attribute.name", foreground: "F5A041" },
+			{ token: "attribute.value", foreground: "D5C2B0" },
+			{ token: "variable", foreground: "6FA8FF" },
+			{ token: "variable.predefined", foreground: "6FA8FF" },
 		],
 		colors: {
-			"editor.background": "#161514",
-			"editor.foreground": "#FAF9F6",
-			"editor.lineHighlightBackground": "#1f1e1d",
+			"editor.background": "#151210",
+			"editor.foreground": "#EAE5DF",
+			"editor.lineHighlightBackground": "#201D1A",
 			"editor.lineHighlightBorder": "#00000000",
-			"editor.selectionBackground": "#353534",
-			"editor.inactiveSelectionBackground": "#2a2928",
-			"editor.wordHighlightBackground": "#35353488",
-			"editor.wordHighlightStrongBackground": "#45454588",
-			"editorCursor.foreground": "#FAF9F6",
-			"editorWhitespace.foreground": "#595755",
-			"editorIndentGuide.background1": "#2b2a29",
-			"editorIndentGuide.activeBackground1": "#4b4946",
-			"editorLineNumber.foreground": "#868584",
-			"editorLineNumber.activeForeground": "#FAF9F6",
-			"editorGutter.background": "#161514",
-			"editorWidget.background": "#1e1d1c",
-			"editorWidget.border": "#343332",
-			"editorSuggestWidget.background": "#1e1d1c",
-			"editorSuggestWidget.border": "#343332",
-			"editorHoverWidget.background": "#1e1d1c",
-			"editorHoverWidget.border": "#343332",
-			"scrollbarSlider.background": "#faf9f626",
-			"scrollbarSlider.hoverBackground": "#faf9f640",
-			"scrollbarSlider.activeBackground": "#faf9f655",
-			"minimap.background": "#161514",
+			"editor.selectionBackground": "#3A332E",
+			"editor.inactiveSelectionBackground": "#2A2522",
+			"editor.wordHighlightBackground": "#3A332E88",
+			"editor.wordHighlightStrongBackground": "#4A413A88",
+			"editorCursor.foreground": "#EAE5DF",
+			"editorWhitespace.foreground": "#5D5650",
+			"editorIndentGuide.background1": "#2A2522",
+			"editorIndentGuide.activeBackground1": "#554C45",
+			"editorLineNumber.foreground": "#A39D96",
+			"editorLineNumber.activeForeground": "#EAE5DF",
+			"editorGutter.background": "#151210",
+			"editorWidget.background": "#211D1A",
+			"editorWidget.border": "#3B352F",
+			"editorSuggestWidget.background": "#211D1A",
+			"editorSuggestWidget.border": "#3B352F",
+			"editorHoverWidget.background": "#211D1A",
+			"editorHoverWidget.border": "#3B352F",
+			"editorError.foreground": "#FF7B79",
+			"editorWarning.foreground": "#F0A552",
+			"editorInfo.foreground": "#6FA8FF",
+			"scrollbarSlider.background": "#eae5df26",
+			"scrollbarSlider.hoverBackground": "#eae5df40",
+			"scrollbarSlider.activeBackground": "#eae5df55",
+			"minimap.background": "#151210",
 			"diffEditor.insertedLineBackground": "#2ea04318",
 			"diffEditor.insertedTextBackground": "#2ea04340",
 			"diffEditor.removedLineBackground": "#da363318",

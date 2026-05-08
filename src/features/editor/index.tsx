@@ -1,7 +1,9 @@
-import { Eye, FileCode, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Eye, FileCode, GitCompareArrows } from "lucide-react";
 import {
 	type MutableRefObject,
 	Suspense,
+	useCallback,
 	useEffect,
 	useLayoutEffect,
 	useMemo,
@@ -12,12 +14,19 @@ import { TrafficLightSpacer } from "@/components/chrome/traffic-light-spacer";
 import { LazyStreamdown } from "@/components/streamdown-loader";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShortcutDisplay } from "@/features/shortcuts/shortcut-display";
+import {
+	type ShortcutHandler,
+	useAppShortcuts,
+} from "@/features/shortcuts/use-app-shortcuts";
+import { readEditorFile, writeEditorFile } from "@/lib/api";
 import {
 	type EditorSessionState,
 	type EditorViewMode,
 	isMarkdownPath,
 } from "@/lib/editor-session";
+import { helmorQueryKeys } from "@/lib/query-client";
+import { useSettings } from "@/lib/settings";
+import { cn } from "@/lib/utils";
 import { describeUnknownError } from "@/lib/workspace-helpers";
 
 // Refined segmented-tab look: no tray, soft glassy pill on the active state.
@@ -37,6 +46,12 @@ const SEGMENT_CLASS = [
 type WorkspaceEditorSurfaceProps = {
 	editorSession: EditorSessionState;
 	workspaceRootPath?: string | null;
+	/**
+	 * True when the active file has uncommitted (or branch-relative) changes.
+	 * When false, the Diff segment is disabled — opening a diff on an unchanged
+	 * file produces a phantom trailing-newline-only diff that confuses users.
+	 */
+	fileHasChanges?: boolean;
 	onChangeSession: (session: EditorSessionState) => void;
 	onExit: () => void;
 	onError?: (description: string, title?: string) => void;
@@ -46,6 +61,11 @@ type SurfaceStatus =
 	| { kind: "loading" }
 	| { kind: "ready" }
 	| { kind: "error"; message: string };
+
+type MtimeConflict = {
+	path: string;
+	currentMtimeMs: number;
+};
 
 type MonacoRuntimeModule = typeof import("@/lib/monaco-runtime");
 type FileController = Awaited<
@@ -58,6 +78,7 @@ type DiffController = Awaited<
 export function WorkspaceEditorSurface({
 	editorSession,
 	workspaceRootPath,
+	fileHasChanges = false,
 	onChangeSession,
 	onExit,
 	onError,
@@ -74,6 +95,14 @@ export function WorkspaceEditorSurface({
 	const [surfaceStatus, setSurfaceStatus] = useState<SurfaceStatus>({
 		kind: "ready",
 	});
+	const [, setSaveStatus] = useState<"idle" | "saving" | "saved" | "conflict">(
+		"idle",
+	);
+	const [mtimeConflict, setMtimeConflict] = useState<MtimeConflict | null>(
+		null,
+	);
+	const { settings } = useSettings();
+	const queryClient = useQueryClient();
 	latestSessionRef.current = editorSession;
 	onChangeSessionRef.current = onChangeSession;
 	onErrorRef.current = onError;
@@ -86,8 +115,6 @@ export function WorkspaceEditorSurface({
 		editorSession.kind === "diff" &&
 		editorSession.originalText !== undefined &&
 		editorSession.modifiedText !== undefined;
-	const closeLabel =
-		editorSession.kind === "diff" ? "Close diff view" : "Close editor view";
 	const isMarkdown = isMarkdownPath(editorSession.path);
 	const viewMode: EditorViewMode = isMarkdown
 		? (editorSession.viewMode ?? "source")
@@ -110,7 +137,6 @@ export function WorkspaceEditorSurface({
 
 		void (async () => {
 			try {
-				const api = await import("@/lib/api");
 				const isDiff = editorSession.kind === "diff";
 				const status = editorSession.fileStatus ?? "M";
 				const origRef = editorSession.originalRef ?? "HEAD";
@@ -118,26 +144,43 @@ export function WorkspaceEditorSurface({
 				// Fetch original side (from git ref)
 				const originalPromise =
 					isDiff && status !== "A" && workspaceRootPath
-						? api.readFileAtRef(workspaceRootPath, editorSession.path, origRef)
+						? (await import("@/lib/api")).readFileAtRef(
+								workspaceRootPath,
+								editorSession.path,
+								origRef,
+							)
 						: Promise.resolve(null);
 
 				// Fetch modified side (from disk or git ref)
-				const modifiedPromise = editorSession.modifiedRef
+				const modifiedPromise: Promise<
+					string | null | { content: string; mtimeMs: number }
+				> = editorSession.modifiedRef
 					? workspaceRootPath
-						? api.readFileAtRef(
+						? (await import("@/lib/api")).readFileAtRef(
 								workspaceRootPath,
 								editorSession.path,
 								editorSession.modifiedRef,
 							)
 						: Promise.resolve(null)
 					: status !== "D"
-						? api.readEditorFile(editorSession.path).then((r) => r.content)
+						? readEditorFile(editorSession.path).then((r) => ({
+								content: r.content,
+								mtimeMs: r.mtimeMs,
+							}))
 						: Promise.resolve(null);
 
 				const [original, modified] = await Promise.all([
 					originalPromise,
 					modifiedPromise,
 				]);
+				const modifiedContent =
+					typeof modified === "object" && modified !== null
+						? modified.content
+						: modified;
+				const modifiedMtimeMs =
+					typeof modified === "object" && modified !== null
+						? modified.mtimeMs
+						: null;
 
 				if (cancelled) {
 					return;
@@ -147,9 +190,13 @@ export function WorkspaceEditorSurface({
 					...editorSession,
 					originalText:
 						editorSession.originalText ??
-						(isDiff ? (original ?? "") : (modified ?? "")),
-					modifiedText: editorSession.modifiedText ?? modified ?? "",
+						(isDiff ? (original ?? "") : (modifiedContent ?? "")),
+					modifiedText: editorSession.modifiedText ?? modifiedContent ?? "",
 					dirty: Boolean(editorSession.dirty),
+					mtimeMs:
+						editorSession.kind === "file"
+							? (editorSession.mtimeMs ?? modifiedMtimeMs)
+							: editorSession.mtimeMs,
 				});
 			} catch (error) {
 				if (cancelled) {
@@ -430,6 +477,145 @@ export function WorkspaceEditorSurface({
 		editorSession.originalText,
 	]);
 
+	const saveCurrentFile = useCallback(
+		async (overwrite = false) => {
+			const latest = latestSessionRef.current;
+			if (latest.kind !== "file" || latest.modifiedText === undefined) {
+				return;
+			}
+			setSaveStatus("saving");
+			try {
+				const outcome = await writeEditorFile(
+					latest.path,
+					latest.modifiedText,
+					{
+						expectedMtimeMs: latest.mtimeMs ?? undefined,
+						overwrite,
+					},
+				);
+				if (outcome.kind === "conflict") {
+					setMtimeConflict({
+						path: outcome.path,
+						currentMtimeMs: outcome.currentMtimeMs,
+					});
+					setSaveStatus("conflict");
+					return;
+				}
+				setMtimeConflict(null);
+				setSaveStatus("saved");
+				if (workspaceRootPath) {
+					void queryClient.invalidateQueries({
+						queryKey: ["workspaceDirectory", workspaceRootPath],
+					});
+					void queryClient.invalidateQueries({
+						queryKey: helmorQueryKeys.workspaceChanges(workspaceRootPath),
+					});
+				}
+				onChangeSessionRef.current({
+					...latest,
+					originalText: latest.modifiedText,
+					modifiedText: latest.modifiedText,
+					mtimeMs: outcome.mtimeMs,
+					dirty: false,
+				});
+			} catch (error) {
+				const message = describeUnknownError(
+					error,
+					"Unable to save the selected file.",
+				);
+				setSaveStatus("idle");
+				onErrorRef.current?.(message, "File save failed");
+			}
+		},
+		[queryClient, workspaceRootPath],
+	);
+
+	const shortcutHandlers = useMemo<ShortcutHandler[]>(
+		() => [
+			{
+				id: "editor.save",
+				callback: () => {
+					void saveCurrentFile(false);
+				},
+				enabled: editorSession.kind === "file",
+			},
+		],
+		[editorSession.kind, saveCurrentFile],
+	);
+	useAppShortcuts({
+		overrides: settings.shortcuts,
+		handlers: shortcutHandlers,
+	});
+
+	useEffect(() => {
+		if (
+			!settings.editorAutosave ||
+			editorSession.kind !== "file" ||
+			!editorSession.dirty ||
+			editorSession.modifiedText === undefined
+		) {
+			return;
+		}
+		const id = window.setTimeout(() => {
+			void saveCurrentFile(false);
+		}, 1200);
+		return () => window.clearTimeout(id);
+	}, [
+		editorSession.dirty,
+		editorSession.kind,
+		editorSession.modifiedText,
+		saveCurrentFile,
+		settings.editorAutosave,
+	]);
+
+	const handleReloadConflict = useCallback(async () => {
+		const latest = latestSessionRef.current;
+		try {
+			const response = await readEditorFile(latest.path);
+			setMtimeConflict(null);
+			setSaveStatus("idle");
+			onChangeSessionRef.current({
+				...latest,
+				kind: "file",
+				originalText: response.content,
+				modifiedText: response.content,
+				mtimeMs: response.mtimeMs,
+				dirty: false,
+			});
+		} catch (error) {
+			const message = describeUnknownError(
+				error,
+				"Unable to reload the selected file.",
+			);
+			onErrorRef.current?.(message, "File reload failed");
+		}
+	}, []);
+
+	const handleFileDiffModeChange = (next: string) => {
+		if (next !== "file" && next !== "diff") return;
+		if (next === editorSession.kind) return;
+		if (next === "diff" && !fileHasChanges) return;
+		if (
+			editorSession.kind === "file" &&
+			editorSession.dirty &&
+			next === "diff" &&
+			typeof window !== "undefined" &&
+			!window.confirm("Discard unsaved changes and open the saved diff?")
+		) {
+			return;
+		}
+		onChangeSession({
+			...editorSession,
+			kind: next,
+			dirty: false,
+			originalText: undefined,
+			modifiedText: undefined,
+			inline:
+				next === "diff" ? (editorSession.fileStatus ?? "M") !== "M" : undefined,
+			viewMode: isMarkdownPath(editorSession.path) ? "source" : undefined,
+		});
+	};
+
 	const handleViewModeChange = (next: string) => {
 		if (next !== "source" && next !== "preview") return;
 		if (next === viewMode) return;
@@ -446,7 +632,7 @@ export function WorkspaceEditorSurface({
 			className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground"
 		>
 			<div
-				className="flex h-9 items-center border-b border-border"
+				className="flex h-7 items-center border-b border-border"
 				data-tauri-drag-region
 			>
 				{/* Traffic-light inset. macOS: left; Windows / Linux: right. */}
@@ -454,7 +640,36 @@ export function WorkspaceEditorSurface({
 
 				<div className="min-w-0 flex-1" data-tauri-drag-region />
 
-				<div className="flex shrink-0 items-center gap-2 pr-2">
+				<div className="flex shrink-0 items-center gap-2 pr-3">
+					<Tabs
+						value={editorSession.kind}
+						onValueChange={handleFileDiffModeChange}
+						aria-label="File editor mode"
+					>
+						<TabsList className="h-5 gap-0 bg-transparent p-0">
+							<TabsTrigger value="file" className={SEGMENT_CLASS}>
+								<FileCode strokeWidth={1.8} />
+								File
+							</TabsTrigger>
+							<TabsTrigger
+								value="diff"
+								disabled={!fileHasChanges}
+								title={
+									fileHasChanges
+										? undefined
+										: "No changes to diff against this file"
+								}
+								className={cn(
+									SEGMENT_CLASS,
+									!fileHasChanges &&
+										"cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground/70",
+								)}
+							>
+								<GitCompareArrows strokeWidth={1.8} />
+								Diff
+							</TabsTrigger>
+						</TabsList>
+					</Tabs>
 					{isMarkdown && (
 						<Tabs
 							value={viewMode}
@@ -474,17 +689,6 @@ export function WorkspaceEditorSurface({
 							</TabsList>
 						</Tabs>
 					)}
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						onClick={onExit}
-						aria-label={closeLabel}
-						className="gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-					>
-						<ShortcutDisplay hotkey="Escape" />
-						<X className="size-3.5" strokeWidth={1.8} />
-					</Button>
 				</div>
 			</div>
 
@@ -493,7 +697,7 @@ export function WorkspaceEditorSurface({
 				<div
 					ref={editorHostRef}
 					aria-label="Editor canvas"
-					className="h-full min-h-0 flex-1"
+					className="helmor-editor-canvas h-full min-h-0 flex-1 bg-background"
 					aria-hidden={showPreview}
 					style={showPreview ? { visibility: "hidden" } : undefined}
 				/>
@@ -527,6 +731,48 @@ export function WorkspaceEditorSurface({
 						<SurfaceMessage message={surfaceStatus.message} />
 					</div>
 				)}
+				{mtimeConflict ? (
+					<div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80">
+						<div className="w-[340px] rounded-lg border border-border bg-popover p-4 shadow-lg">
+							<h2 className="text-[13px] font-semibold text-foreground">
+								File changed on disk
+							</h2>
+							<p className="mt-2 text-[12px] leading-5 text-muted-foreground">
+								The file has been modified since this tab loaded. Reload it, or
+								overwrite the version on disk.
+							</p>
+							<div className="mt-4 flex justify-end gap-2">
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									onClick={() => {
+										setMtimeConflict(null);
+										setSaveStatus("idle");
+									}}
+								>
+									Cancel
+								</Button>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={() => void handleReloadConflict()}
+								>
+									Reload
+								</Button>
+								<Button
+									type="button"
+									variant="default"
+									size="sm"
+									onClick={() => void saveCurrentFile(true)}
+								>
+									Overwrite
+								</Button>
+							</div>
+						</div>
+					</div>
+				) : null}
 			</div>
 		</section>
 	);

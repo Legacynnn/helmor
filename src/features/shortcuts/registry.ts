@@ -63,6 +63,14 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		editable: true,
 	},
 	{
+		id: "editor.save",
+		title: "Save file",
+		group: "Workspace",
+		defaultHotkey: "Mod+S",
+		scopes: ["editor"],
+		editable: true,
+	},
+	{
 		id: "workspace.copyPath",
 		title: "Copy workspace path",
 		group: "Workspace",

@@ -188,6 +188,7 @@ export type AppSettings = {
 	 *  `CONTEXT_USAGE_AUTO_REVEAL_THRESHOLD`. */
 	alwaysShowContextUsage: boolean;
 	showUsageStats: boolean;
+	editorAutosave: boolean;
 	onboardingCompleted: boolean;
 	shortcuts: ShortcutOverrides;
 	claudeCustomProviders: ClaudeCustomProviderSettings;
@@ -235,6 +236,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 	followUpBehavior: "steer",
 	alwaysShowContextUsage: true,
 	showUsageStats: true,
+	editorAutosave: false,
 	onboardingCompleted: false,
 	shortcuts: {},
 	claudeCustomProviders: {
@@ -283,6 +285,7 @@ const SETTINGS_KEY_MAP: Record<
 	followUpBehavior: "app.follow_up_behavior",
 	alwaysShowContextUsage: "app.always_show_context_usage",
 	showUsageStats: "app.show_usage_stats",
+	editorAutosave: "app.editor_autosave",
 	onboardingCompleted: "app.onboarding_completed",
 	shortcuts: "app.shortcuts",
 	claudeCustomProviders: "app.claude_custom_providers",
@@ -681,6 +684,10 @@ export async function loadSettings(): Promise<AppSettings> {
 				raw[SETTINGS_KEY_MAP.showUsageStats] !== undefined
 					? raw[SETTINGS_KEY_MAP.showUsageStats] === "true"
 					: DEFAULT_SETTINGS.showUsageStats,
+			editorAutosave:
+				raw[SETTINGS_KEY_MAP.editorAutosave] !== undefined
+					? raw[SETTINGS_KEY_MAP.editorAutosave] === "true"
+					: DEFAULT_SETTINGS.editorAutosave,
 			onboardingCompleted:
 				raw[SETTINGS_KEY_MAP.onboardingCompleted] !== undefined
 					? raw[SETTINGS_KEY_MAP.onboardingCompleted] === "true"

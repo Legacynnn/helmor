@@ -1,19 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
-	getMaterialFileIcon,
-	getMaterialFolderIcon,
-} from "file-extension-icon-js";
-import {
-	ChevronRightIcon,
-	CloudIcon,
 	CopyIcon,
 	FolderOpenIcon,
-	LaptopIcon,
 	LinkIcon,
-	ListIcon,
-	ListTreeIcon,
-	LoaderCircleIcon,
 	MinusIcon,
 	PlusIcon,
 	Undo2Icon,
@@ -22,7 +12,6 @@ import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	ContextMenu,
@@ -33,6 +22,11 @@ import {
 } from "@/components/ui/context-menu";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type {
 	CommitButtonState,
 	WorkspaceCommitButtonMode,
@@ -70,6 +64,18 @@ const STATUS_COLORS: Record<InspectorFileItem["status"], string> = {
 	D: "text-red-500",
 };
 
+type StageActionKind = "stage" | "unstage";
+
+type ChangeSide = "staged" | "unstaged" | "remote";
+
+type ChangeEntry = {
+	change: InspectorFileItem;
+	side: ChangeSide;
+	action?: StageActionKind;
+	onStageAction?: (path: string) => void;
+	onDiscard?: (path: string) => void;
+};
+
 type ChangesSectionProps = {
 	workspaceId: string | null;
 	workspaceRootPath: string | null;
@@ -87,8 +93,9 @@ type ChangesSectionProps = {
 	 * editor flow. `side` describes which row group the file came from.
 	 */
 	onOpenChangedFile?: (
-		path: string,
+		file: InspectorFileItem,
 		side: "unstaged" | "staged" | "remote",
+		options?: DiffOpenOptions,
 	) => void;
 	flashingPaths: Set<string>;
 	onCommitAction?: (mode: WorkspaceCommitButtonMode) => Promise<void>;
@@ -135,11 +142,6 @@ export function ChangesSection({
 		ease: TABS_EASING_CURVE,
 	};
 	const queryClient = useQueryClient();
-	const [changesTreeView, setChangesTreeView] = useState(true);
-	const [branchDiffTreeView, setBranchDiffTreeView] = useState(true);
-	const [changesOpen, setChangesOpen] = useState(true);
-	const [stagedOpen, setStagedOpen] = useState(true);
-	const [branchDiffOpen, setBranchDiffOpen] = useState(true);
 	const [isContinuingWorkspace, setIsContinuingWorkspace] = useState(false);
 	const forgeQuery = useQuery({
 		...workspaceForgeQueryOptions(workspaceId ?? "__none__"),
@@ -386,37 +388,89 @@ export function ChangesSection({
 	// background refresh or a placeholder render).
 	const isForgeRefreshing = workspaceId !== null && forgeIsRefreshing;
 
-	// Per-group taps that ALSO fire `onOpenChangedFile` so the new tab
-	// system can listen for "user wants to open this changed file" without
-	// disturbing the legacy `onOpenEditorFile` path. Each group classifies
-	// its rows by which uncommitted/remote bucket the file came from.
-	const makeOpenWithSide = useCallback(
-		(side: "unstaged" | "staged" | "remote") =>
-			(absolutePath: string, options?: DiffOpenOptions) => {
-				onOpenEditorFile(absolutePath, options);
-				if (!onOpenChangedFile) return;
-				// `absolutePath` here is `file.absolutePath`. Recover the
-				// relative path from the live changes list — every visible row
-				// is sourced from that same array so this is O(n) once per click.
-				const match = changes.find(
-					(change) => change.absolutePath === absolutePath,
-				);
-				if (!match) return;
-				onOpenChangedFile(match.path, side);
-			},
-		[changes, onOpenChangedFile, onOpenEditorFile],
+	// ---- Flat list of all changes ----
+	// One unified surface: staged → unstaged → committed (remote). The status
+	// letter on each row carries its kind (M/A/D); we drop the section-header
+	// chrome entirely. Each `ChangeEntry` carries the per-row action set so
+	// the renderer doesn't need to re-derive it.
+	const entries = useMemo<ChangeEntry[]>(() => {
+		const list: ChangeEntry[] = [];
+		for (const change of stagedChanges) {
+			list.push({
+				change,
+				side: "staged",
+				action: "unstage",
+				onStageAction: unstageFile,
+			});
+		}
+		for (const change of unstagedChanges) {
+			list.push({
+				change,
+				side: "unstaged",
+				action: "stage",
+				onStageAction: stageFile,
+				onDiscard: discardFile,
+			});
+		}
+		for (const change of committedChanges) {
+			list.push({ change, side: "remote" });
+		}
+		return list;
+	}, [
+		stagedChanges,
+		unstagedChanges,
+		committedChanges,
+		stageFile,
+		unstageFile,
+		discardFile,
+	]);
+
+	const openEntry = useCallback(
+		(entry: ChangeEntry) => {
+			const baseOptions: DiffOpenOptions =
+				entry.side === "remote"
+					? {
+							fileStatus: entry.change.status,
+							originalRef: workspaceTargetBranch ?? undefined,
+							modifiedRef: "HEAD",
+						}
+					: { fileStatus: entry.change.status };
+			if (onOpenChangedFile) {
+				onOpenChangedFile(entry.change, entry.side, baseOptions);
+				return;
+			}
+			onOpenEditorFile(entry.change.absolutePath, baseOptions);
+		},
+		[onOpenChangedFile, onOpenEditorFile, workspaceTargetBranch],
 	);
-	const handleOpenStagedFile = useMemo(
-		() => makeOpenWithSide("staged"),
-		[makeOpenWithSide],
+
+	// ---- Keyboard navigation across the unified list ----
+	const rowRefs = useRef(new Map<string, HTMLDivElement>());
+	const registerRowRef = useCallback(
+		(path: string, el: HTMLDivElement | null) => {
+			if (el) {
+				rowRefs.current.set(path, el);
+			} else {
+				rowRefs.current.delete(path);
+			}
+		},
+		[],
 	);
-	const handleOpenUnstagedFile = useMemo(
-		() => makeOpenWithSide("unstaged"),
-		[makeOpenWithSide],
-	);
-	const handleOpenRemoteFile = useMemo(
-		() => makeOpenWithSide("remote"),
-		[makeOpenWithSide],
+	const handleArrowNav = useCallback(
+		(currentPath: string, direction: 1 | -1) => {
+			const idx = entries.findIndex(
+				(entry) => entry.change.path === currentPath,
+			);
+			if (idx < 0) return;
+			const next = idx + direction;
+			if (next < 0 || next >= entries.length) return;
+			const target = entries[next];
+			const el = rowRefs.current.get(target.change.path);
+			el?.focus();
+			el?.scrollIntoView({ block: "nearest" });
+			openEntry(target);
+		},
+		[entries, openEntry],
 	);
 
 	return (
@@ -450,78 +504,33 @@ export function ChangesSection({
 				aria-label="Changes panel body"
 				className="min-h-0 flex-1 bg-muted/20 font-mono text-[11.5px]"
 			>
-				{hasUncommittedChanges && (
-					<>
-						{stagedChanges.length > 0 && (
-							<ChangesGroup
-								label="Staged Changes"
-								count={stagedChanges.length}
-								open={stagedOpen}
-								onToggle={() => setStagedOpen((current) => !current)}
-								changes={stagedChanges}
-								treeView={changesTreeView}
-								onToggleTreeView={() => setChangesTreeView((v) => !v)}
-								action="unstage"
-								onStageAction={unstageFile}
-								onBatchAction={unstageAll}
-								editorMode={editorMode}
-								activeEditorPath={activeEditorPath}
-								onOpenEditorFile={handleOpenStagedFile}
-								flashingPaths={flashingPaths}
-								workspaceBranch={workspaceBranch}
-								workspaceRemoteUrl={workspaceRemoteUrl}
-							/>
-						)}
-						{unstagedChanges.length > 0 && (
-							<ChangesGroup
-								label="Changes"
-								icon={
-									<LaptopIcon
-										className="size-3 shrink-0 text-muted-foreground"
-										strokeWidth={2}
-									/>
-								}
-								count={unstagedChanges.length}
-								open={changesOpen}
-								onToggle={() => setChangesOpen((current) => !current)}
-								changes={unstagedChanges}
-								treeView={changesTreeView}
-								onToggleTreeView={() => setChangesTreeView((v) => !v)}
-								action="stage"
-								onStageAction={stageFile}
-								onBatchAction={stageAll}
-								onDiscard={discardFile}
-								editorMode={editorMode}
-								activeEditorPath={activeEditorPath}
-								onOpenEditorFile={handleOpenUnstagedFile}
-								flashingPaths={flashingPaths}
-								workspaceBranch={workspaceBranch}
-								workspaceRemoteUrl={workspaceRemoteUrl}
-							/>
-						)}
-					</>
-				)}
-
-				{(committedChanges.length > 0 || branchSwitching) && (
-					<BranchDiffSection
-						targetBranch={workspaceTargetBranch}
-						count={committedChanges.length}
-						loading={branchSwitching}
-						open={branchDiffOpen}
-						onToggle={() => setBranchDiffOpen((current) => !current)}
-						changes={committedChanges}
-						treeView={branchDiffTreeView}
-						onToggleTreeView={() => setBranchDiffTreeView((v) => !v)}
-						editorMode={editorMode}
-						activeEditorPath={activeEditorPath}
-						onOpenEditorFile={handleOpenRemoteFile}
-						flashingPaths={flashingPaths}
-						workspaceBranch={workspaceBranch}
-						workspaceRemoteUrl={workspaceRemoteUrl}
+				{hasChanges && (
+					<ChangesListHeader
+						count={entries.length}
+						hasUnstaged={unstagedChanges.length > 0}
+						hasStaged={stagedChanges.length > 0}
+						onStageAll={stageAll}
+						onUnstageAll={unstageAll}
 					/>
 				)}
 
-				{!hasChanges && (
+				{branchSwitching && entries.length === 0 ? (
+					<div className="px-2 py-2 text-[10.5px] text-muted-foreground">
+						Switching target branch…
+					</div>
+				) : entries.length > 0 ? (
+					<ChangesFlatView
+						entries={entries}
+						editorMode={editorMode}
+						activeEditorPath={activeEditorPath}
+						onOpenEntry={openEntry}
+						flashingPaths={flashingPaths}
+						workspaceBranch={workspaceBranch}
+						workspaceRemoteUrl={workspaceRemoteUrl}
+						registerRowRef={registerRowRef}
+						onArrowNav={handleArrowNav}
+					/>
+				) : (
 					<div className="px-3 py-3 text-[11px] leading-5 text-muted-foreground">
 						No changes on this branch yet.
 					</div>
@@ -531,670 +540,175 @@ export function ChangesSection({
 	);
 }
 
-type StageActionKind = "stage" | "unstage";
-
-function ChangesGroup({
-	label,
-	icon,
+function ChangesListHeader({
 	count,
-	open,
-	onToggle,
-	changes,
-	treeView,
-	onToggleTreeView,
-	action,
-	onStageAction,
-	onBatchAction,
-	onDiscard,
-	editorMode,
-	activeEditorPath,
-	onOpenEditorFile,
-	flashingPaths,
-	workspaceBranch,
-	workspaceRemoteUrl,
+	hasUnstaged,
+	hasStaged,
+	onStageAll,
+	onUnstageAll,
 }: {
-	label: string;
-	icon?: React.ReactNode;
 	count: number;
-	open: boolean;
-	onToggle: () => void;
-	changes: InspectorFileItem[];
-	treeView: boolean;
-	onToggleTreeView: () => void;
-	action: StageActionKind;
-	onStageAction: (path: string) => void;
-	onBatchAction?: () => void;
-	onDiscard?: (path: string) => void;
-	editorMode: boolean;
-	activeEditorPath?: string | null;
-	onOpenEditorFile: (path: string, options?: DiffOpenOptions) => void;
-	flashingPaths: Set<string>;
-	workspaceBranch: string | null;
-	workspaceRemoteUrl: string | null;
+	hasUnstaged: boolean;
+	hasStaged: boolean;
+	onStageAll: () => void;
+	onUnstageAll: () => void;
 }) {
 	return (
-		<div>
-			<div className="group/header flex w-full items-center gap-1 py-1 pl-1 pr-2 text-[11.5px] font-semibold tracking-[-0.01em] text-muted-foreground">
-				<Button
-					type="button"
-					variant="ghost"
-					size="xs"
-					onClick={onToggle}
-					aria-expanded={open}
-					className="h-auto min-w-0 flex-1 justify-start gap-1 rounded-none px-0 text-left hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground"
-				>
-					<ChevronRightIcon
-						data-icon="inline-start"
-						className={cn(
-							"size-3 shrink-0 transition-transform",
-							open && "rotate-90",
-						)}
-						strokeWidth={2}
-					/>
-					{icon}
-					<span className="truncate">{label}</span>
-				</Button>
-				<ViewToggleButton treeView={treeView} onToggle={onToggleTreeView} />
-				{onBatchAction && (
-					<RowIconButton
-						aria-label={
-							action === "stage" ? "Stage all changes" : "Unstage all changes"
-						}
-						onClick={onBatchAction}
-						className="text-transparent hover:bg-transparent group-hover/header:text-muted-foreground group-hover/header:hover:text-foreground"
-					>
-						{action === "stage" ? (
+		<div className="sticky top-0 z-10 flex h-6 items-center justify-end gap-1.5 bg-muted/20 px-2 backdrop-blur-sm">
+			{hasUnstaged && (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-xs"
+							aria-label="Stage all"
+							onClick={() => void onStageAll()}
+							className="size-4 rounded-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+						>
 							<PlusIcon className="size-3.5" strokeWidth={2} />
-						) : (
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent side="bottom" sideOffset={4}>
+						Stage all
+					</TooltipContent>
+				</Tooltip>
+			)}
+			{hasStaged && (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-xs"
+							aria-label="Unstage all"
+							onClick={() => void onUnstageAll()}
+							className="size-4 rounded-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+						>
 							<MinusIcon className="size-3.5" strokeWidth={2} />
-						)}
-					</RowIconButton>
-				)}
-				<Badge
-					variant="secondary"
-					className="h-4 min-w-[16px] justify-center rounded-full px-1 text-[9.5px] font-semibold"
-				>
-					{count}
-				</Badge>
-			</div>
-			{open && (
-				<div className="pl-3">
-					{treeView ? (
-						<ChangesTreeView
-							changes={changes}
-							editorMode={editorMode}
-							activeEditorPath={activeEditorPath}
-							onOpenEditorFile={onOpenEditorFile}
-							flashingPaths={flashingPaths}
-							action={action}
-							onStageAction={onStageAction}
-							onDiscard={onDiscard}
-							workspaceBranch={workspaceBranch}
-							workspaceRemoteUrl={workspaceRemoteUrl}
-						/>
-					) : (
-						<ChangesFlatView
-							changes={changes}
-							editorMode={editorMode}
-							activeEditorPath={activeEditorPath}
-							onOpenEditorFile={onOpenEditorFile}
-							flashingPaths={flashingPaths}
-							action={action}
-							onStageAction={onStageAction}
-							onDiscard={onDiscard}
-							workspaceBranch={workspaceBranch}
-							workspaceRemoteUrl={workspaceRemoteUrl}
-						/>
-					)}
-				</div>
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent side="bottom" sideOffset={4}>
+						Unstage all
+					</TooltipContent>
+				</Tooltip>
 			)}
+			<span className="text-[10.5px] tabular-nums text-muted-foreground">
+				{count} change{count === 1 ? "" : "s"}
+			</span>
 		</div>
-	);
-}
-
-function BranchDiffSection({
-	targetBranch,
-	count,
-	loading,
-	open,
-	onToggle,
-	changes,
-	treeView,
-	onToggleTreeView,
-	editorMode,
-	activeEditorPath,
-	onOpenEditorFile,
-	flashingPaths,
-	workspaceBranch,
-	workspaceRemoteUrl,
-}: {
-	targetBranch: string | null;
-	count: number;
-	loading: boolean;
-	open: boolean;
-	onToggle: () => void;
-	changes: InspectorFileItem[];
-	treeView: boolean;
-	onToggleTreeView: () => void;
-	editorMode: boolean;
-	activeEditorPath?: string | null;
-	onOpenEditorFile: (path: string, options?: DiffOpenOptions) => void;
-	flashingPaths: Set<string>;
-	workspaceBranch: string | null;
-	workspaceRemoteUrl: string | null;
-}) {
-	const handleOpenFile = useCallback(
-		(path: string, options?: DiffOpenOptions) => {
-			onOpenEditorFile(path, {
-				fileStatus: options?.fileStatus ?? "M",
-				originalRef: targetBranch ?? undefined,
-				modifiedRef: "HEAD",
-			});
-		},
-		[onOpenEditorFile, targetBranch],
-	);
-
-	return (
-		<div>
-			<div className="group/header flex w-full items-center gap-1 py-1 pl-1 pr-2 text-[11.5px] font-semibold tracking-[-0.01em] text-muted-foreground">
-				<Button
-					type="button"
-					variant="ghost"
-					size="xs"
-					onClick={onToggle}
-					aria-expanded={open}
-					className="h-auto min-w-0 flex-1 justify-start gap-1 rounded-none px-0 text-left hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground"
-				>
-					<ChevronRightIcon
-						data-icon="inline-start"
-						className={cn(
-							"size-3 shrink-0 transition-transform",
-							open && "rotate-90",
-						)}
-						strokeWidth={2}
-					/>
-					<CloudIcon
-						className="size-3 shrink-0 text-muted-foreground"
-						strokeWidth={2}
-					/>
-					<span className="truncate">Remote</span>
-				</Button>
-				<ViewToggleButton treeView={treeView} onToggle={onToggleTreeView} />
-				<Badge
-					variant="secondary"
-					className="h-4 min-w-[16px] justify-center rounded-full px-1 text-[9.5px] leading-none"
-				>
-					{loading ? (
-						<LoaderCircleIcon className="size-2.5 animate-spin" />
-					) : (
-						count
-					)}
-				</Badge>
-			</div>
-			{open && (
-				<div
-					className={cn(
-						"pl-3 transition-opacity duration-150",
-						loading && "pointer-events-none opacity-40",
-					)}
-				>
-					{loading && changes.length === 0 ? (
-						<div className="px-2 py-2 text-[10.5px] text-muted-foreground">
-							Switching target branch…
-						</div>
-					) : treeView ? (
-						<ChangesTreeView
-							changes={changes}
-							editorMode={editorMode}
-							activeEditorPath={activeEditorPath}
-							onOpenEditorFile={handleOpenFile}
-							flashingPaths={flashingPaths}
-							workspaceBranch={workspaceBranch}
-							workspaceRemoteUrl={workspaceRemoteUrl}
-						/>
-					) : (
-						<ChangesFlatView
-							changes={changes}
-							editorMode={editorMode}
-							activeEditorPath={activeEditorPath}
-							onOpenEditorFile={handleOpenFile}
-							flashingPaths={flashingPaths}
-							workspaceBranch={workspaceBranch}
-							workspaceRemoteUrl={workspaceRemoteUrl}
-						/>
-					)}
-				</div>
-			)}
-		</div>
-	);
-}
-
-function buildTree(changes: InspectorFileItem[]) {
-	type TreeNode = {
-		name: string;
-		path: string;
-		children: Map<string, TreeNode>;
-		file?: InspectorFileItem;
-	};
-
-	const root: TreeNode = { name: "", path: "", children: new Map() };
-
-	for (const change of changes) {
-		const parts = change.path.split("/");
-		let current = root;
-		for (let index = 0; index < parts.length - 1; index += 1) {
-			const part = parts[index];
-			if (!current.children.has(part)) {
-				current.children.set(part, {
-					name: part,
-					path: parts.slice(0, index + 1).join("/"),
-					children: new Map(),
-				});
-			}
-			current = current.children.get(part)!;
-		}
-		current.children.set(change.name, {
-			name: change.name,
-			path: change.path,
-			children: new Map(),
-			file: change,
-		});
-	}
-
-	return root;
-}
-
-function ChangesTreeView({
-	changes,
-	editorMode,
-	activeEditorPath,
-	onOpenEditorFile,
-	flashingPaths,
-	action,
-	onStageAction,
-	onDiscard,
-	workspaceBranch,
-	workspaceRemoteUrl,
-}: {
-	changes: InspectorFileItem[];
-	editorMode: boolean;
-	activeEditorPath?: string | null;
-	onOpenEditorFile: (path: string, options?: DiffOpenOptions) => void;
-	flashingPaths: Set<string>;
-	action?: StageActionKind;
-	onStageAction?: (path: string) => void;
-	onDiscard?: (path: string) => void;
-	workspaceBranch: string | null;
-	workspaceRemoteUrl: string | null;
-}) {
-	const tree = buildTree(changes);
-	const [expanded, setExpanded] = useState<Set<string>>(
-		() => new Set(collectFolderPaths(tree)),
-	);
-
-	const toggle = (path: string) => {
-		setExpanded((previous) => {
-			const next = new Set(previous);
-			if (next.has(path)) {
-				next.delete(path);
-			} else {
-				next.add(path);
-			}
-			return next;
-		});
-	};
-
-	return (
-		<div className="py-0.5">
-			<TreeNodeList
-				nodes={tree.children}
-				expanded={expanded}
-				onToggle={toggle}
-				depth={0}
-				editorMode={editorMode}
-				activeEditorPath={activeEditorPath}
-				onOpenEditorFile={onOpenEditorFile}
-				flashingPaths={flashingPaths}
-				action={action}
-				onStageAction={onStageAction}
-				onDiscard={onDiscard}
-				workspaceBranch={workspaceBranch}
-				workspaceRemoteUrl={workspaceRemoteUrl}
-			/>
-		</div>
-	);
-}
-
-function collectFolderPaths(node: ReturnType<typeof buildTree>): string[] {
-	const paths: string[] = [];
-	for (const child of node.children.values()) {
-		if (child.children.size > 0 && !child.file) {
-			paths.push(child.path);
-			paths.push(...collectFolderPaths(child));
-		}
-	}
-	return paths;
-}
-
-function TreeNodeList({
-	nodes,
-	expanded,
-	onToggle,
-	depth,
-	editorMode,
-	activeEditorPath,
-	onOpenEditorFile,
-	flashingPaths,
-	action,
-	onStageAction,
-	onDiscard,
-	workspaceBranch,
-	workspaceRemoteUrl,
-}: {
-	nodes: Map<string, ReturnType<typeof buildTree>>;
-	expanded: Set<string>;
-	onToggle: (path: string) => void;
-	depth: number;
-	editorMode: boolean;
-	activeEditorPath?: string | null;
-	onOpenEditorFile: (path: string, options?: DiffOpenOptions) => void;
-	flashingPaths: Set<string>;
-	action?: StageActionKind;
-	onStageAction?: (path: string) => void;
-	onDiscard?: (path: string) => void;
-	workspaceBranch: string | null;
-	workspaceRemoteUrl: string | null;
-}) {
-	const sorted = [...nodes.values()].sort((left, right) => {
-		const leftIsFolder = left.children.size > 0 && !left.file;
-		const rightIsFolder = right.children.size > 0 && !right.file;
-		if (leftIsFolder !== rightIsFolder) {
-			return leftIsFolder ? -1 : 1;
-		}
-		return left.name.localeCompare(right.name);
-	});
-
-	return (
-		<>
-			{sorted.map((node) => {
-				const isFolder = node.children.size > 0 && !node.file;
-
-				if (isFolder) {
-					const isOpen = expanded.has(node.path);
-					return (
-						<div key={node.path}>
-							<div
-								className="flex cursor-pointer items-center gap-1 py-[1.5px] pr-2 text-muted-foreground transition-colors hover:bg-accent/60"
-								style={{ paddingLeft: `${depth * 12 + 8}px` }}
-								onClick={() => onToggle(node.path)}
-								onKeyDown={(event) => {
-									if (event.key === "Enter" || event.key === " ") {
-										onToggle(node.path);
-									}
-								}}
-								tabIndex={0}
-								role="treeitem"
-								aria-expanded={isOpen}
-							>
-								<ChevronRightIcon
-									className={cn(
-										"size-3 shrink-0 transition-transform",
-										isOpen && "rotate-90",
-									)}
-									strokeWidth={1.8}
-								/>
-								<img
-									src={getMaterialFolderIcon(node.name, isOpen || undefined)}
-									alt=""
-									className="size-4 shrink-0"
-								/>
-								<span className="truncate">{node.name}</span>
-							</div>
-							{isOpen && (
-								<TreeNodeList
-									nodes={node.children}
-									expanded={expanded}
-									onToggle={onToggle}
-									depth={depth + 1}
-									editorMode={editorMode}
-									activeEditorPath={activeEditorPath}
-									onOpenEditorFile={onOpenEditorFile}
-									flashingPaths={flashingPaths}
-									action={action}
-									onStageAction={onStageAction}
-									onDiscard={onDiscard}
-									workspaceBranch={workspaceBranch}
-									workspaceRemoteUrl={workspaceRemoteUrl}
-								/>
-							)}
-						</div>
-					);
-				}
-
-				const file = node.file;
-				const selected = file?.absolutePath === activeEditorPath;
-				const isFlashing = !!file && flashingPaths.has(file.path);
-
-				const row = (
-					<div
-						className={cn(
-							"group/row flex cursor-pointer items-center gap-1 py-[1.5px] pr-2 text-muted-foreground transition-colors hover:bg-accent/60",
-							selected &&
-								(editorMode
-									? "bg-accent text-foreground"
-									: "bg-muted/60 text-foreground"),
-						)}
-						style={{ paddingLeft: `${depth * 12 + 22}px` }}
-						role="treeitem"
-						tabIndex={0}
-						onClick={() =>
-							file &&
-							onOpenEditorFile(file.absolutePath, {
-								fileStatus: file.status,
-							})
-						}
-						onKeyDown={(event) => {
-							if ((event.key === "Enter" || event.key === " ") && file) {
-								event.preventDefault();
-								onOpenEditorFile(file.absolutePath, {
-									fileStatus: file.status,
-								});
-							}
-						}}
-					>
-						<img
-							src={getMaterialFileIcon(node.name)}
-							alt=""
-							className="size-4 shrink-0"
-						/>
-						<ShinyFlash active={isFlashing}>{node.name}</ShinyFlash>
-						{file && (
-							<StageActionSlot
-								file={file}
-								action={action}
-								onStageAction={onStageAction}
-								onDiscard={onDiscard}
-							/>
-						)}
-					</div>
-				);
-
-				return (
-					<div key={node.path}>
-						{file ? (
-							<FileRowContextMenu
-								file={file}
-								workspaceBranch={workspaceBranch}
-								workspaceRemoteUrl={workspaceRemoteUrl}
-							>
-								{row}
-							</FileRowContextMenu>
-						) : (
-							row
-						)}
-					</div>
-				);
-			})}
-		</>
 	);
 }
 
 function ChangesFlatView({
-	changes,
+	entries,
 	editorMode,
 	activeEditorPath,
-	onOpenEditorFile,
+	onOpenEntry,
 	flashingPaths,
-	action,
-	onStageAction,
-	onDiscard,
 	workspaceBranch,
 	workspaceRemoteUrl,
+	registerRowRef,
+	onArrowNav,
 }: {
-	changes: InspectorFileItem[];
+	entries: ChangeEntry[];
 	editorMode: boolean;
 	activeEditorPath?: string | null;
-	onOpenEditorFile: (path: string, options?: DiffOpenOptions) => void;
+	onOpenEntry: (entry: ChangeEntry) => void;
 	flashingPaths: Set<string>;
-	action?: StageActionKind;
-	onStageAction?: (path: string) => void;
-	onDiscard?: (path: string) => void;
 	workspaceBranch: string | null;
 	workspaceRemoteUrl: string | null;
+	registerRowRef?: (path: string, el: HTMLDivElement | null) => void;
+	onArrowNav?: (currentPath: string, direction: 1 | -1) => void;
 }) {
-	const hasStage = !!action && !!onStageAction;
-	const hasDiscard = !!onDiscard;
-	const hasAction = hasStage || hasDiscard;
-
 	return (
-		<div className="py-0.5">
-			{changes.map((change) => (
-				<FileRowContextMenu
-					key={change.path}
-					file={change}
-					workspaceBranch={workspaceBranch}
-					workspaceRemoteUrl={workspaceRemoteUrl}
-				>
-					<div
-						className={cn(
-							"group/row flex cursor-pointer items-center gap-1.5 py-[1.5px] pl-2 pr-2 text-muted-foreground transition-colors hover:bg-accent/60",
-							change.absolutePath === activeEditorPath &&
-								(editorMode
-									? "bg-accent text-foreground"
-									: "bg-muted/60 text-foreground"),
-						)}
-						role="button"
-						tabIndex={0}
-						onClick={() =>
-							onOpenEditorFile(change.absolutePath, {
-								fileStatus: change.status,
-							})
-						}
-						onKeyDown={(event) => {
-							if (event.key === "Enter" || event.key === " ") {
-								event.preventDefault();
-								onOpenEditorFile(change.absolutePath, {
-									fileStatus: change.status,
-								});
-							}
-						}}
+		<div className="py-1">
+			{entries.map((entry) => {
+				const { change, action, onStageAction, onDiscard } = entry;
+				const lastSlash = change.path.lastIndexOf("/");
+				const dir = lastSlash >= 0 ? change.path.slice(0, lastSlash + 1) : "";
+				const name =
+					lastSlash >= 0 ? change.path.slice(lastSlash + 1) : change.path;
+				const selected = change.absolutePath === activeEditorPath;
+				const hasAction = !!action || !!onDiscard;
+				return (
+					<FileRowContextMenu
+						key={change.path}
+						file={change}
+						workspaceBranch={workspaceBranch}
+						workspaceRemoteUrl={workspaceRemoteUrl}
 					>
-						<img
-							src={getMaterialFileIcon(change.name)}
-							alt=""
-							className="size-4 shrink-0"
-						/>
-						<span className="min-w-0 max-w-[60%] truncate">
-							<ShinyFlash active={flashingPaths.has(change.path)}>
-								{change.name}
-							</ShinyFlash>
-						</span>
-						<span
+						<div
+							ref={(el) => registerRowRef?.(change.path, el)}
 							className={cn(
-								"min-w-0 flex-1 truncate text-right text-[10px] text-muted-foreground",
-								hasAction && "group-hover/row:hidden",
+								"group/row relative mx-1.5 flex h-[26px] cursor-pointer items-center gap-2 rounded-md px-2 transition-colors hover:bg-accent/60 focus:outline-none",
+								selected &&
+									cn(
+										"bg-primary/10 text-foreground",
+										editorMode && "bg-primary/15",
+									),
 							)}
+							role="button"
+							tabIndex={0}
+							onClick={() => onOpenEntry(entry)}
+							onKeyDown={(event) => {
+								if (event.key === "Enter" || event.key === " ") {
+									event.preventDefault();
+									onOpenEntry(entry);
+									return;
+								}
+								if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+									if (!onArrowNav) return;
+									event.preventDefault();
+									onArrowNav(change.path, event.key === "ArrowDown" ? 1 : -1);
+								}
+							}}
 						>
-							{change.path.includes("/")
-								? change.path.slice(0, change.path.lastIndexOf("/"))
-								: ""}
-						</span>
-						<span
-							className={cn(
-								"flex shrink-0 items-center gap-1 tabular-nums",
-								hasAction && "group-hover/row:hidden",
-							)}
-						>
-							<LineStats
-								insertions={change.insertions}
-								deletions={change.deletions}
-							/>
+							<span className="min-w-0 flex-1 truncate text-[11.5px] leading-[18px]">
+								<ShinyFlash active={flashingPaths.has(change.path)}>
+									<span className="text-muted-foreground/70">{dir}</span>
+									<span
+										className={cn(
+											"text-foreground/85",
+											selected && "font-medium text-foreground",
+										)}
+									>
+										{name}
+									</span>
+								</ShinyFlash>
+							</span>
 							<span
 								className={cn(
-									"inline-flex h-4 w-4 items-center justify-center text-[10px] font-semibold",
-									STATUS_COLORS[change.status],
+									"flex shrink-0 items-center gap-1.5 tabular-nums",
+									hasAction && "group-hover/row:hidden",
 								)}
 							>
-								{change.status}
+								<span
+									className={cn(
+										"inline-flex h-4 w-3 items-center justify-center text-[10px] font-semibold",
+										STATUS_COLORS[change.status],
+									)}
+								>
+									{change.status}
+								</span>
+								<LineStats
+									insertions={change.insertions}
+									deletions={change.deletions}
+								/>
 							</span>
-						</span>
-						{hasAction && (
-							<RowHoverActions
-								path={change.path}
-								action={action}
-								onStageAction={onStageAction}
-								onDiscard={onDiscard}
-							/>
-						)}
-					</div>
-				</FileRowContextMenu>
-			))}
+							{hasAction && (
+								<RowHoverActions
+									path={change.path}
+									action={action}
+									onStageAction={onStageAction}
+									onDiscard={onDiscard}
+								/>
+							)}
+						</div>
+					</FileRowContextMenu>
+				);
+			})}
 		</div>
-	);
-}
-
-function StageActionSlot({
-	file,
-	action,
-	onStageAction,
-	onDiscard,
-}: {
-	file: InspectorFileItem;
-	action?: StageActionKind;
-	onStageAction?: (path: string) => void;
-	onDiscard?: (path: string) => void;
-}) {
-	const hasStage = !!action && !!onStageAction;
-	const hasDiscard = !!onDiscard;
-	const hasAction = hasStage || hasDiscard;
-
-	return (
-		<>
-			<span
-				className={cn(
-					"ml-auto flex shrink-0 items-center gap-1.5",
-					hasAction && "group-hover/row:hidden",
-				)}
-			>
-				<LineStats insertions={file.insertions} deletions={file.deletions} />
-				<span
-					className={cn(
-						"inline-flex h-4 w-4 items-center justify-center text-[10px] font-semibold",
-						STATUS_COLORS[file.status],
-					)}
-				>
-					{file.status}
-				</span>
-			</span>
-			{hasAction && (
-				<RowHoverActions
-					path={file.path}
-					action={action}
-					onStageAction={onStageAction}
-					onDiscard={onDiscard}
-				/>
-			)}
-		</>
 	);
 }
 
@@ -1269,28 +783,6 @@ function RowIconButton({
 		>
 			{children}
 		</Button>
-	);
-}
-
-function ViewToggleButton({
-	treeView,
-	onToggle,
-}: {
-	treeView: boolean;
-	onToggle: () => void;
-}) {
-	return (
-		<RowIconButton
-			aria-label={treeView ? "Switch to list view" : "Switch to tree view"}
-			onClick={onToggle}
-			className="text-transparent hover:bg-transparent group-hover/header:text-muted-foreground group-hover/header:hover:text-foreground"
-		>
-			{treeView ? (
-				<ListIcon className="size-3.5" strokeWidth={1.8} />
-			) : (
-				<ListTreeIcon className="size-3.5" strokeWidth={1.8} />
-			)}
-		</RowIconButton>
 	);
 }
 

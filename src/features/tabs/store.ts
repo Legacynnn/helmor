@@ -9,6 +9,8 @@ interface OpenInput {
 	opener: FileTabOpener;
 }
 
+const EMPTY_TABS: FileTab[] = [];
+
 export interface WorkspaceTabsStore {
 	getTabs(workspaceId: string): FileTab[];
 	openFileTab(workspaceId: string, input: OpenInput): FileTabId;
@@ -26,10 +28,10 @@ export function createWorkspaceTabsStore(): WorkspaceTabsStore {
 		for (const fn of listeners) fn();
 	};
 
-	const get = (workspaceId: string) => tabs.get(workspaceId) ?? [];
+	const get = (workspaceId: string) => tabs.get(workspaceId) ?? EMPTY_TABS;
 
 	return {
-		getTabs: (workspaceId) => get(workspaceId).slice(),
+		getTabs: (workspaceId) => get(workspaceId),
 
 		openFileTab(workspaceId, input) {
 			const list = get(workspaceId).slice();

@@ -4,6 +4,7 @@ import { createWorkspaceTabsStore, type WorkspaceTabsStore } from "../store";
 import type { FileTab, FileTabOpener, TabId } from "../types";
 
 let singleton: WorkspaceTabsStore | null = null;
+const EMPTY_FILE_TABS: FileTab[] = [];
 
 function getStore(): WorkspaceTabsStore {
 	if (!singleton) singleton = createWorkspaceTabsStore();
@@ -14,8 +15,8 @@ export function useWorkspaceFileTabs(workspaceId: string | null): FileTab[] {
 	const store = getStore();
 	return useSyncExternalStore(
 		(cb) => store.subscribe(cb),
-		() => (workspaceId ? store.getTabs(workspaceId) : []),
-		() => [],
+		() => (workspaceId ? store.getTabs(workspaceId) : EMPTY_FILE_TABS),
+		() => EMPTY_FILE_TABS,
 	);
 }
 

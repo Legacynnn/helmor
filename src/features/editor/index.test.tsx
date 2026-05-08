@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	cleanup,
 	fireEvent,
@@ -105,18 +106,26 @@ function EditorSurfaceHarness({
 	onError?: (description: string, title?: string) => void;
 }) {
 	const [session, setSession] = useState(initialSession);
+	const [queryClient] = useState(
+		() =>
+			new QueryClient({
+				defaultOptions: { queries: { retry: false } },
+			}),
+	);
 
 	return (
-		<WorkspaceEditorSurface
-			editorSession={session}
-			workspaceRootPath="/tmp/helmor-workspace"
-			onChangeSession={(next) => {
-				onChangeSpy(next);
-				setSession(next);
-			}}
-			onError={onError}
-			onExit={vi.fn()}
-		/>
+		<QueryClientProvider client={queryClient}>
+			<WorkspaceEditorSurface
+				editorSession={session}
+				workspaceRootPath="/tmp/helmor-workspace"
+				onChangeSession={(next) => {
+					onChangeSpy(next);
+					setSession(next);
+				}}
+				onError={onError}
+				onExit={vi.fn()}
+			/>
+		</QueryClientProvider>
 	);
 }
 
