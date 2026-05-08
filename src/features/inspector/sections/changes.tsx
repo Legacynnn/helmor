@@ -80,6 +80,16 @@ type ChangesSectionProps = {
 	editorMode: boolean;
 	activeEditorPath?: string | null;
 	onOpenEditorFile: (path: string, options?: DiffOpenOptions) => void;
+	/**
+	 * Sibling-style callback fired in addition to `onOpenEditorFile` whenever
+	 * the user clicks a changed-file row. Lets the new tab system listen for
+	 * "user wants to open this changed file" without disturbing the legacy
+	 * editor flow. `side` describes which row group the file came from.
+	 */
+	onOpenChangedFile?: (
+		path: string,
+		side: "unstaged" | "staged" | "remote",
+	) => void;
 	flashingPaths: Set<string>;
 	onCommitAction?: (mode: WorkspaceCommitButtonMode) => Promise<void>;
 	commitButtonMode?: WorkspaceCommitButtonMode;
@@ -105,6 +115,7 @@ export function ChangesSection({
 	editorMode,
 	activeEditorPath,
 	onOpenEditorFile,
+	onOpenChangedFile,
 	flashingPaths,
 	onCommitAction,
 	commitButtonMode = "create-pr",
@@ -375,6 +386,39 @@ export function ChangesSection({
 	// background refresh or a placeholder render).
 	const isForgeRefreshing = workspaceId !== null && forgeIsRefreshing;
 
+	// Per-group taps that ALSO fire `onOpenChangedFile` so the new tab
+	// system can listen for "user wants to open this changed file" without
+	// disturbing the legacy `onOpenEditorFile` path. Each group classifies
+	// its rows by which uncommitted/remote bucket the file came from.
+	const makeOpenWithSide = useCallback(
+		(side: "unstaged" | "staged" | "remote") =>
+			(absolutePath: string, options?: DiffOpenOptions) => {
+				onOpenEditorFile(absolutePath, options);
+				if (!onOpenChangedFile) return;
+				// `absolutePath` here is `file.absolutePath`. Recover the
+				// relative path from the live changes list — every visible row
+				// is sourced from that same array so this is O(n) once per click.
+				const match = changes.find(
+					(change) => change.absolutePath === absolutePath,
+				);
+				if (!match) return;
+				onOpenChangedFile(match.path, side);
+			},
+		[changes, onOpenChangedFile, onOpenEditorFile],
+	);
+	const handleOpenStagedFile = useMemo(
+		() => makeOpenWithSide("staged"),
+		[makeOpenWithSide],
+	);
+	const handleOpenUnstagedFile = useMemo(
+		() => makeOpenWithSide("unstaged"),
+		[makeOpenWithSide],
+	);
+	const handleOpenRemoteFile = useMemo(
+		() => makeOpenWithSide("remote"),
+		[makeOpenWithSide],
+	);
+
 	return (
 		<motion.section
 			aria-label="Inspector section Git"
@@ -422,7 +466,7 @@ export function ChangesSection({
 								onBatchAction={unstageAll}
 								editorMode={editorMode}
 								activeEditorPath={activeEditorPath}
-								onOpenEditorFile={onOpenEditorFile}
+								onOpenEditorFile={handleOpenStagedFile}
 								flashingPaths={flashingPaths}
 								workspaceBranch={workspaceBranch}
 								workspaceRemoteUrl={workspaceRemoteUrl}
@@ -449,7 +493,7 @@ export function ChangesSection({
 								onDiscard={discardFile}
 								editorMode={editorMode}
 								activeEditorPath={activeEditorPath}
-								onOpenEditorFile={onOpenEditorFile}
+								onOpenEditorFile={handleOpenUnstagedFile}
 								flashingPaths={flashingPaths}
 								workspaceBranch={workspaceBranch}
 								workspaceRemoteUrl={workspaceRemoteUrl}
@@ -470,7 +514,7 @@ export function ChangesSection({
 						onToggleTreeView={() => setBranchDiffTreeView((v) => !v)}
 						editorMode={editorMode}
 						activeEditorPath={activeEditorPath}
-						onOpenEditorFile={onOpenEditorFile}
+						onOpenEditorFile={handleOpenRemoteFile}
 						flashingPaths={flashingPaths}
 						workspaceBranch={workspaceBranch}
 						workspaceRemoteUrl={workspaceRemoteUrl}

@@ -7,16 +7,22 @@ import {
 	type ShortcutHandler,
 	useAppShortcuts,
 } from "@/features/shortcuts/use-app-shortcuts";
+import type { FileTabOpener } from "@/features/tabs/types";
 import type { ChangeRequestInfo } from "@/lib/api";
 import type { DiffOpenOptions } from "@/lib/editor-session";
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
+import {
+	AllFilesChangesTabs,
+	type TopSectionView,
+} from "./components/all-files-changes-tabs";
 import { useWorkspaceInspectorSidebar } from "./hooks/use-inspector";
 import { useScriptStatus } from "./hooks/use-script-status";
 import { useSetupAutoRun } from "./hooks/use-setup-auto-run";
 import { HorizontalResizeHandle, InspectorTabsSection } from "./layout";
 import type { ScriptStatus } from "./script-store";
 import { ActionsSection } from "./sections/actions";
+import { AllFilesSection } from "./sections/all-files";
 import { ChangesSection } from "./sections/changes";
 import { OpenDevServerButton, RunTab } from "./sections/run";
 import { SetupTab } from "./sections/setup";
@@ -29,6 +35,17 @@ import {
 	TERMINAL_INSTANCE_LIMIT,
 	type TerminalInstance,
 } from "./terminal-store";
+
+interface OpenFileInput {
+	absolutePath: string;
+	relativePath: string;
+	fileName: string;
+}
+
+function pathJoinAbsolute(root: string | null, rel: string): string {
+	if (!root) return rel;
+	return `${root.replace(/\/$/, "")}/${rel}`;
+}
 
 type WorkspaceInspectorSidebarProps = {
 	workspaceId?: string | null;
@@ -62,6 +79,20 @@ type WorkspaceInspectorSidebarProps = {
 	 */
 	forgeIsRefreshing?: boolean;
 	onOpenSettings?: () => void;
+	/**
+	 * Absolute path of the file currently focused in the editor (if any).
+	 * Used by the All-files browser to highlight the active file. Defaults to
+	 * `null` — Task 13 wires this to the file-tab store.
+	 */
+	activeFileAbsolutePath?: string | null;
+	/**
+	 * Sibling-style callback invoked when the user wants to open a file in
+	 * the new tab system — either by clicking a file in the All-files panel
+	 * (`opener.kind === "browser"`) or a row in the Changes panel
+	 * (`opener.kind === "changes"`). Defaults to a no-op until Task 13 wires
+	 * the file-tab store.
+	 */
+	onOpenFileTab?: (input: OpenFileInput, opener: FileTabOpener) => void;
 };
 
 export function WorkspaceInspectorSidebar({
@@ -85,7 +116,14 @@ export function WorkspaceInspectorSidebar({
 	changeRequest,
 	forgeIsRefreshing = false,
 	onOpenSettings,
+	activeFileAbsolutePath = null,
+	onOpenFileTab,
 }: WorkspaceInspectorSidebarProps) {
+	const [topSectionView, setTopSectionView] =
+		useState<TopSectionView>("changes");
+	const handleOpenFileTab = useMemo<
+		(input: OpenFileInput, opener: FileTabOpener) => void
+	>(() => onOpenFileTab ?? (() => {}), [onOpenFileTab]);
 	const {
 		actionsHeight,
 		actionsOpen,
@@ -382,26 +420,64 @@ export function WorkspaceInspectorSidebar({
 				isResizing && "select-none",
 			)}
 		>
-			<ChangesSection
-				workspaceId={workspaceId ?? null}
-				workspaceRootPath={workspaceRootPath ?? null}
-				workspaceBranch={workspaceBranch ?? null}
-				workspaceRemoteUrl={workspaceRemoteUrl ?? null}
-				workspaceTargetBranch={workspaceTargetBranch ?? null}
-				changes={changes}
-				editorMode={editorMode}
-				activeEditorPath={activeEditorPath}
-				onOpenEditorFile={onOpenEditorFile}
-				flashingPaths={flashingPaths}
-				onCommitAction={onCommitAction}
-				commitButtonMode={commitButtonMode}
-				commitButtonState={commitButtonState}
-				changeRequest={changeRequest ?? null}
-				forgeIsRefreshing={forgeIsRefreshing}
-				bodyHeight={changesHeight}
-				animatePanelToggle={isPanelToggleAnimating}
-				isResizing={isResizing}
-			/>
+			<section className="flex min-h-0 shrink-0 flex-col overflow-hidden bg-sidebar">
+				<div className="flex h-9 shrink-0 items-center gap-2 border-b border-border/60 bg-muted/25 px-2">
+					<AllFilesChangesTabs
+						value={topSectionView}
+						onChange={setTopSectionView}
+						changesCount={changes.length}
+					/>
+				</div>
+				{topSectionView === "files" ? (
+					<div
+						className="flex min-h-0 shrink-0 flex-col border-b border-border/60"
+						style={{ height: changesHeight }}
+					>
+						<AllFilesSection
+							workspaceRootPath={workspaceRootPath ?? null}
+							workspaceId={workspaceId ?? null}
+							activeAbsolutePath={activeFileAbsolutePath}
+							onOpenFile={(input) =>
+								handleOpenFileTab(input, { kind: "browser" })
+							}
+						/>
+					</div>
+				) : (
+					<ChangesSection
+						workspaceId={workspaceId ?? null}
+						workspaceRootPath={workspaceRootPath ?? null}
+						workspaceBranch={workspaceBranch ?? null}
+						workspaceRemoteUrl={workspaceRemoteUrl ?? null}
+						workspaceTargetBranch={workspaceTargetBranch ?? null}
+						changes={changes}
+						editorMode={editorMode}
+						activeEditorPath={activeEditorPath}
+						onOpenEditorFile={onOpenEditorFile}
+						onOpenChangedFile={(path, side) =>
+							handleOpenFileTab(
+								{
+									absolutePath: pathJoinAbsolute(
+										workspaceRootPath ?? null,
+										path,
+									),
+									relativePath: path,
+									fileName: path.split("/").pop() ?? path,
+								},
+								{ kind: "changes", side },
+							)
+						}
+						flashingPaths={flashingPaths}
+						onCommitAction={onCommitAction}
+						commitButtonMode={commitButtonMode}
+						commitButtonState={commitButtonState}
+						changeRequest={changeRequest ?? null}
+						forgeIsRefreshing={forgeIsRefreshing}
+						bodyHeight={changesHeight}
+						animatePanelToggle={isPanelToggleAnimating}
+						isResizing={isResizing}
+					/>
+				)}
+			</section>
 			{actionsOpen ? (
 				<HorizontalResizeHandle
 					onMouseDown={handleResizeStart("actions")}
