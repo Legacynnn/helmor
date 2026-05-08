@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { getShortcut } from "@/features/shortcuts/registry";
+import type { FileTab, TabId } from "@/features/tabs/types";
 import type {
 	AgentModelSection,
 	AgentProvider,
@@ -11,6 +12,7 @@ import type {
 	WorkspaceSessionSummary,
 } from "@/lib/api";
 import { createSession, loadRepoScripts } from "@/lib/api";
+import type { EditorSessionState } from "@/lib/editor-session";
 import {
 	helmorQueryKeys,
 	sessionThreadMessagesQueryOptions,
@@ -65,6 +67,16 @@ type WorkspacePanelContainerProps = {
 	contextPreviewActive?: boolean;
 	onSelectContextPreview?: () => void;
 	onCloseContextPreview?: () => void;
+	fileTabs?: FileTab[];
+	activeTabId?: TabId | null;
+	activeFileEditorSession?: EditorSessionState | null;
+	activeFileHasChanges?: boolean;
+	workspaceRootPath?: string | null;
+	onSelectFileTab?: (id: TabId) => void;
+	onCloseFileTab?: (id: TabId) => void;
+	onChangeFileEditorSession?: (session: EditorSessionState) => void;
+	onExitFileEditor?: () => void;
+	onFileEditorError?: (description: string, title?: string) => void;
 	headerActions?: React.ReactNode;
 	headerLeading?: React.ReactNode;
 	/** Optimistic user bubble for a workspace that's mid-finalize — rendered
@@ -92,6 +104,16 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	contextPreviewActive = false,
 	onSelectContextPreview,
 	onCloseContextPreview,
+	fileTabs,
+	activeTabId = null,
+	activeFileEditorSession = null,
+	activeFileHasChanges = false,
+	workspaceRootPath = null,
+	onSelectFileTab,
+	onCloseFileTab,
+	onChangeFileEditorSession,
+	onExitFileEditor,
+	onFileEditorError,
 	headerActions,
 	headerLeading,
 	optimisticPendingSubmit = null,
@@ -589,6 +611,16 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			interactionRequiredSessionIds={interactionRequiredSessionIds}
 			contextPreviewCard={contextPreviewCard}
 			contextPreviewActive={contextPreviewActive}
+			fileTabs={fileTabs}
+			activeTabId={activeTabId}
+			activeFileEditorSession={activeFileEditorSession}
+			activeFileHasChanges={activeFileHasChanges}
+			workspaceRootPath={workspaceRootPath}
+			onSelectFileTab={onSelectFileTab}
+			onCloseFileTab={onCloseFileTab}
+			onChangeFileEditorSession={onChangeFileEditorSession}
+			onExitFileEditor={onExitFileEditor}
+			onFileEditorError={onFileEditorError}
 			onSelectSession={handleSelectSession}
 			onSelectContextPreview={onSelectContextPreview}
 			onCloseContextPreview={onCloseContextPreview}

@@ -1,5 +1,7 @@
 import { memo, type ReactNode, useEffect } from "react";
+import { WorkspaceEditorSurface } from "@/features/editor";
 import { SourceDetailView } from "@/features/source-detail";
+import type { FileTab, TabId } from "@/features/tabs/types";
 import type {
 	AgentProvider,
 	ChangeRequestInfo,
@@ -7,6 +9,7 @@ import type {
 	WorkspaceSessionSummary,
 } from "@/lib/api";
 import { HelmorProfiler } from "@/lib/dev-react-profiler";
+import type { EditorSessionState } from "@/lib/editor-session";
 import type { ContextCard } from "@/lib/sources/types";
 import type { WorkspaceScriptType } from "@/lib/workspace-script-actions";
 import { WorkspacePanelHeader } from "./header";
@@ -40,9 +43,19 @@ type WorkspacePanelProps = {
 	interactionRequiredSessionIds?: Set<string>;
 	contextPreviewCard?: ContextCard | null;
 	contextPreviewActive?: boolean;
+	fileTabs?: FileTab[];
+	activeTabId?: TabId | null;
+	activeFileEditorSession?: EditorSessionState | null;
+	activeFileHasChanges?: boolean;
+	workspaceRootPath?: string | null;
 	onSelectSession?: (sessionId: string) => void;
 	onSelectContextPreview?: () => void;
 	onCloseContextPreview?: () => void;
+	onSelectFileTab?: (id: TabId) => void;
+	onCloseFileTab?: (id: TabId) => void;
+	onChangeFileEditorSession?: (session: EditorSessionState) => void;
+	onExitFileEditor?: () => void;
+	onFileEditorError?: (description: string, title?: string) => void;
 	onPrefetchSession?: (sessionId: string) => void;
 	onSessionsChanged?: () => void;
 	onSessionRenamed?: (sessionId: string, title: string) => void;
@@ -71,9 +84,19 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	interactionRequiredSessionIds,
 	contextPreviewCard = null,
 	contextPreviewActive = false,
+	fileTabs,
+	activeTabId = null,
+	activeFileEditorSession = null,
+	activeFileHasChanges = false,
+	workspaceRootPath = null,
 	onSelectSession,
 	onSelectContextPreview,
 	onCloseContextPreview,
+	onSelectFileTab,
+	onCloseFileTab,
+	onChangeFileEditorSession,
+	onExitFileEditor,
+	onFileEditorError,
 	onPrefetchSession,
 	onSessionsChanged,
 	onSessionRenamed,
@@ -133,11 +156,15 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 					loadingWorkspace={loadingWorkspace}
 					contextPreviewCard={contextPreviewCard}
 					contextPreviewActive={contextPreviewActive}
+					fileTabs={fileTabs}
+					activeTabId={activeTabId}
 					headerActions={headerActions}
 					headerLeading={headerLeading}
 					onSelectSession={onSelectSession}
 					onSelectContextPreview={onSelectContextPreview}
 					onCloseContextPreview={onCloseContextPreview}
+					onSelectFileTab={onSelectFileTab}
+					onCloseFileTab={onCloseFileTab}
 					onPrefetchSession={onPrefetchSession}
 					onSessionsChanged={onSessionsChanged}
 					onSessionRenamed={onSessionRenamed}
@@ -147,7 +174,16 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 				/>
 
 				<div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-					{contextPreviewActive && contextPreviewCard ? (
+					{activeTabId?.kind === "file" && activeFileEditorSession ? (
+						<WorkspaceEditorSurface
+							editorSession={activeFileEditorSession}
+							workspaceRootPath={workspaceRootPath}
+							fileHasChanges={activeFileHasChanges}
+							onChangeSession={onChangeFileEditorSession ?? (() => {})}
+							onExit={onExitFileEditor ?? (() => {})}
+							onError={onFileEditorError}
+						/>
+					) : contextPreviewActive && contextPreviewCard ? (
 						<div className="min-h-0 flex-1 overflow-hidden px-0 pt-4 pb-3">
 							<SourceDetailView card={contextPreviewCard} />
 						</div>

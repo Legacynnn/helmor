@@ -10,6 +10,7 @@ export type ShortcutId =
 	| "session.new"
 	| "session.close"
 	| "session.reopenClosed"
+	| "editor.save"
 	| "script.run"
 	| "settings.open"
 	| "theme.toggle"

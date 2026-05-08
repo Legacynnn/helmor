@@ -10,13 +10,6 @@ pub struct EditorFileReadResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct EditorFileWriteResponse {
-    pub path: String,
-    pub mtime_ms: i64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct EditorFileStatResponse {
     pub path: String,
     pub exists: bool,
@@ -71,4 +64,39 @@ pub struct EditorFilePrefetchItem {
 pub struct EditorFilesWithContentResponse {
     pub items: Vec<EditorFileListItem>,
     pub prefetched: Vec<EditorFilePrefetchItem>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub struct DirEntry {
+    pub kind: DirEntryKind,
+    pub name: String,
+    pub path: String,
+    pub absolute_path: String,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+#[allow(dead_code)]
+pub enum DirEntryKind {
+    File,
+    Directory,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub struct PathSearchHit {
+    pub kind: DirEntryKind,
+    pub name: String,
+    pub path: String,
+    pub absolute_path: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum EditorFileWriteOutcome {
+    Written { path: String, mtime_ms: i64 },
+    Conflict { path: String, current_mtime_ms: i64 },
 }

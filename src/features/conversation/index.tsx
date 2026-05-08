@@ -12,9 +12,11 @@ import type { UserInputResponseHandler } from "@/features/composer/user-input";
 import { WorkspacePanelContainer } from "@/features/panel/container";
 import { FileLinkProvider } from "@/features/panel/message-components/file-link-context";
 import type { SessionCloseRequest } from "@/features/panel/use-confirm-session-close";
+import type { FileTab, TabId } from "@/features/tabs/types";
 import type { ChangeRequestInfo } from "@/lib/api";
 import type { ResolvedComposerInsertRequest } from "@/lib/composer-insert";
 import { insertRequestMatchesComposer } from "@/lib/composer-insert";
+import type { EditorSessionState } from "@/lib/editor-session";
 import { hasUnresolvedPlanReview } from "@/lib/plan-review";
 import { sessionThreadMessagesQueryOptions } from "@/lib/query-client";
 import { useSettings } from "@/lib/settings";
@@ -90,6 +92,15 @@ type WorkspaceConversationContainerProps = {
 	contextPreviewActive?: boolean;
 	onSelectContextPreview?: () => void;
 	onCloseContextPreview?: () => void;
+	fileTabs?: FileTab[];
+	activeTabId?: TabId | null;
+	activeFileEditorSession?: EditorSessionState | null;
+	activeFileHasChanges?: boolean;
+	onSelectFileTab?: (id: TabId) => void;
+	onCloseFileTab?: (id: TabId) => void;
+	onChangeFileEditorSession?: (session: EditorSessionState) => void;
+	onExitFileEditor?: () => void;
+	onFileEditorError?: (description: string, title?: string) => void;
 	/** Prompt queued by an external caller (e.g. the inspector Git commit
 	 *  button or a drained CLI send) to be auto-submitted once the displayed
 	 *  session matches. Per-session config (model / effort / fast-mode /
@@ -174,6 +185,15 @@ export const WorkspaceConversationContainer = memo(
 		contextPreviewActive = false,
 		onSelectContextPreview,
 		onCloseContextPreview,
+		fileTabs,
+		activeTabId = null,
+		activeFileEditorSession = null,
+		activeFileHasChanges = false,
+		onSelectFileTab,
+		onCloseFileTab,
+		onChangeFileEditorSession,
+		onExitFileEditor,
+		onFileEditorError,
 		pendingPromptForSession = null,
 		pendingCreatedWorkspaceSubmit = null,
 		onPendingCreatedWorkspaceSubmitConsumed,
@@ -501,6 +521,16 @@ export const WorkspaceConversationContainer = memo(
 						contextPreviewActive={contextPreviewActive}
 						onSelectContextPreview={onSelectContextPreview}
 						onCloseContextPreview={onCloseContextPreview}
+						fileTabs={fileTabs}
+						activeTabId={activeTabId}
+						activeFileEditorSession={activeFileEditorSession}
+						activeFileHasChanges={activeFileHasChanges}
+						workspaceRootPath={workspaceRootPath}
+						onSelectFileTab={onSelectFileTab}
+						onCloseFileTab={onCloseFileTab}
+						onChangeFileEditorSession={onChangeFileEditorSession}
+						onExitFileEditor={onExitFileEditor}
+						onFileEditorError={onFileEditorError}
 						headerActions={headerActions}
 						headerLeading={headerLeading}
 						optimisticPendingSubmit={

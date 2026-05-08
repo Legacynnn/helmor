@@ -63,6 +63,11 @@ import {
 	useAppShortcuts,
 } from "@/features/shortcuts/use-app-shortcuts";
 import { useGlobalHotkeySync } from "@/features/shortcuts/use-global-hotkey-sync";
+import {
+	useWorkspaceFileTabs,
+	useWorkspaceTabsActions,
+} from "@/features/tabs/hooks/use-workspace-tabs";
+import type { FileTabOpener, TabId } from "@/features/tabs/types";
 import { AppUpdateButton } from "@/features/updater/app-update-button";
 import { useAppUpdater } from "@/features/updater/use-app-updater";
 import { WorkspaceStartPage } from "@/features/workspace-start";
@@ -123,6 +128,7 @@ import {
 	repositoriesQueryOptions,
 	sessionThreadMessagesQueryOptions,
 	workspaceChangeRequestQueryOptions,
+	workspaceChangesQueryOptions,
 	workspaceDetailQueryOptions,
 	workspaceForgeActionStatusQueryOptions,
 	workspaceForgeQueryOptions,
@@ -460,6 +466,24 @@ function AppShell({
 	);
 	const [displayedSessionId, setDisplayedSessionId] = useState<string | null>(
 		null,
+	);
+	const [activeTabId, setActiveTabId] = useState<TabId | null>(null);
+	const fileTabs = useWorkspaceFileTabs(displayedWorkspaceId);
+	const tabActions = useWorkspaceTabsActions();
+	const activeFileAbsolutePath =
+		activeTabId?.kind === "file" ? activeTabId.absolutePath : null;
+	const [fileTabEditorSessions, setFileTabEditorSessions] = useState<
+		Record<string, EditorSessionState>
+	>({});
+	const activeFileEditorSession =
+		activeFileAbsolutePath !== null
+			? (fileTabEditorSessions[activeFileAbsolutePath] ?? null)
+			: null;
+	const dirtyFileTabCount = useMemo(
+		() =>
+			Object.values(fileTabEditorSessions).filter((session) => session.dirty)
+				.length,
+		[fileTabEditorSessions],
 	);
 	const [workspaceViewMode, setWorkspaceViewMode] =
 		useState<WorkspaceViewMode>("conversation");
@@ -857,6 +881,19 @@ function AppShell({
 		enabled: selectedWorkspaceId !== null,
 	});
 	const workspaceForge = workspaceForgeQuery.data ?? null;
+
+	// Subscribe to the workspace's changes list so we can disable the editor
+	// Diff toggle on files that aren't actually changed. Hits the same cache
+	// the inspector populates — no extra fetch.
+	const workspaceChangesForActiveFileQuery = useQuery({
+		...workspaceChangesQueryOptions(workspaceRootPath ?? ""),
+		enabled: !!workspaceRootPath && activeFileAbsolutePath !== null,
+	});
+	const activeFileHasChanges = useMemo(() => {
+		if (!activeFileAbsolutePath) return false;
+		const items = workspaceChangesForActiveFileQuery.data?.items ?? [];
+		return items.some((item) => item.absolutePath === activeFileAbsolutePath);
+	}, [activeFileAbsolutePath, workspaceChangesForActiveFileQuery.data]);
 	const workspaceForgeProvider = workspaceForge?.provider ?? "unknown";
 	const workspaceForgeQueriesEnabled =
 		selectedWorkspaceId !== null &&
@@ -1394,6 +1431,11 @@ function AppShell({
 			selectedSessionIdRef.current = immediateSessionId;
 			setSelectedWorkspaceId(workspaceId);
 			setSelectedSessionId(immediateSessionId);
+			setActiveTabId(
+				immediateSessionId
+					? { kind: "session", sessionId: immediateSessionId }
+					: null,
+			);
 
 			if (workspaceId) {
 				// Skip git fetch while the worktree is still being created —
@@ -1434,6 +1476,14 @@ function AppShell({
 				selectedSessionIdRef.current = cachedWorkspaceDisplay.sessionId;
 				rememberSessionSelection(workspaceId, cachedWorkspaceDisplay.sessionId);
 				setSelectedSessionId(cachedWorkspaceDisplay.sessionId);
+				setActiveTabId(
+					cachedWorkspaceDisplay.sessionId
+						? {
+								kind: "session",
+								sessionId: cachedWorkspaceDisplay.sessionId,
+							}
+						: null,
+				);
 				if (workspaceSelectionRequestRef.current !== requestId) {
 					return;
 				}
@@ -1462,6 +1512,7 @@ function AppShell({
 					selectedSessionIdRef.current = sessionId;
 					rememberSessionSelection(workspaceId, sessionId);
 					setSelectedSessionId(sessionId);
+					setActiveTabId(sessionId ? { kind: "session", sessionId } : null);
 					setDisplayedWorkspaceId(workspaceId);
 					setDisplayedSessionId(sessionId);
 				})
@@ -1489,6 +1540,9 @@ function AppShell({
 		(sessionId: string | null) => {
 			setWorkspacePreviewActive(false);
 			if (sessionId === selectedSessionIdRef.current) {
+				if (sessionId) {
+					setActiveTabId({ kind: "session", sessionId });
+				}
 				return;
 			}
 
@@ -1497,6 +1551,7 @@ function AppShell({
 			rememberSessionSelection(selectedWorkspaceIdRef.current, sessionId);
 			selectedSessionIdRef.current = sessionId;
 			setSelectedSessionId(sessionId);
+			setActiveTabId(sessionId ? { kind: "session", sessionId } : null);
 			if (sessionId === null) {
 				if (sessionSelectionRequestRef.current !== requestId) {
 					return;
@@ -1540,6 +1595,169 @@ function AppShell({
 		},
 		[queryClient, rememberSessionSelection],
 	);
+
+	const handleOpenFileTab = useCallback(
+		(
+			input: {
+				absolutePath: string;
+				relativePath: string;
+				fileName: string;
+				diffOptions?: DiffOpenOptions;
+			},
+			opener: FileTabOpener,
+		) => {
+			if (!displayedWorkspaceId) return;
+			const isDiff = opener.kind === "changes";
+			const status = input.diffOptions?.fileStatus ?? "M";
+
+			// Always-open-as-diff for "changes" opener: if a `file`-kind session
+			// already exists for this path (e.g. user opened it from All files
+			// first), we replace it with a fresh diff session. If that existing
+			// session is dirty we ask first; bail out without focusing the tab
+			// when the user declines so we don't silently lose edits.
+			if (isDiff) {
+				const existing = fileTabEditorSessions[input.absolutePath];
+				if (
+					existing &&
+					existing.kind === "file" &&
+					existing.dirty &&
+					typeof window !== "undefined" &&
+					!window.confirm(
+						`Discard unsaved changes in ${input.absolutePath} and open the diff?`,
+					)
+				) {
+					return;
+				}
+			}
+
+			const id = tabActions.openFileTab(displayedWorkspaceId, {
+				...input,
+				opener,
+			});
+
+			const buildDiffSession = (): EditorSessionState => ({
+				kind: "diff",
+				path: input.absolutePath,
+				inline: status !== "M",
+				dirty: false,
+				fileStatus: status,
+				originalRef: input.diffOptions?.originalRef,
+				modifiedRef: input.diffOptions?.modifiedRef,
+				viewMode: isMarkdownPath(input.absolutePath) ? "source" : undefined,
+			});
+			const buildFileSession = (): EditorSessionState => ({
+				kind: "file",
+				path: input.absolutePath,
+				dirty: false,
+				viewMode: isMarkdownPath(input.absolutePath) ? "source" : undefined,
+			});
+
+			setFileTabEditorSessions((current) => {
+				const existing = current[input.absolutePath];
+				// Browser opener: preserve any existing session as-is.
+				if (!isDiff) {
+					if (existing) return current;
+					return { ...current, [input.absolutePath]: buildFileSession() };
+				}
+				// Changes opener: ensure the session is a diff. Already a diff →
+				// reuse. File-kind → replace with a fresh diff session (the
+				// dirty-edits prompt above already gated this).
+				if (existing && existing.kind === "diff") return current;
+				return { ...current, [input.absolutePath]: buildDiffSession() };
+			});
+			setActiveTabId(id);
+			setWorkspaceViewMode("conversation");
+		},
+		[displayedWorkspaceId, fileTabEditorSessions, tabActions],
+	);
+
+	const handleCloseFileTab = useCallback(
+		(id: TabId) => {
+			if (!displayedWorkspaceId || id.kind !== "file") return;
+			const tabSession = fileTabEditorSessions[id.absolutePath];
+			if (
+				tabSession?.dirty &&
+				typeof window !== "undefined" &&
+				!window.confirm(
+					`Discard unsaved changes in ${id.absolutePath} and close this tab?`,
+				)
+			) {
+				return;
+			}
+			tabActions.closeFileTab(displayedWorkspaceId, id);
+			setFileTabEditorSessions((current) => {
+				if (!current[id.absolutePath]) return current;
+				const next = { ...current };
+				delete next[id.absolutePath];
+				return next;
+			});
+			if (
+				activeTabId?.kind === "file" &&
+				activeTabId.absolutePath === id.absolutePath
+			) {
+				setActiveTabId(
+					selectedSessionId
+						? { kind: "session", sessionId: selectedSessionId }
+						: null,
+				);
+			}
+		},
+		[
+			activeTabId,
+			displayedWorkspaceId,
+			fileTabEditorSessions,
+			selectedSessionId,
+			tabActions,
+		],
+	);
+
+	const handleSelectFileTab = useCallback(
+		(id: TabId) => {
+			if (id.kind !== "file") return;
+			const tab = fileTabs.find(
+				(item) => item.absolutePath === id.absolutePath,
+			);
+			setFileTabEditorSessions((current) => {
+				if (current[id.absolutePath] || !tab) return current;
+				return {
+					...current,
+					[id.absolutePath]: {
+						kind: tab.opener.kind === "changes" ? "diff" : "file",
+						path: tab.absolutePath,
+						dirty: false,
+						viewMode: isMarkdownPath(tab.absolutePath) ? "source" : undefined,
+					},
+				};
+			});
+			setActiveTabId(id);
+			setWorkspaceViewMode("conversation");
+		},
+		[fileTabs],
+	);
+
+	const handleFileTabEditorSessionChange = useCallback(
+		(session: EditorSessionState) => {
+			if (!displayedWorkspaceId || activeTabId?.kind !== "file") return;
+			setFileTabEditorSessions((current) => ({
+				...current,
+				[activeTabId.absolutePath]: session,
+			}));
+			tabActions.setDirty(
+				displayedWorkspaceId,
+				activeTabId,
+				Boolean(session.dirty),
+			);
+		},
+		[activeTabId, displayedWorkspaceId, tabActions],
+	);
+
+	const handleExitFileEditor = useCallback(() => {
+		setActiveTabId(
+			selectedSessionId
+				? { kind: "session", sessionId: selectedSessionId }
+				: null,
+		);
+	}, [selectedSessionId]);
 
 	const {
 		commitButtonMode,
@@ -2379,6 +2597,7 @@ function AppShell({
 			selectedSessionIdRef.current = null;
 			setSelectedWorkspaceId(null);
 			setSelectedSessionId(null);
+			setActiveTabId(null);
 			setDisplayedWorkspaceId(null);
 			setDisplayedSessionId(null);
 			setWorkspaceViewMode("start");
@@ -3047,6 +3266,17 @@ function AppShell({
 													onCloseContextPreview={
 														handleWorkspaceContextPreviewClose
 													}
+													fileTabs={fileTabs}
+													activeTabId={activeTabId}
+													activeFileEditorSession={activeFileEditorSession}
+													activeFileHasChanges={activeFileHasChanges}
+													onSelectFileTab={handleSelectFileTab}
+													onCloseFileTab={handleCloseFileTab}
+													onChangeFileEditorSession={
+														handleFileTabEditorSessionChange
+													}
+													onExitFileEditor={handleExitFileEditor}
+													onFileEditorError={handleEditorSurfaceError}
 													headerLeading={
 														sidebarCollapsed ? (
 															<>
@@ -3387,7 +3617,11 @@ function AppShell({
 															return `${remote}/${target}`;
 														})()}
 														editorMode={workspaceViewMode === "editor"}
-														activeEditorPath={editorSession?.path ?? null}
+														activeEditorPath={
+															activeFileAbsolutePath ??
+															editorSession?.path ??
+															null
+														}
 														onOpenEditorFile={handleOpenEditorFile}
 														onCommitAction={handleCommitAction}
 														onReviewAction={() =>
@@ -3412,6 +3646,8 @@ function AppShell({
 														changeRequest={workspaceChangeRequest}
 														forgeIsRefreshing={workspaceForgeIsRefreshing}
 														onOpenSettings={handleOpenSettings}
+														activeFileAbsolutePath={activeFileAbsolutePath}
+														onOpenFileTab={handleOpenFileTab}
 													/>
 												)}
 											</div>
@@ -3429,7 +3665,10 @@ function AppShell({
 					</ComposerInsertProvider>
 				</SessionRunStatesProvider>
 			</WorkspaceToastProvider>
-			<QuitConfirmDialog sessionRunStates={effectiveSessionRunStates} />
+			<QuitConfirmDialog
+				sessionRunStates={effectiveSessionRunStates}
+				dirtyFileTabCount={dirtyFileTabCount}
+			/>
 		</TooltipProvider>
 	);
 }

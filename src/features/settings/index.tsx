@@ -430,6 +430,17 @@ export const SettingsDialog = memo(function SettingsDialog({
 										/>
 									</SettingsRow>
 									<SettingsRow
+										title="Editor autosave"
+										description="Save open file tabs after you stop typing."
+									>
+										<Switch
+											checked={settings.editorAutosave}
+											onCheckedChange={(checked) =>
+												updateSettings({ editorAutosave: checked })
+											}
+										/>
+									</SettingsRow>
+									<SettingsRow
 										title="Follow-up behavior"
 										description={
 											<>
