@@ -305,9 +305,9 @@ export function GitSectionHeader({
 										size="icon-xs"
 										aria-label="Stage all"
 										onClick={() => void onStageAll()}
-										className="size-4 rounded-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+										className="size-3.5 translate-y-px rounded-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground"
 									>
-										<PlusIcon className="size-3.5" strokeWidth={2} />
+										<PlusIcon className="size-3" strokeWidth={2} />
 									</Button>
 								</TooltipTrigger>
 								<TooltipContent side="bottom" sideOffset={4}>
@@ -324,9 +324,9 @@ export function GitSectionHeader({
 										size="icon-xs"
 										aria-label="Unstage all"
 										onClick={() => void onUnstageAll()}
-										className="size-4 rounded-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+										className="size-3.5 translate-y-px rounded-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground"
 									>
-										<MinusIcon className="size-3.5" strokeWidth={2} />
+										<MinusIcon className="size-3" strokeWidth={2} />
 									</Button>
 								</TooltipTrigger>
 								<TooltipContent side="bottom" sideOffset={4}>
