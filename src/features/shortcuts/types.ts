@@ -37,7 +37,8 @@ export type ShortcutId =
 	| "terminal.next"
 	| "terminal.previous"
 	| "inspector.toggleScripts"
-	| "inspector.focusTerminal";
+	| "inspector.focusTerminal"
+	| "fileBrowser.collapseAll";
 
 export type ShortcutGroup =
 	| "Navigation"
@@ -54,7 +55,13 @@ export type ShortcutGroup =
 // "composer" and "chat"), so a shortcut bound to "chat" still fires while
 // typing — and a "composer"-only shortcut stays off when chat focus lives
 // elsewhere (inspector, message list).
-export type ShortcutScope = "app" | "chat" | "composer" | "terminal" | "editor";
+export type ShortcutScope =
+	| "app"
+	| "chat"
+	| "composer"
+	| "terminal"
+	| "editor"
+	| "fileBrowser";
 
 export type ShortcutDefinition = {
 	id: ShortcutId;

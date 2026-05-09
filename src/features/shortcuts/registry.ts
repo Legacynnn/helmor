@@ -324,6 +324,15 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		scopes: ["app"],
 		editable: true,
 	},
+	{
+		id: "fileBrowser.collapseAll",
+		title: "Collapse all folders",
+		description: "Closes every expanded folder in the All files tree.",
+		group: "Workspace",
+		defaultHotkey: "Mod+Shift+W",
+		scopes: ["fileBrowser"],
+		editable: true,
+	},
 ];
 
 export const SHORTCUT_DEFINITION_BY_ID = new Map(
