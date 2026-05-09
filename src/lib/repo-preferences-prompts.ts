@@ -31,6 +31,10 @@ type ResolveRepoPreferencePromptArgs = {
 	 *  fresh clone, so the agent doesn't see a literal `<remote>`
 	 *  placeholder in the prompt. */
 	remote?: string | null;
+	/** User-provided title/body draft for the upcoming PR (read from the
+	 *  Checks panel inputs). When present and non-empty, the createPr
+	 *  prompt asks the agent to use these verbatim. */
+	prDraft?: { title?: string; body?: string } | null;
 };
 
 const DEFAULT_REMOTE = "origin";
@@ -109,9 +113,18 @@ function createPrPrompt(
 	dialect: ForgePromptDialect,
 	targetBranch?: string | null,
 	remote?: string | null,
+	prDraft?: { title?: string; body?: string } | null,
 ): string {
 	const branch = requireTargetBranch("createPr", targetBranch);
 	const remoteName = normalizeRemote(remote);
+	const draftTitle = prDraft?.title?.trim();
+	const draftBody = prDraft?.body?.trim();
+	const titleClause = draftTitle
+		? `Use exactly this ${dialect.changeRequestName} title (do not modify it): ${draftTitle}`
+		: `Use a clear ${dialect.changeRequestName} title`;
+	const bodyClause = draftBody
+		? `Use exactly this body (do not modify it): ${draftBody}`
+		: `Use a body that explains: what changed, why it changed, and any follow-up / test notes`;
 	return `Create a ${dialect.changeRequestFullName} for the uncommitted work in this workspace.
 
 Do the following, in order:
@@ -119,7 +132,7 @@ Do the following, in order:
 2. Stage everything that should ship with \`git add\`.
 3. Commit with a concise, Conventional-Commits-style message (\`feat:\`, \`fix:\`, \`refactor:\`, \`chore:\`, etc.) that summarizes the change in one line.
 4. Push the current branch to \`${remoteName}\`. If needed, create the remote tracking branch with \`git push -u ${remoteName} HEAD\`.
-5. Open a ${dialect.changeRequestFullName} against \`${branch}\` using \`${dialect.createCommand(branch)}\`. Use a clear ${dialect.changeRequestName} title and a body that explains: what changed, why it changed, and any follow-up / test notes.
+5. Open a ${dialect.changeRequestFullName} against \`${branch}\` using \`${dialect.createCommand(branch)}\`. ${titleClause}. ${bodyClause}.
 6. Report the ${dialect.changeRequestName} URL in your final message so I can click it.
 
 Don't stop to ask for confirmation — execute each step automatically. If you hit an unrecoverable error (e.g. merge conflict, pre-push hook failure), report it clearly so I can intervene.`;
@@ -289,6 +302,7 @@ export function resolveRepoPreferencePrompt({
 	resolveConflictsKind = "mergeConflict",
 	forge,
 	remote,
+	prDraft,
 }: ResolveRepoPreferencePromptArgs): string {
 	const override = repoPreferenceOverride(key, repoPreferences);
 	const targetPlaceholderValue = targetRef ?? targetBranch ?? null;
@@ -310,7 +324,12 @@ export function resolveRepoPreferencePrompt({
 			);
 		case "createPr":
 			return appendUserPreferences(
-				createPrPrompt(forgePromptDialect(forge), targetBranch, remote),
+				createPrPrompt(
+					forgePromptDialect(forge),
+					targetBranch,
+					remote,
+					prDraft,
+				),
 				resolvedOverride,
 			);
 		case "review":

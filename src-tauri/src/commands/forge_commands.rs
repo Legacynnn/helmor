@@ -355,6 +355,36 @@ pub async fn close_workspace_change_request(
     run_change_request_action(workspace_id, app, forge::close_workspace_change_request).await
 }
 
+#[tauri::command]
+pub async fn update_workspace_change_request(
+    workspace_id: String,
+    title: Option<String>,
+    body: Option<String>,
+    app: tauri::AppHandle,
+) -> CmdResult<Option<ChangeRequestInfo>> {
+    let lookup_workspace_id = workspace_id.clone();
+    let title_owned = title.clone();
+    let body_owned = body.clone();
+    let (result, workspace_status_changed) = run_blocking(move || {
+        let result = forge::update_workspace_change_request(
+            &lookup_workspace_id,
+            title_owned.as_deref(),
+            body_owned.as_deref(),
+        )?;
+        let changed =
+            crate::workspaces::sync_workspace_pr_state(&lookup_workspace_id, result.as_ref())?;
+        Ok::<_, anyhow::Error>((result, changed))
+    })
+    .await?;
+    if workspace_status_changed {
+        ui_sync::publish(
+            &app,
+            UiMutationEvent::WorkspaceChangeRequestChanged { workspace_id },
+        );
+    }
+    Ok(result)
+}
+
 async fn run_change_request_action(
     workspace_id: String,
     app: tauri::AppHandle,

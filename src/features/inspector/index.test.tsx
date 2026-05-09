@@ -1,4 +1,5 @@
 import {
+	act,
 	cleanup,
 	fireEvent,
 	screen,
@@ -74,7 +75,7 @@ function emptyPrStatus(
 function renderInspector(
 	props: Partial<ComponentProps<typeof WorkspaceInspectorSidebar>> = {},
 ) {
-	return renderWithProviders(
+	const result = renderWithProviders(
 		<WorkspaceInspectorSidebar
 			workspaceId="workspace-1"
 			workspaceRootPath="/tmp/workspace"
@@ -87,6 +88,12 @@ function renderInspector(
 			{...props}
 		/>,
 	);
+	// Tests in this file all assert against the Checks panel; the top-section
+	// tab defaults to "changes", so click "Checks" to surface its body.
+	act(() => {
+		fireEvent.click(screen.getByRole("button", { name: /^Checks/ }));
+	});
+	return result;
 }
 
 function expectTextBefore(
@@ -102,7 +109,7 @@ function expectTextBefore(
 	).toBeTruthy();
 }
 
-describe("WorkspaceInspectorSidebar Actions section", () => {
+describe("WorkspaceInspectorSidebar Checks section", () => {
 	beforeEach(() => {
 		apiMocks.listWorkspaceChangesWithContent.mockReset();
 		apiMocks.getWorkspaceForgeCheckInsertText.mockReset();
@@ -136,7 +143,7 @@ describe("WorkspaceInspectorSidebar Actions section", () => {
 
 		await screen.findByText("No uncommitted changes");
 
-		const actions = screen.getByLabelText("Inspector section Actions");
+		const actions = screen.getByLabelText("Inspector section Checks");
 		expect(within(actions).queryByText("Deployments")).not.toBeInTheDocument();
 		expect(within(actions).queryByText("Checks")).not.toBeInTheDocument();
 		expect(within(actions).queryByText("marketing")).not.toBeInTheDocument();
@@ -150,7 +157,7 @@ describe("WorkspaceInspectorSidebar Actions section", () => {
 
 		await screen.findByText("Up to date with testuser/main");
 
-		const actions = screen.getByLabelText("Inspector section Actions");
+		const actions = screen.getByLabelText("Inspector section Checks");
 		expect(
 			within(actions).getByText("Up to date with testuser/main"),
 		).toBeInTheDocument();
@@ -163,13 +170,13 @@ describe("WorkspaceInspectorSidebar Actions section", () => {
 		expect(within(actions).getAllByLabelText("Passed")).toHaveLength(3);
 	});
 
-	it("keeps the actions scroll area shrinkable when tabs are collapsed", async () => {
+	it("keeps the checks scroll area shrinkable when tabs are collapsed", async () => {
 		renderInspector();
 
 		await screen.findByText("Up to date with testuser/main");
 
-		const actionsBody = screen.getByLabelText("Actions panel body");
-		expect(actionsBody).toHaveClass("min-h-0");
+		const checksBody = screen.getByLabelText("Checks panel body");
+		expect(checksBody).toHaveClass("min-h-0");
 	});
 
 	it("shows dirty and conflicting git rows and reuses commit action handlers", async () => {
@@ -440,7 +447,7 @@ describe("WorkspaceInspectorSidebar Actions section", () => {
 
 		await screen.findByText("6 commits ahead of origin/testuser/leo");
 
-		const actions = screen.getByLabelText("Inspector section Actions");
+		const actions = screen.getByLabelText("Inspector section Checks");
 		expectTextBefore(
 			actions,
 			"6 commits ahead of origin/testuser/leo",
@@ -467,7 +474,7 @@ describe("WorkspaceInspectorSidebar Actions section", () => {
 
 		await screen.findByText("Review approved");
 
-		const actions = screen.getByLabelText("Inspector section Actions");
+		const actions = screen.getByLabelText("Inspector section Checks");
 		expectTextBefore(actions, "Merge conflicts detected", "Review approved");
 	});
 
@@ -521,7 +528,7 @@ describe("WorkspaceInspectorSidebar Actions section", () => {
 			commitButtonState: "busy",
 		});
 
-		const actions = screen.getByLabelText("Inspector section Actions");
+		const actions = screen.getByLabelText("Inspector section Checks");
 		const pushButton = await within(actions).findByRole("button", {
 			name: "Pushing",
 		});
@@ -548,7 +555,7 @@ describe("WorkspaceInspectorSidebar Actions section", () => {
 			commitButtonState: "busy",
 		});
 
-		const actions = screen.getByLabelText("Inspector section Actions");
+		const actions = screen.getByLabelText("Inspector section Checks");
 		const commitButton = await within(actions).findByRole("button", {
 			name: "Committing",
 		});
@@ -586,7 +593,7 @@ describe("WorkspaceInspectorSidebar Actions section", () => {
 
 		await user.click(await screen.findByRole("button", { name: "Pull" }));
 
-		const actions = screen.getByLabelText("Inspector section Actions");
+		const actions = screen.getByLabelText("Inspector section Checks");
 		const pullButton = await within(actions).findByRole("button", {
 			name: "Pulling",
 		});

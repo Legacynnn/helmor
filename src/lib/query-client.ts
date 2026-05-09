@@ -702,6 +702,7 @@ function changeRequestPlaceholder(
 		number: parsed.number,
 		state: syncState.toUpperCase(),
 		title: seed.prTitle ?? "",
+		body: null,
 		isMerged: syncState === "merged",
 	};
 }

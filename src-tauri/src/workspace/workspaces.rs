@@ -1215,6 +1215,7 @@ mod tests {
             number: 1,
             state: "OPEN".to_string(),
             title: "PR".to_string(),
+            body: None,
             is_merged: false,
         };
         assert!(sync_workspace_pr_state("w-pr", Some(&open)).unwrap());
@@ -1275,6 +1276,7 @@ mod tests {
             number: 1,
             state: "OPEN".to_string(),
             title: "PR".to_string(),
+            body: None,
             is_merged: false,
         };
 
@@ -1336,6 +1338,7 @@ mod tests {
             number: 42,
             state: "OPEN".to_string(),
             title: "Add cool feature".to_string(),
+            body: None,
             is_merged: false,
         };
         assert!(sync_workspace_pr_state("w-pr", Some(&open)).unwrap());

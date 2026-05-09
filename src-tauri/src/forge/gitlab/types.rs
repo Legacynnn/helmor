@@ -10,6 +10,8 @@ use serde::Deserialize;
 pub(super) struct GitlabMergeRequest {
     pub(super) iid: i64,
     pub(super) title: String,
+    #[serde(default)]
+    pub(super) description: Option<String>,
     pub(super) state: String,
     pub(super) web_url: String,
     pub(super) merged_at: Option<String>,

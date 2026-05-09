@@ -71,6 +71,22 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		editable: true,
 	},
 	{
+		id: "editor.previousTab",
+		title: "Previous file tab",
+		group: "Workspace",
+		defaultHotkey: "Alt+ArrowLeft",
+		scopes: ["editor"],
+		editable: true,
+	},
+	{
+		id: "editor.nextTab",
+		title: "Next file tab",
+		group: "Workspace",
+		defaultHotkey: "Alt+ArrowRight",
+		scopes: ["editor"],
+		editable: true,
+	},
+	{
 		id: "workspace.copyPath",
 		title: "Copy workspace path",
 		group: "Workspace",

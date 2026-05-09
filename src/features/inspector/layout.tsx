@@ -56,8 +56,6 @@ export const INSPECTOR_SECTION_HEADER_HEIGHT = 33;
 const TABS_WRAPPER_COLLAPSED_MIN_HEIGHT_PX = INSPECTOR_SECTION_HEADER_HEIGHT;
 
 // Inspector layout persistence
-export const INSPECTOR_ACTIONS_OPEN_STORAGE_KEY =
-	"helmor.workspaceInspectorActionsOpen";
 export const INSPECTOR_TABS_OPEN_STORAGE_KEY =
 	"helmor.workspaceInspectorTabsOpen";
 export const INSPECTOR_ACTIVE_TAB_STORAGE_KEY =
@@ -66,20 +64,25 @@ export const INSPECTOR_CHANGES_HEIGHT_STORAGE_KEY =
 	"helmor.workspaceInspectorChangesHeight";
 export const INSPECTOR_TABS_HEIGHT_STORAGE_KEY =
 	"helmor.workspaceInspectorTabsHeight";
+export const INSPECTOR_TOP_VIEW_STORAGE_KEY =
+	"helmor.workspaceInspectorTopView";
 
-export function getInitialActionsOpen(): boolean {
+export function getInitialTopView<T extends string>(
+	allowed: readonly T[],
+	fallback: T,
+): T {
 	if (typeof window === "undefined") {
-		return true; // default: Actions open
+		return fallback;
 	}
 	try {
-		const stored = window.localStorage.getItem(
-			INSPECTOR_ACTIONS_OPEN_STORAGE_KEY,
-		);
-		if (!stored) return true;
-		return stored === "true";
+		const stored = window.localStorage.getItem(INSPECTOR_TOP_VIEW_STORAGE_KEY);
+		if (stored && (allowed as readonly string[]).includes(stored)) {
+			return stored as T;
+		}
 	} catch {
-		return true;
+		// fall through
 	}
+	return fallback;
 }
 
 export function getInitialTabsOpen(): boolean {

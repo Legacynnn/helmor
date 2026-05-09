@@ -19,6 +19,7 @@ const OPEN_CHANGE_REQUEST: ChangeRequestInfo = {
 	number: 1,
 	state: "OPEN",
 	title: "feat: thing",
+	body: null,
 	isMerged: false,
 };
 

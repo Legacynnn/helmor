@@ -7,6 +7,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { loadPrDraft } from "@/features/inspector/sections/pr-fields";
 import {
 	type ChangeRequestInfo,
 	closeWorkspaceChangeRequest,
@@ -394,12 +395,14 @@ export function useWorkspaceCommitLifecycle({
 				const forge = await queryClient
 					.ensureQueryData(workspaceForgeQueryOptions(workspaceId))
 					.catch(() => null);
+				const prDraft = mode === "create-pr" ? loadPrDraft(workspaceId) : null;
 				const prompt = buildCommitButtonPrompt(
 					mode,
 					repoPreferences,
 					selectedWorkspaceTargetBranch,
 					forge,
 					selectedWorkspaceRemote,
+					prDraft,
 				);
 				console.log("[commitButton] session created", { sessionId });
 

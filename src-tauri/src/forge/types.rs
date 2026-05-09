@@ -76,6 +76,7 @@ pub struct ChangeRequestInfo {
     pub number: i64,
     pub state: String,
     pub title: String,
+    pub body: Option<String>,
     pub is_merged: bool,
 }
 

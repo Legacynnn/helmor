@@ -88,6 +88,8 @@ describe("useWorkspaceCommitLifecycle", () => {
 			title: "Fix overflow",
 			url: "https://github.com/example/repo/pull/53",
 			state: "OPEN",
+			body: null,
+
 			isMerged: false,
 		} satisfies ChangeRequestInfo);
 		apiMocks.pushWorkspaceToRemote.mockResolvedValue({
@@ -519,6 +521,8 @@ describe("useWorkspaceCommitLifecycle", () => {
 				title: "Fix overflow",
 				url: "https://github.com/example/repo/pull/53",
 				state: "OPEN",
+				body: null,
+
 				isMerged: false,
 			},
 		);
@@ -571,6 +575,8 @@ describe("useWorkspaceCommitLifecycle", () => {
 						title: "Fix overflow",
 						url: "https://github.com/example/repo/pull/53",
 						state: "OPEN",
+						body: null,
+
 						isMerged: false,
 					},
 					forgeActionStatus: {
@@ -618,6 +624,8 @@ describe("useWorkspaceCommitLifecycle", () => {
 				title: "Fix overflow",
 				url: "https://github.com/example/repo/pull/53",
 				state: "MERGED",
+				body: null,
+
 				isMerged: true,
 			});
 			await Promise.resolve();
@@ -670,6 +678,8 @@ describe("useWorkspaceCommitLifecycle", () => {
 						title: "Fix overflow",
 						url: "https://github.com/example/repo/pull/53",
 						state: "OPEN",
+						body: null,
+
 						isMerged: false,
 					},
 					forgeActionStatus: {
@@ -727,6 +737,8 @@ describe("useWorkspaceCommitLifecycle", () => {
 						title: "Add Review PR button",
 						url: "https://github.com/example/repo/pull/99",
 						state: "OPEN",
+						body: null,
+
 						isMerged: false,
 					},
 					forgeActionStatus: EMPTY_FORGE_ACTION_STATUS,
@@ -866,6 +878,8 @@ describe("useWorkspaceCommitLifecycle", () => {
 						title: "Fix overflow",
 						url: "https://github.com/example/repo/pull/53",
 						state: "OPEN",
+						body: null,
+
 						isMerged: false,
 					},
 					forgeActionStatus: {

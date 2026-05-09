@@ -168,6 +168,29 @@ pub fn merge_workspace_change_request(workspace_id: &str) -> Result<Option<Chang
     Ok(result)
 }
 
+pub fn update_workspace_change_request(
+    workspace_id: &str,
+    title: Option<&str>,
+    body: Option<&str>,
+) -> Result<Option<ChangeRequestInfo>> {
+    let Some((detection, backend)) = resolve_backend(workspace_id, "update_change_request")? else {
+        return Ok(None);
+    };
+    let result = backend
+        .update_change_request(workspace_id, title, body)
+        .inspect_err(|error| {
+            log_forge_backend_error(error, workspace_id, &detection, "Forge update failed")
+        })?;
+    tracing::info!(
+        workspace_id,
+        provider = ?detection.provider,
+        host = ?detection.host,
+        number = result.as_ref().map(|pr| pr.number),
+        "Forge update completed"
+    );
+    Ok(result)
+}
+
 pub fn close_workspace_change_request(workspace_id: &str) -> Result<Option<ChangeRequestInfo>> {
     let Some((detection, backend)) = resolve_backend(workspace_id, "close_change_request")? else {
         return Ok(None);

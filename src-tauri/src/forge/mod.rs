@@ -44,5 +44,5 @@ pub use types::{
 pub use workspace::{
     close_workspace_change_request, get_workspace_forge, lookup_workspace_forge_action_status,
     lookup_workspace_forge_check_insert_text, merge_workspace_change_request,
-    refresh_workspace_change_request,
+    refresh_workspace_change_request, update_workspace_change_request,
 };
