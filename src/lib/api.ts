@@ -1819,6 +1819,7 @@ export type ChangeRequestInfo = {
 	number: number;
 	state: "OPEN" | "CLOSED" | "MERGED" | string;
 	title: string;
+	body: string | null;
 	isMerged: boolean;
 };
 
@@ -2004,6 +2005,28 @@ export async function closeWorkspaceChangeRequest(
 	} catch (error) {
 		throw new Error(
 			describeInvokeError(error, "Unable to close change request."),
+		);
+	}
+}
+
+export async function updateWorkspaceChangeRequest(
+	workspaceId: string,
+	fields: { title?: string; body?: string },
+): Promise<ChangeRequestInfo | null> {
+	try {
+		return (
+			(await invoke<ChangeRequestInfo | null>(
+				"update_workspace_change_request",
+				{
+					workspaceId,
+					title: fields.title ?? null,
+					body: fields.body ?? null,
+				},
+			)) ?? null
+		);
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to update change request."),
 		);
 	}
 }

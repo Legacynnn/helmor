@@ -11,6 +11,8 @@ export type ShortcutId =
 	| "session.close"
 	| "session.reopenClosed"
 	| "editor.save"
+	| "editor.previousTab"
+	| "editor.nextTab"
 	| "script.run"
 	| "settings.open"
 	| "theme.toggle"

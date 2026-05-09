@@ -35,6 +35,7 @@ use self::actions::{
 use self::context::{load_github_context, GithubContext, GithubResolution, HostAuthCheck};
 use self::pull_request::{
     close_pull_request, fetch_open_pr_node_id, find_workspace_pr, merge_pull_request,
+    update_pull_request,
 };
 
 /// Look up the (most recent) pull request matching this workspace's
@@ -173,6 +174,32 @@ pub fn close_workspace_pr(workspace_id: &str) -> Result<Option<ChangeRequestInfo
         bail!("Could not resolve PR node ID for #{}", pr.number);
     };
     close_pull_request(&context.login, &pr_node_id).context("closePullRequest failed")?;
+    lookup_workspace_pr(workspace_id)
+}
+
+/// Update title and/or body on a workspace's open PR. Returns the
+/// refreshed `ChangeRequestInfo` so the caller can update its cache in
+/// one round-trip. Pass `None` for any field you don't want to change.
+pub fn update_workspace_pr(
+    workspace_id: &str,
+    title: Option<&str>,
+    body: Option<&str>,
+) -> Result<Option<ChangeRequestInfo>> {
+    let pr = lookup_workspace_pr(workspace_id)?;
+    let Some(pr) = pr else {
+        return Ok(None);
+    };
+    if pr.state != "OPEN" {
+        bail!("PR #{} is not open (state: {})", pr.number, pr.state);
+    }
+    let Some(context) = mutation_context(workspace_id)? else {
+        return Ok(None);
+    };
+    let Some(pr_node_id) = fetch_open_pr_node_id(&context)? else {
+        bail!("Could not resolve PR node ID for #{}", pr.number);
+    };
+    update_pull_request(&context.login, &pr_node_id, title, body)
+        .context("updatePullRequest failed")?;
     lookup_workspace_pr(workspace_id)
 }
 

@@ -13,6 +13,7 @@ const CHANGE_REQUEST_OPEN: ChangeRequestInfo = {
 	number: 42,
 	state: "OPEN",
 	title: "feat: add workspace git sync",
+	body: null,
 	isMerged: false,
 };
 
@@ -21,6 +22,7 @@ const CHANGE_REQUEST_MERGED: ChangeRequestInfo = {
 	number: 42,
 	state: "MERGED",
 	title: "feat: add workspace git sync",
+	body: null,
 	isMerged: true,
 };
 
@@ -29,6 +31,7 @@ const CHANGE_REQUEST_CLOSED: ChangeRequestInfo = {
 	number: 42,
 	state: "CLOSED",
 	title: "feat: add workspace git sync",
+	body: null,
 	isMerged: false,
 };
 

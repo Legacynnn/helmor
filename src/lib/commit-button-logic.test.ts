@@ -20,6 +20,7 @@ function makeChangeRequest(
 		number: 1,
 		state: "OPEN",
 		title: "test change request",
+		body: null,
 		isMerged: false,
 		...overrides,
 	};

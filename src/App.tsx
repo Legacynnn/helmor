@@ -2109,6 +2109,28 @@ function AppShell({
 		[handleSelectSession, queryClient],
 	);
 
+	const handleNavigateFileTabs = useCallback(
+		(offset: -1 | 1) => {
+			if (fileTabs.length === 0) return;
+			const currentPath =
+				activeTabId?.kind === "file" ? activeTabId.absolutePath : null;
+			const currentIndex = currentPath
+				? fileTabs.findIndex((tab) => tab.absolutePath === currentPath)
+				: -1;
+			// Wrap around in both directions; matches the terminal-tab nav UX.
+			const baseIndex = currentIndex === -1 ? 0 : currentIndex;
+			const nextIndex =
+				(baseIndex + offset + fileTabs.length) % fileTabs.length;
+			const nextTab = fileTabs[nextIndex];
+			if (!nextTab) return;
+			handleSelectFileTab({
+				kind: "file",
+				absolutePath: nextTab.absolutePath,
+			});
+		},
+		[activeTabId, fileTabs, handleSelectFileTab],
+	);
+
 	const handleNavigateWorkspaces = useCallback(
 		(offset: -1 | 1) => {
 			const nextWorkspaceId = findAdjacentWorkspaceId(
@@ -2170,6 +2192,16 @@ function AppShell({
 				id: "session.next" as const,
 				callback: () => handleNavigateSessions(1),
 				enabled: workspaceViewMode === "conversation",
+			},
+			{
+				id: "editor.previousTab" as const,
+				callback: () => handleNavigateFileTabs(-1),
+				enabled: fileTabs.length > 1,
+			},
+			{
+				id: "editor.nextTab" as const,
+				callback: () => handleNavigateFileTabs(1),
+				enabled: fileTabs.length > 1,
 			},
 			{
 				id: "session.close" as const,
@@ -2288,8 +2320,10 @@ function AppShell({
 			handleCreateSession,
 			handleCommitAction,
 			handleInspectorCommitAction,
+			handleNavigateFileTabs,
 			handleNavigateSessions,
 			handleNavigateWorkspaces,
+			fileTabs.length,
 			handleOpenModelPicker,
 			handleOpenPreferredEditor,
 			handleOpenPullRequest,

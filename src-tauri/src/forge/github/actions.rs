@@ -245,6 +245,7 @@ fn build_action_status(node: ActionPullRequestNode) -> ForgeActionStatus {
         number: node.number,
         state: node.state,
         title: node.title,
+        body: None,
         is_merged: node.merged,
     };
     let review_decision = node.review_decision;

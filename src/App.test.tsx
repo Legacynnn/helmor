@@ -80,12 +80,9 @@ describe("App", () => {
 		expect(inspector).toHaveClass("overflow-hidden");
 		expect(inspector).toHaveStyle({ width: "336px" });
 		expect(screen.getByLabelText("Inspector section Git")).toBeInTheDocument();
-		expect(
-			screen.getByLabelText("Inspector section Actions"),
-		).toBeInTheDocument();
 		expect(screen.getByLabelText("Inspector section Tabs")).toBeInTheDocument();
 		expect(screen.getByLabelText("Changes panel body")).toBeInTheDocument();
-		expect(screen.getByLabelText("Actions panel body")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /^Checks/ })).toBeInTheDocument();
 		// Inspector tabs section starts collapsed; body only mounts when opened.
 		expect(
 			screen.queryByLabelText("Inspector tabs body"),
@@ -121,26 +118,19 @@ describe("App", () => {
 		expect(newWorkspaceButton).toBeInTheDocument();
 	});
 
-	it("toggles the inspector tabs section while leaving the first two panels expanded", async () => {
+	it("toggles the inspector tabs section while keeping the top section visible", async () => {
 		const user = userEvent.setup();
 		render(<App />);
 		await screen.findByRole("main", { name: "Application shell" });
 		const tabsToggle = screen.getByLabelText("Toggle inspector tabs section");
 		const tabsChevron = tabsToggle.querySelector("svg");
-		const actionsChevron = screen
-			.getByLabelText("Toggle inspector actions section")
-			.querySelector("svg");
 
 		expect(tabsChevron).toHaveStyle({
 			transition: "transform 0ms cubic-bezier(0.32, 0.72, 0, 1)",
 		});
-		expect(actionsChevron).toHaveStyle({
-			transition: "transform 0ms cubic-bezier(0.32, 0.72, 0, 1)",
-		});
 
-		// Default: tabs section collapsed; changes + actions bodies present.
+		// Default: tabs section collapsed; top section's Changes body present.
 		expect(screen.getByLabelText("Changes panel body")).toBeInTheDocument();
-		expect(screen.getByLabelText("Actions panel body")).toBeInTheDocument();
 		expect(
 			screen.queryByLabelText("Inspector tabs body"),
 		).not.toBeInTheDocument();
@@ -149,7 +139,6 @@ describe("App", () => {
 		await user.click(tabsToggle);
 
 		expect(screen.getByLabelText("Changes panel body")).toBeInTheDocument();
-		expect(screen.getByLabelText("Actions panel body")).toBeInTheDocument();
 		expect(screen.getByLabelText("Inspector tabs body")).toBeInTheDocument();
 		expect(tabsChevron).toHaveStyle({
 			transition: "transform 350ms cubic-bezier(0.32, 0.72, 0, 1)",
@@ -159,7 +148,6 @@ describe("App", () => {
 		await user.click(tabsToggle);
 
 		expect(screen.getByLabelText("Changes panel body")).toBeInTheDocument();
-		expect(screen.getByLabelText("Actions panel body")).toBeInTheDocument();
 		expect(
 			screen.queryByLabelText("Inspector tabs body"),
 		).not.toBeInTheDocument();
@@ -184,13 +172,14 @@ describe("App", () => {
 			render(<App />);
 			await screen.findByRole("main", { name: "Application shell" });
 
+			// Container 900px − 2 × 33px section headers = 834px body budget.
+			// Tabs section is collapsed by default → top section absorbs all of
+			// it. The Git section wraps its body in `header(33) + bodyHeight`,
+			// so it lays out at 33 + 834 = 867px.
 			await waitFor(() => {
 				expect(screen.getByLabelText("Inspector section Git")).toHaveStyle({
-					height: "273px",
+					height: "867px",
 				});
-			});
-			expect(screen.getByLabelText("Inspector section Actions")).toHaveStyle({
-				height: "594px",
 			});
 			const tabsWrapper = screen.getByLabelText("Inspector section Tabs")
 				.parentElement?.parentElement;

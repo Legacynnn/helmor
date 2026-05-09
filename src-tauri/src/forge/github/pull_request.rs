@@ -21,6 +21,7 @@ query($owner: String!, $name: String!, $head: String!) {
         number
         state
         title
+        body
         merged
         isCrossRepository
       }
@@ -33,7 +34,7 @@ const PR_NODE_ID_QUERY: &str = r#"
 query($owner: String!, $name: String!, $head: String!) {
   repository(owner: $owner, name: $name) {
     pullRequests(headRefName: $head, states: [OPEN], first: 5) {
-      nodes { id, url, number, state, title, merged, isCrossRepository }
+      nodes { id, url, number, state, title, body, merged, isCrossRepository }
     }
   }
 }
@@ -53,10 +54,18 @@ query($owner: String!, $name: String!) {
 }
 "#;
 
+const UPDATE_PR_MUTATION: &str = r#"
+mutation($prId: ID!, $title: String, $body: String) {
+  updatePullRequest(input: { pullRequestId: $prId, title: $title, body: $body }) {
+    pullRequest { url, number, state, title, body, merged }
+  }
+}
+"#;
+
 const CLOSE_PR_MUTATION: &str = r#"
 mutation($prId: ID!) {
   closePullRequest(input: { pullRequestId: $prId }) {
-    pullRequest { url, number, state, title, merged }
+    pullRequest { url, number, state, title, body, merged }
   }
 }
 "#;
@@ -167,6 +176,7 @@ fn pr_info(node: PullRequestNode) -> ChangeRequestInfo {
         number: node.number,
         state: node.state,
         title: node.title,
+        body: node.body,
         is_merged: node.merged,
     }
 }
@@ -213,7 +223,7 @@ fn merge_mutation_for(method: MergeMethod) -> String {
         r#"
 mutation($prId: ID!) {{
   mergePullRequest(input: {{ pullRequestId: $prId, mergeMethod: {} }}) {{
-    pullRequest {{ url, number, state, title, merged }}
+    pullRequest {{ url, number, state, title, body, merged }}
   }}
 }}
 "#,
@@ -266,6 +276,41 @@ pub(super) fn close_pull_request(login: &str, pr_node_id: &str) -> Result<()> {
     run_pr_mutation(login, CLOSE_PR_MUTATION, pr_node_id)
 }
 
+/// Run the `updatePullRequest` mutation for `pr_node_id`. Either `title`
+/// or `body` (or both) must be provided — passing both as `None` is a
+/// no-op and bails so we don't waste a network round-trip.
+pub(super) fn update_pull_request(
+    login: &str,
+    pr_node_id: &str,
+    title: Option<&str>,
+    body: Option<&str>,
+) -> Result<()> {
+    if title.is_none() && body.is_none() {
+        bail!("updatePullRequest needs at least one of title or body");
+    }
+    let mut variables: Vec<(&str, &str)> = vec![("prId", pr_node_id)];
+    if let Some(t) = title {
+        variables.push(("title", t));
+    }
+    if let Some(b) = body {
+        variables.push(("body", b));
+    }
+    let parsed: serde_json::Value = match run_graphql_raw(login, UPDATE_PR_MUTATION, &variables)? {
+        GraphqlOutcome::Auth => bail!("GitHub token was rejected"),
+        GraphqlOutcome::Ok(value) => value,
+    };
+    if let Some(errors) = parsed.get("errors").and_then(|v| v.as_array()) {
+        if !errors.is_empty() {
+            let msgs: Vec<&str> = errors
+                .iter()
+                .filter_map(|e| e.get("message").and_then(|m| m.as_str()))
+                .collect();
+            bail!("GraphQL mutation failed: {}", msgs.join("; "));
+        }
+    }
+    Ok(())
+}
+
 fn run_pr_mutation(login: &str, mutation: &str, pr_node_id: &str) -> Result<()> {
     let parsed: serde_json::Value = match run_graphql_raw(login, mutation, &[("prId", pr_node_id)])?
     {
@@ -295,6 +340,7 @@ mod tests {
             number: 1,
             state: state.to_string(),
             title: "Update".to_string(),
+            body: None,
             merged,
             is_cross_repository: false,
         }
@@ -307,6 +353,7 @@ mod tests {
             number,
             state: state.to_string(),
             title: "Update".to_string(),
+            body: None,
             merged: false,
             is_cross_repository: cross,
         }

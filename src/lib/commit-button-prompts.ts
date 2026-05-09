@@ -37,6 +37,7 @@ export function buildCommitButtonPrompt(
 	targetBranch?: string | null,
 	forge?: ForgeDetection | null,
 	remote?: string | null,
+	prDraft?: { title?: string; body?: string } | null,
 ): string {
 	const remoteName =
 		remote && remote.trim().length > 0 ? remote.trim() : "origin";
@@ -71,6 +72,7 @@ Use \`${dialect.reopenCommand}\` + \`${dialect.commentCommand}\`. Report the ${d
 				targetBranch,
 				forge,
 				remote,
+				prDraft: mode === "create-pr" ? prDraft : null,
 			});
 	}
 }

@@ -1,14 +1,22 @@
 import { cn } from "@/lib/utils";
 
-export type TopSectionView = "files" | "changes";
+export type TopSectionView = "files" | "changes" | "checks";
+
+export type ChecksIndicator = "none" | "pending" | "failure";
 
 interface Props {
 	value: TopSectionView;
 	onChange: (value: TopSectionView) => void;
 	changesCount?: number | null;
+	checksIndicator?: ChecksIndicator;
 }
 
-export function AllFilesChangesTabs({ value, onChange, changesCount }: Props) {
+export function TopSectionTabs({
+	value,
+	onChange,
+	changesCount,
+	checksIndicator = "none",
+}: Props) {
 	return (
 		<div className="flex h-7 items-center gap-1 rounded-md bg-muted/40 p-0.5">
 			<TabButton active={value === "files"} onClick={() => onChange("files")}>
@@ -23,6 +31,22 @@ export function AllFilesChangesTabs({ value, onChange, changesCount }: Props) {
 					<span className="ml-1 rounded-sm bg-foreground/10 px-1 text-[10px] font-medium text-foreground/80">
 						{changesCount}
 					</span>
+				) : null}
+			</TabButton>
+			<TabButton active={value === "checks"} onClick={() => onChange("checks")}>
+				Checks
+				{checksIndicator !== "none" ? (
+					<span
+						aria-label={
+							checksIndicator === "failure"
+								? "Checks have failures"
+								: "Checks pending"
+						}
+						className={cn(
+							"ml-1 inline-block size-1.5 rounded-full",
+							checksIndicator === "failure" ? "bg-destructive" : "bg-amber-500",
+						)}
+					/>
 				) : null}
 			</TabButton>
 		</div>

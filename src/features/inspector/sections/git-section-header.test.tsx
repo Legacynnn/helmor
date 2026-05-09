@@ -20,6 +20,7 @@ const changeRequest: ChangeRequestInfo = {
 	number: 182,
 	state: "OPEN",
 	title: "Add GitLab forge support",
+	body: null,
 	isMerged: false,
 };
 

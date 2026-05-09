@@ -13,17 +13,22 @@ import type { DiffOpenOptions } from "@/lib/editor-session";
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import {
-	AllFilesChangesTabs,
+	TopSectionTabs,
 	type TopSectionView,
-} from "./components/all-files-changes-tabs";
+} from "./components/top-section-tabs";
 import { useWorkspaceInspectorSidebar } from "./hooks/use-inspector";
 import { useScriptStatus } from "./hooks/use-script-status";
 import { useSetupAutoRun } from "./hooks/use-setup-auto-run";
-import { HorizontalResizeHandle, InspectorTabsSection } from "./layout";
+import {
+	getInitialTopView,
+	HorizontalResizeHandle,
+	INSPECTOR_TOP_VIEW_STORAGE_KEY,
+	InspectorTabsSection,
+} from "./layout";
 import type { ScriptStatus } from "./script-store";
-import { ActionsSection } from "./sections/actions";
 import { AllFilesSection } from "./sections/all-files";
 import { ChangesSection } from "./sections/changes";
+import { ChecksSection, useChecksIndicator } from "./sections/checks";
 import { OpenDevServerButton, RunTab } from "./sections/run";
 import { SetupTab } from "./sections/setup";
 import { TerminalInstancePanel } from "./sections/terminal";
@@ -115,24 +120,33 @@ export function WorkspaceInspectorSidebar({
 	activeFileAbsolutePath = null,
 	onOpenFileTab,
 }: WorkspaceInspectorSidebarProps) {
-	const [topSectionView, setTopSectionView] =
-		useState<TopSectionView>("changes");
+	const [topSectionView, setTopSectionView] = useState<TopSectionView>(() =>
+		getInitialTopView<TopSectionView>(
+			["files", "changes", "checks"] as const,
+			"changes",
+		),
+	);
+	useEffect(() => {
+		try {
+			window.localStorage.setItem(
+				INSPECTOR_TOP_VIEW_STORAGE_KEY,
+				topSectionView,
+			);
+		} catch {
+			// non-fatal
+		}
+	}, [topSectionView]);
 	const handleOpenFileTab = useMemo<
 		(input: OpenFileInput, opener: FileTabOpener) => void
 	>(() => onOpenFileTab ?? (() => {}), [onOpenFileTab]);
 	const {
-		actionsHeight,
-		actionsOpen,
-		actionsRef,
 		activeTab,
 		changes,
-		changesHeight,
+		topBodyHeight,
 		containerRef,
 		flashingPaths,
 		handleResizeStart,
-		handleToggleActions,
 		handleToggleTabs,
-		isActionsResizing,
 		isPanelToggleAnimating,
 		isResizing,
 		isTabsResizing,
@@ -147,6 +161,11 @@ export function WorkspaceInspectorSidebar({
 		workspaceId: workspaceId ?? null,
 		repoId: repoId ?? null,
 	});
+	const checksIndicator = useChecksIndicator(
+		workspaceId ?? null,
+		workspaceState ?? null,
+		changeRequest ?? null,
+	);
 
 	// Fire setup auto-run / auto-complete at the sidebar level so it runs even
 	// when the Setup tab isn't mounted (tabsOpen=false).
@@ -418,16 +437,17 @@ export function WorkspaceInspectorSidebar({
 		>
 			<section className="flex min-h-0 shrink-0 flex-col overflow-hidden bg-sidebar">
 				<div className="flex h-9 shrink-0 items-center gap-2 border-b border-border/60 bg-muted/25 px-2">
-					<AllFilesChangesTabs
+					<TopSectionTabs
 						value={topSectionView}
 						onChange={setTopSectionView}
 						changesCount={changes.length}
+						checksIndicator={checksIndicator}
 					/>
 				</div>
 				{topSectionView === "files" ? (
 					<div
 						className="flex min-h-0 shrink-0 flex-col border-b border-border/60"
-						style={{ height: changesHeight }}
+						style={{ height: topBodyHeight }}
 					>
 						<AllFilesSection
 							workspaceRootPath={workspaceRootPath ?? null}
@@ -436,6 +456,26 @@ export function WorkspaceInspectorSidebar({
 							onOpenFile={(input) =>
 								handleOpenFileTab(input, { kind: "browser" })
 							}
+						/>
+					</div>
+				) : topSectionView === "checks" ? (
+					<div
+						className="flex min-h-0 shrink-0 flex-col border-b border-border/60"
+						style={{ height: topBodyHeight }}
+					>
+						<ChecksSection
+							workspaceId={workspaceId ?? null}
+							workspaceState={workspaceState ?? null}
+							repoId={repoId ?? null}
+							workspaceRemote={workspaceRemote ?? null}
+							bodyHeight={topBodyHeight}
+							onCommitAction={onCommitAction}
+							onReviewAction={onReviewAction}
+							currentSessionId={currentSessionId ?? null}
+							onQueuePendingPromptForSession={onQueuePendingPromptForSession}
+							commitButtonMode={commitButtonMode}
+							commitButtonState={commitButtonState}
+							changeRequest={changeRequest ?? null}
 						/>
 					</div>
 				) : (
@@ -466,40 +506,15 @@ export function WorkspaceInspectorSidebar({
 						commitButtonState={commitButtonState}
 						changeRequest={changeRequest ?? null}
 						forgeIsRefreshing={forgeIsRefreshing}
-						bodyHeight={changesHeight}
+						bodyHeight={topBodyHeight}
 						animatePanelToggle={isPanelToggleAnimating}
 						isResizing={isResizing}
 					/>
 				)}
 			</section>
-			{actionsOpen ? (
-				<HorizontalResizeHandle
-					onMouseDown={handleResizeStart("actions")}
-					isActive={isActionsResizing}
-				/>
-			) : null}
-			<ActionsSection
-				workspaceId={workspaceId ?? null}
-				workspaceState={workspaceState ?? null}
-				repoId={repoId ?? null}
-				workspaceRemote={workspaceRemote ?? null}
-				sectionRef={actionsRef}
-				open={actionsOpen}
-				onToggle={handleToggleActions}
-				bodyHeight={actionsHeight}
-				isResizing={isResizing}
-				onCommitAction={onCommitAction}
-				onReviewAction={onReviewAction}
-				currentSessionId={currentSessionId ?? null}
-				onQueuePendingPromptForSession={onQueuePendingPromptForSession}
-				commitButtonMode={commitButtonMode}
-				commitButtonState={commitButtonState}
-				changeRequest={changeRequest ?? null}
-				animatePanelToggle={isPanelToggleAnimating}
-			/>
 			{tabsOpen ? (
 				<HorizontalResizeHandle
-					onMouseDown={handleResizeStart("tabs")}
+					onMouseDown={handleResizeStart}
 					isActive={isTabsResizing}
 				/>
 			) : null}

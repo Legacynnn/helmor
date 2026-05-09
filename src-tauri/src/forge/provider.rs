@@ -10,6 +10,14 @@ pub(crate) trait WorkspaceForgeBackend {
     fn check_insert_text(&self, workspace_id: &str, item_id: &str) -> Result<String>;
     fn merge_change_request(&self, workspace_id: &str) -> Result<Option<ChangeRequestInfo>>;
     fn close_change_request(&self, workspace_id: &str) -> Result<Option<ChangeRequestInfo>>;
+    /// Update title and/or body on the workspace's open change request.
+    /// Backends that don't support this yet (GitLab) return an error.
+    fn update_change_request(
+        &self,
+        workspace_id: &str,
+        title: Option<&str>,
+        body: Option<&str>,
+    ) -> Result<Option<ChangeRequestInfo>>;
 }
 
 struct GithubBackend;
@@ -35,6 +43,15 @@ impl WorkspaceForgeBackend for GithubBackend {
     fn close_change_request(&self, workspace_id: &str) -> Result<Option<ChangeRequestInfo>> {
         github::close_workspace_pr(workspace_id)
     }
+
+    fn update_change_request(
+        &self,
+        workspace_id: &str,
+        title: Option<&str>,
+        body: Option<&str>,
+    ) -> Result<Option<ChangeRequestInfo>> {
+        github::update_workspace_pr(workspace_id, title, body)
+    }
 }
 
 impl WorkspaceForgeBackend for GitlabBackend {
@@ -56,6 +73,15 @@ impl WorkspaceForgeBackend for GitlabBackend {
 
     fn close_change_request(&self, workspace_id: &str) -> Result<Option<ChangeRequestInfo>> {
         gitlab::close_workspace_mr(workspace_id)
+    }
+
+    fn update_change_request(
+        &self,
+        _workspace_id: &str,
+        _title: Option<&str>,
+        _body: Option<&str>,
+    ) -> Result<Option<ChangeRequestInfo>> {
+        anyhow::bail!("Editing MR title/body is not implemented for GitLab yet")
     }
 }
 

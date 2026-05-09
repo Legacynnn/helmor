@@ -339,6 +339,7 @@ pub fn run() {
             commands::forge_commands::get_workspace_forge_check_insert_text,
             commands::forge_commands::merge_workspace_change_request,
             commands::forge_commands::close_workspace_change_request,
+            commands::forge_commands::update_workspace_change_request,
             commands::workspace_commands::get_workspace,
             commands::repository_commands::add_repository_from_local_path,
             commands::repository_commands::clone_repository_from_url,

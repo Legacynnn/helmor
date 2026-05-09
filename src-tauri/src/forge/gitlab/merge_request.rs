@@ -78,6 +78,7 @@ pub(super) fn mr_info(mr: &GitlabMergeRequest) -> ChangeRequestInfo {
         number: mr.iid,
         state: gitlab_mr_state(&mr.state).to_string(),
         title: mr.title.clone(),
+        body: mr.description.clone(),
         is_merged: mr.state == "merged" || mr.merged_at.is_some(),
     }
 }
@@ -201,6 +202,7 @@ mod tests {
         GitlabMergeRequest {
             iid: 1,
             title: "MR".to_string(),
+            description: None,
             state: "opened".to_string(),
             web_url: "https://gitlab.example.com/acme/repo/-/merge_requests/1".to_string(),
             merged_at: None,

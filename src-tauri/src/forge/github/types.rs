@@ -39,6 +39,10 @@ pub(super) struct PullRequestNode {
     pub number: i64,
     pub state: String,
     pub title: String,
+    /// The PR description. Selected by the lookup query so the inspector
+    /// can prefill its title/body inputs without a second round-trip.
+    #[serde(default)]
+    pub body: Option<String>,
     pub merged: bool,
     /// True when head is in a fork. `pullRequests(headRefName:)` matches
     /// branch name only, so we drop these to avoid mis-association.
