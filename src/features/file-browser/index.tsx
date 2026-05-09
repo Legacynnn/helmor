@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+	type ShortcutHandler,
+	useAppShortcuts,
+} from "@/features/shortcuts/use-app-shortcuts";
+import { useSettings } from "@/lib/settings";
 
+import { useTreeState } from "./hooks/use-tree-state";
 import { SearchInput } from "./search-input";
 import { SearchResults } from "./search-results";
 import { Tree } from "./tree";
@@ -27,11 +33,21 @@ export function AllFilesPanel({
 }: Props) {
 	const [query, setQuery] = useState("");
 	const trimmed = query.trim();
+	const { settings } = useSettings();
+	const { collapseAll } = useTreeState(workspaceId);
+	const handlers = useMemo<ShortcutHandler[]>(
+		() => [{ id: "fileBrowser.collapseAll", callback: collapseAll }],
+		[collapseAll],
+	);
+	useAppShortcuts({ overrides: settings.shortcuts, handlers });
 
 	return (
-		<div className="flex h-full flex-col gap-1.5 px-2 py-1.5">
+		<div
+			className="flex h-full flex-col gap-1.5 px-2 py-1.5"
+			data-focus-scope="fileBrowser"
+		>
 			<SearchInput value={query} onChange={setQuery} />
-			<ScrollArea className="flex-1">
+			<ScrollArea className="min-h-0 flex-1">
 				{trimmed ? (
 					<SearchResults
 						workspaceRootPath={workspaceRootPath}

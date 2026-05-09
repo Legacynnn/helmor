@@ -53,5 +53,13 @@ export function useTreeState(workspaceId: string | null) {
 		[workspaceId],
 	);
 
-	return { isExpanded, toggle };
+	const collapseAll = useCallback(() => {
+		if (!workspaceId) return;
+		const current = expandedByWorkspace.get(workspaceId);
+		if (!current || current.size === 0) return;
+		expandedByWorkspace.set(workspaceId, new Set());
+		emit();
+	}, [workspaceId]);
+
+	return { isExpanded, toggle, collapseAll };
 }

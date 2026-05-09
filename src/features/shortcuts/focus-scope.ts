@@ -13,6 +13,7 @@ const KNOWN_SCOPES: ReadonlySet<ShortcutScope> = new Set([
 	"composer",
 	"terminal",
 	"editor",
+	"fileBrowser",
 ]);
 
 // Scope inheritance: when a leaf scope is active, every parent scope is also
