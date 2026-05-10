@@ -632,7 +632,7 @@ export function WorkspaceEditorSurface({
 			className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground"
 		>
 			<div
-				className="flex h-7 items-center border-b border-border"
+				className="flex h-8 items-center border-y border-border/60"
 				data-tauri-drag-region
 			>
 				{/* Traffic-light inset. macOS: left; Windows / Linux: right. */}
