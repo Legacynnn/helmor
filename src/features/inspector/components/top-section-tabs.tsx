@@ -49,14 +49,14 @@ function TabButton({
 			type="button"
 			onClick={onClick}
 			className={cn(
-				"flex h-6 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-sm px-2 text-[11.5px] font-medium",
+				"flex h-6 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-sm px-2 text-[11.5px] font-medium leading-none",
 				active
 					? "bg-background text-foreground shadow-sm"
 					: "text-muted-foreground hover:text-foreground",
 			)}
 		>
 			{icon}
-			<span>{label}</span>
+			<span className="leading-none">{label}</span>
 		</button>
 	);
 }
