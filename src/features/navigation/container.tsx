@@ -24,6 +24,8 @@ type WorkspacesSidebarContainerProps = {
 	/** Resolved hotkey for `sidebar.left.toggle`, surfaced in the toggle
 	 *  button's tooltip. */
 	sidebarToggleShortcut?: string | null;
+	onOpenHistory?: () => void;
+	historyActive?: boolean;
 	pushWorkspaceToast: (
 		description: string,
 		title?: string,
@@ -50,6 +52,8 @@ export const WorkspacesSidebarContainer = memo(
 		onCollapseSidebar,
 		sidebarToggleShortcut,
 		pushWorkspaceToast,
+		onOpenHistory,
+		historyActive,
 	}: WorkspacesSidebarContainerProps) {
 		const {
 			addingRepository,
@@ -124,6 +128,8 @@ export const WorkspacesSidebarContainer = memo(
 				}}
 				onCollapseSidebar={onCollapseSidebar}
 				sidebarToggleShortcut={sidebarToggleShortcut}
+				onOpenHistory={onOpenHistory}
+				historyActive={historyActive}
 			/>
 		);
 	},

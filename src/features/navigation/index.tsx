@@ -136,6 +136,8 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 	restoringWorkspaceId,
 	onCollapseSidebar,
 	sidebarToggleShortcut,
+	onOpenHistory,
+	historyActive,
 }: {
 	groups: WorkspaceGroup[];
 	repositoryGroups?: RepositoryGroup[];
@@ -172,6 +174,8 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 	restoringWorkspaceId?: string | null;
 	onCollapseSidebar?: () => void;
 	sidebarToggleShortcut?: string | null;
+	onOpenHistory?: () => void;
+	historyActive?: boolean;
 }) {
 	const [isAddRepositoryMenuOpen, setIsAddRepositoryMenuOpen] = useState(false);
 	const [isViewModeMenuOpen, setIsViewModeMenuOpen] = useState(false);
@@ -712,7 +716,12 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 			<nav className="mt-1 flex flex-col gap-0.5 px-2">
 				<SidebarNavItem icon={LayoutDashboard} label="Dashboard" />
 				<SidebarNavItem icon={ListChecks} label="Tasks" />
-				<SidebarNavItem icon={History} label="History" />
+				<SidebarNavItem
+					icon={History}
+					label="History"
+					onClick={onOpenHistory}
+					active={historyActive}
+				/>
 			</nav>
 
 			<div className="mx-3 mt-2 h-px shrink-0 bg-sidebar-border/60" />
@@ -912,16 +921,24 @@ function SidebarNavItem({
 	icon: Icon,
 	label,
 	onClick,
+	active,
 }: {
 	icon: typeof LayoutDashboard;
 	label: string;
 	onClick?: () => void;
+	active?: boolean;
 }) {
 	return (
 		<button
 			type="button"
 			onClick={onClick}
-			className="group flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+			aria-current={active ? "page" : undefined}
+			className={cn(
+				"group flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-[13px] font-medium transition-colors",
+				active
+					? "bg-accent/70 text-foreground"
+					: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+			)}
 		>
 			<Icon className="size-[15px] shrink-0" strokeWidth={1.9} />
 			<span className="truncate">{label}</span>
