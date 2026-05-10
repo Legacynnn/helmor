@@ -2033,6 +2033,75 @@ export async function closeWorkspaceChangeRequest(
 	}
 }
 
+export type PrCommentKind = "issue" | "review";
+
+export type PrCommentInfo = {
+	id: string;
+	kind: PrCommentKind;
+	authorLogin: string;
+	authorAvatarUrl: string | null;
+	body: string;
+	createdAt: string;
+	url: string;
+	/** GitHub review state for `kind === "review"` rows: APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED. `null` for issue comments. */
+	reviewState: string | null;
+};
+
+export type WorkspaceCommitInfo = {
+	sha: string;
+	shortSha: string;
+	subject: string;
+	authorName: string;
+	authorEmail: string;
+	committedAt: string;
+	filesChanged: number;
+	insertions: number;
+	deletions: number;
+};
+
+export async function listWorkspaceChangeRequestComments(
+	workspaceId: string,
+): Promise<PrCommentInfo[]> {
+	try {
+		return await invoke<PrCommentInfo[]>(
+			"list_workspace_change_request_comments",
+			{ workspaceId },
+		);
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to load change request comments."),
+		);
+	}
+}
+
+export async function listWorkspaceCommitsAhead(
+	workspaceId: string,
+): Promise<WorkspaceCommitInfo[]> {
+	try {
+		return await invoke<WorkspaceCommitInfo[]>("list_workspace_commits_ahead", {
+			workspaceId,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to list workspace commits."),
+		);
+	}
+}
+
+export async function resolveWorkspaceMergeBase(
+	workspaceId: string,
+): Promise<string | null> {
+	try {
+		return await invoke<string | null>("resolve_workspace_merge_base", {
+			workspaceId,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to resolve merge base."),
+		);
+	}
+}
+
 export async function updateWorkspaceChangeRequest(
 	workspaceId: string,
 	fields: { title?: string; body?: string },

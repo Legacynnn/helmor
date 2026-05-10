@@ -25,7 +25,9 @@ import {
 	listRepositories,
 	listSlashCommands,
 	listWorkspaceCandidateDirectories,
+	listWorkspaceChangeRequestComments,
 	listWorkspaceChangesWithContent,
+	listWorkspaceCommitsAhead,
 	listWorkspaceDirectory,
 	listWorkspaceFiles,
 	listWorkspaceLinkedDirectories,
@@ -41,6 +43,7 @@ import {
 	loadWorkspaceSessions,
 	type PrSyncState,
 	refreshWorkspaceChangeRequest,
+	resolveWorkspaceMergeBase,
 	searchWorkspacePaths,
 } from "./api";
 import { parsePrUrl } from "./pr-url";
@@ -141,6 +144,12 @@ export const helmorQueryKeys = {
 	workspaceCandidateDirectories: (excludeWorkspaceId: string | null) =>
 		["workspaceCandidateDirectories", excludeWorkspaceId ?? ""] as const,
 	activeStreams: ["activeStreams"] as const,
+	workspaceCommitsAhead: (workspaceId: string) =>
+		["workspaceCommitsAhead", workspaceId] as const,
+	workspaceMergeBase: (workspaceId: string) =>
+		["workspaceMergeBase", workspaceId] as const,
+	workspaceChangeRequestComments: (workspaceId: string) =>
+		["workspaceChangeRequestComments", workspaceId] as const,
 };
 
 /** Persistence is opt-in per `queryOptions` via `meta: { persist: true }`.
@@ -854,6 +863,61 @@ export function workspaceDirectoryQueryOptions(
  * because the result set tracks the user's query; identity of `query`
  * already gates refetches.
  */
+/**
+ * Commits on the workspace branch that are ahead of `origin/<target>`.
+ * Powers the Diff sub-tab "Commits" accordion. Refetches when the
+ * workspace's git state changes (push / new commit) — invalidated by
+ * the same event the Changes list uses.
+ */
+export function workspaceCommitsAheadQueryOptions(workspaceId: string) {
+	return queryOptions({
+		queryKey: helmorQueryKeys.workspaceCommitsAhead(workspaceId),
+		queryFn: () => listWorkspaceCommitsAhead(workspaceId),
+		staleTime: CHANGES_STALE_TIME,
+		gcTime: DEFAULT_GC_TIME,
+		refetchOnWindowFocus: true,
+		retry: 0,
+	});
+}
+
+/**
+ * Merge-base SHA between the workspace HEAD and `origin/<target>`.
+ * Used as the diff base for the "Against main" accordion so the
+ * inspector mirrors GitHub's PR diff anchoring. Cheap to compute,
+ * cheap to recompute on focus.
+ */
+export function workspaceMergeBaseQueryOptions(workspaceId: string) {
+	return queryOptions({
+		queryKey: helmorQueryKeys.workspaceMergeBase(workspaceId),
+		queryFn: () => resolveWorkspaceMergeBase(workspaceId),
+		staleTime: 30_000,
+		gcTime: DEFAULT_GC_TIME,
+		refetchOnWindowFocus: true,
+		retry: 0,
+	});
+}
+
+/**
+ * PR comments + review summaries for the Review sub-tab. Lazy: the
+ * accordion drives mounting; nothing fetches until the user reveals it.
+ * Newest-first ordering is enforced server-side. Refetches on window
+ * focus so reviewers' bot comments and CI bot comments come through
+ * without manual refresh, but doesn't poll on a timer (gh API is
+ * rate-limited and the sidebar isn't a live conversation surface).
+ */
+export function workspaceChangeRequestCommentsQueryOptions(
+	workspaceId: string,
+) {
+	return queryOptions({
+		queryKey: helmorQueryKeys.workspaceChangeRequestComments(workspaceId),
+		queryFn: () => listWorkspaceChangeRequestComments(workspaceId),
+		staleTime: 30_000,
+		gcTime: DEFAULT_GC_TIME,
+		refetchOnWindowFocus: true,
+		retry: 0,
+	});
+}
+
 export function workspacePathSearchQueryOptions(
 	workspaceRootPath: string,
 	query: string,
