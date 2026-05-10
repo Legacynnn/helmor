@@ -1,3 +1,5 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,7 @@ import {
 import type { FileTabOpener } from "@/features/tabs/types";
 import type { ChangeRequestInfo } from "@/lib/api";
 import type { DiffOpenOptions } from "@/lib/editor-session";
+import { helmorQueryKeys } from "@/lib/query-client";
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import {
@@ -43,6 +46,8 @@ import type { ScriptStatus } from "./script-store";
 import { AllFilesSection } from "./sections/all-files";
 import { ChangesSection } from "./sections/changes";
 import { ChecksSection, useChecksIndicator } from "./sections/checks";
+import { DiffActionToolbar } from "./sections/diff/action-toolbar";
+import { DiffCommitFooter } from "./sections/diff/commit-footer";
 import { OpenDevServerButton, RunTab } from "./sections/run";
 import { SetupTab } from "./sections/setup";
 import { TerminalInstancePanel } from "./sections/terminal";
@@ -167,6 +172,8 @@ export function WorkspaceInspectorSidebar({
 			// non-fatal
 		}
 	}, [topSectionView]);
+	const queryClient = useQueryClient();
+	const [diffTreeView, setDiffTreeView] = useState(false);
 	const [changesSubView, setChangesSubView] = useState<ChangesSubView>(() => {
 		if (typeof window === "undefined") return "diff";
 		try {
@@ -583,37 +590,71 @@ export function WorkspaceInspectorSidebar({
 								changeRequest={changeRequest ?? null}
 							/>
 						) : (
-							<ChangesSection
-								workspaceId={workspaceId ?? null}
-								workspaceRootPath={workspaceRootPath ?? null}
-								workspaceBranch={workspaceBranch ?? null}
-								workspaceRemoteUrl={workspaceRemoteUrl ?? null}
-								workspaceTargetBranch={workspaceTargetBranch ?? null}
-								changes={changes}
-								editorMode={editorMode}
-								activeEditorPath={activeEditorPath}
-								onOpenEditorFile={onOpenEditorFile}
-								onOpenChangedFile={(file, side, options) =>
-									handleOpenFileTab(
-										{
-											absolutePath: file.absolutePath,
-											relativePath: file.path,
-											fileName: file.name,
-											diffOptions: options,
-										},
-										{ kind: "changes", side },
-									)
-								}
-								flashingPaths={flashingPaths}
-								onCommitAction={onCommitAction}
-								commitButtonMode={commitButtonMode}
-								commitButtonState={commitButtonState}
-								changeRequest={changeRequest ?? null}
-								forgeIsRefreshing={forgeIsRefreshing}
-								bodyHeight={Math.max(topBodyHeight - 28, 0)}
-								animatePanelToggle={isPanelToggleAnimating}
-								isResizing={isResizing}
-							/>
+							<>
+								<DiffActionToolbar
+									changeRequest={changeRequest ?? null}
+									treeView={diffTreeView}
+									onToggleTreeView={() => setDiffTreeView((value) => !value)}
+									onRefreshChanges={() => {
+										if (workspaceRootPath) {
+											void queryClient.invalidateQueries({
+												queryKey:
+													helmorQueryKeys.workspaceChanges(workspaceRootPath),
+											});
+										}
+									}}
+									onOpenChangeRequest={
+										changeRequest
+											? () => void openUrl(changeRequest.url)
+											: undefined
+									}
+								/>
+								<ChangesSection
+									workspaceId={workspaceId ?? null}
+									workspaceRootPath={workspaceRootPath ?? null}
+									workspaceBranch={workspaceBranch ?? null}
+									workspaceRemoteUrl={workspaceRemoteUrl ?? null}
+									workspaceTargetBranch={workspaceTargetBranch ?? null}
+									changes={changes}
+									editorMode={editorMode}
+									activeEditorPath={activeEditorPath}
+									onOpenEditorFile={onOpenEditorFile}
+									onOpenChangedFile={(file, side, options) =>
+										handleOpenFileTab(
+											{
+												absolutePath: file.absolutePath,
+												relativePath: file.path,
+												fileName: file.name,
+												diffOptions: options,
+											},
+											{ kind: "changes", side },
+										)
+									}
+									flashingPaths={flashingPaths}
+									onCommitAction={onCommitAction}
+									commitButtonMode={commitButtonMode}
+									commitButtonState={commitButtonState}
+									changeRequest={changeRequest ?? null}
+									forgeIsRefreshing={forgeIsRefreshing}
+									// Sub-tab strip (28) + toolbar (36) + footer (~150)
+									// trimmed off the sub-section's body budget so the
+									// scroll list never overflows past the sticky
+									// footer.
+									bodyHeight={Math.max(topBodyHeight - 28 - 36 - 150, 0)}
+									animatePanelToggle={isPanelToggleAnimating}
+									isResizing={isResizing}
+									hideGitSectionHeader
+								/>
+								<DiffCommitFooter
+									workspaceId={workspaceId ?? null}
+									commitButtonMode={commitButtonMode ?? "create-pr"}
+									commitButtonState={commitButtonState ?? "idle"}
+									changeRequest={changeRequest ?? null}
+									hasUncommittedChanges={changes.length > 0}
+									changeRequestName="PR"
+									onCommitAction={onCommitAction}
+								/>
+							</>
 						)}
 					</div>
 				)}
