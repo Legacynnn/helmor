@@ -48,6 +48,7 @@ import { ChangesSection } from "./sections/changes";
 import { ChecksSection, useChecksIndicator } from "./sections/checks";
 import { DiffActionToolbar } from "./sections/diff/action-toolbar";
 import { DiffCommitFooter } from "./sections/diff/commit-footer";
+import { PrCommentsSection } from "./sections/review/pr-comments";
 import { OpenDevServerButton, RunTab } from "./sections/run";
 import { SetupTab } from "./sections/setup";
 import { TerminalInstancePanel } from "./sections/terminal";
@@ -575,24 +576,39 @@ export function WorkspaceInspectorSidebar({
 							reviewIndicator={reviewIndicator}
 						/>
 						{changesSubView === "review" ? (
-							<ChecksSection
-								workspaceId={workspaceId ?? null}
-								workspaceState={workspaceState ?? null}
-								repoId={repoId ?? null}
-								workspaceRemote={workspaceRemote ?? null}
-								bodyHeight={Math.max(topBodyHeight - 28, 0)}
-								onCommitAction={onCommitAction}
-								onReviewAction={onReviewAction}
-								currentSessionId={currentSessionId ?? null}
-								onQueuePendingPromptForSession={onQueuePendingPromptForSession}
-								commitButtonMode={commitButtonMode}
-								commitButtonState={commitButtonState}
-								changeRequest={changeRequest ?? null}
-							/>
+							<div className="flex min-h-0 flex-1 flex-col">
+								<ChecksSection
+									workspaceId={workspaceId ?? null}
+									workspaceState={workspaceState ?? null}
+									repoId={repoId ?? null}
+									workspaceRemote={workspaceRemote ?? null}
+									// Cap the checks rail at ~65% of the sub-tab body
+									// (min 160) so a long check list keeps scrolling
+									// without crowding the comments rail out below.
+									bodyHeight={Math.max(
+										Math.round((topBodyHeight - 28) * 0.65),
+										160,
+									)}
+									onCommitAction={onCommitAction}
+									onReviewAction={onReviewAction}
+									currentSessionId={currentSessionId ?? null}
+									onQueuePendingPromptForSession={
+										onQueuePendingPromptForSession
+									}
+									commitButtonMode={commitButtonMode}
+									commitButtonState={commitButtonState}
+									changeRequest={changeRequest ?? null}
+								/>
+								<PrCommentsSection
+									workspaceId={workspaceId ?? null}
+									hasChangeRequest={!!changeRequest}
+								/>
+							</div>
 						) : (
 							<>
 								<DiffActionToolbar
 									changeRequest={changeRequest ?? null}
+									workspaceBranch={workspaceBranch ?? null}
 									treeView={diffTreeView}
 									onToggleTreeView={() => setDiffTreeView((value) => !value)}
 									onRefreshChanges={() => {
@@ -608,6 +624,15 @@ export function WorkspaceInspectorSidebar({
 											? () => void openUrl(changeRequest.url)
 											: undefined
 									}
+								/>
+								<DiffCommitFooter
+									workspaceId={workspaceId ?? null}
+									commitButtonMode={commitButtonMode ?? "create-pr"}
+									commitButtonState={commitButtonState ?? "idle"}
+									changeRequest={changeRequest ?? null}
+									hasUncommittedChanges={changes.length > 0}
+									changeRequestName="PR"
+									onCommitAction={onCommitAction}
 								/>
 								<ChangesSection
 									workspaceId={workspaceId ?? null}
@@ -636,23 +661,14 @@ export function WorkspaceInspectorSidebar({
 									commitButtonState={commitButtonState}
 									changeRequest={changeRequest ?? null}
 									forgeIsRefreshing={forgeIsRefreshing}
-									// Sub-tab strip (28) + toolbar (36) + footer (~150)
-									// trimmed off the sub-section's body budget so the
-									// scroll list never overflows past the sticky
-									// footer.
+									// Sub-tab strip (28) + toolbar (36) + commit area
+									// (~150) trimmed off the sub-section's body budget;
+									// the file list now sits BELOW the commit area and
+									// scrolls in the remaining space.
 									bodyHeight={Math.max(topBodyHeight - 28 - 36 - 150, 0)}
 									animatePanelToggle={isPanelToggleAnimating}
 									isResizing={isResizing}
 									hideGitSectionHeader
-								/>
-								<DiffCommitFooter
-									workspaceId={workspaceId ?? null}
-									commitButtonMode={commitButtonMode ?? "create-pr"}
-									commitButtonState={commitButtonState ?? "idle"}
-									changeRequest={changeRequest ?? null}
-									hasUncommittedChanges={changes.length > 0}
-									changeRequestName="PR"
-									onCommitAction={onCommitAction}
 								/>
 							</>
 						)}

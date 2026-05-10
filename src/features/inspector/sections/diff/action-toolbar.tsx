@@ -15,6 +15,10 @@ import { cn } from "@/lib/utils";
 
 interface DiffActionToolbarProps {
 	changeRequest: ChangeRequestInfo | null;
+	/** Workspace branch name; rendered on the right of the toolbar
+	 *  alongside the PR badge so the user always knows which branch the
+	 *  Diff sub-tab is reading. */
+	workspaceBranch: string | null;
 	treeView: boolean;
 	onToggleTreeView: () => void;
 	onRefreshChanges: () => void;
@@ -35,6 +39,7 @@ interface DiffActionToolbarProps {
  */
 export function DiffActionToolbar({
 	changeRequest,
+	workspaceBranch,
 	treeView,
 	onToggleTreeView,
 	onRefreshChanges,
@@ -69,21 +74,31 @@ export function DiffActionToolbar({
 					icon={<RotateCw className="size-4" strokeWidth={1.8} />}
 				/>
 			</div>
-			{changeRequest ? (
-				<button
-					type="button"
-					onClick={onOpenChangeRequest}
-					className="group/pr flex h-6 cursor-pointer items-center gap-1 rounded-md px-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
-				>
-					<GitPullRequest
-						className="size-4 text-purple-400"
-						strokeWidth={1.8}
-					/>
-					<span className="tabular-nums text-foreground/85">
-						#{changeRequest.number}
+			<div className="flex min-w-0 items-center gap-2 pl-2">
+				{workspaceBranch ? (
+					<span
+						title={workspaceBranch}
+						className="truncate font-mono text-[11.5px] text-muted-foreground/80"
+					>
+						{workspaceBranch}
 					</span>
-				</button>
-			) : null}
+				) : null}
+				{changeRequest ? (
+					<button
+						type="button"
+						onClick={onOpenChangeRequest}
+						className="group/pr flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+					>
+						<GitPullRequest
+							className="size-4 text-purple-400"
+							strokeWidth={1.8}
+						/>
+						<span className="tabular-nums text-foreground/85">
+							#{changeRequest.number}
+						</span>
+					</button>
+				) : null}
+			</div>
 		</div>
 	);
 }
