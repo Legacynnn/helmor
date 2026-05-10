@@ -1,4 +1,10 @@
-import { ChevronDown, ChevronRight, Package, RotateCw } from "lucide-react";
+import {
+	ChevronDown,
+	ChevronRight,
+	Cpu,
+	Package,
+	RotateCw,
+} from "lucide-react";
 import { useState } from "react";
 import {
 	DropdownMenu,
@@ -8,7 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * Lightweight pill in the left sidebar's window-safe top row that opens
+ * Lightweight pill in the left sidebar's bottom control row that opens
  * a translucent process-tree readout showing Helmor's own renderer
  * processes and the per-workspace children spawned underneath.
  *
@@ -29,20 +35,20 @@ export function ResourceUsagePill() {
 					type="button"
 					aria-label="Open resource usage panel"
 					className={cn(
-						"group/resource flex h-6 cursor-pointer items-center gap-1.5 rounded-md border border-transparent px-1.5 text-[11.5px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground",
-						"data-[state=open]:border-border/60 data-[state=open]:bg-foreground/[0.06] data-[state=open]:text-foreground",
+						"group/resource flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border/45 bg-sidebar-foreground/[0.025] px-2 text-[11px] font-medium text-muted-foreground shadow-[inset_0_1px_0_color-mix(in_oklch,var(--foreground)_5%,transparent)] transition-[background-color,border-color,color,box-shadow] hover:border-sidebar-border/70 hover:bg-sidebar-foreground/[0.055] hover:text-foreground",
+						"data-[state=open]:border-sidebar-border/80 data-[state=open]:bg-sidebar-foreground/[0.065] data-[state=open]:text-foreground data-[state=open]:shadow-[inset_0_1px_0_color-mix(in_oklch,var(--foreground)_8%,transparent)]",
 					)}
 				>
-					<span className="relative flex size-2 items-center justify-center">
-						<span className="size-1.5 rounded-full bg-emerald-500" />
-						<span className="absolute size-2 animate-ping rounded-full bg-emerald-500/50" />
+					<span className="flex size-3.5 items-center justify-center rounded-[5px] bg-sidebar-foreground/[0.045] text-muted-foreground ring-1 ring-sidebar-border/45 transition-colors group-hover/resource:text-foreground group-data-[state=open]/resource:text-foreground">
+						<Cpu className="size-2.5" strokeWidth={1.9} />
 					</span>
-					<span className="tabular-nums">— GB</span>
+					<span className="tabular-nums text-foreground/85">1.8 GB</span>
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent
 				align="end"
-				sideOffset={6}
+				side="top"
+				sideOffset={8}
 				className="w-[392px] border-white/10 bg-popover/70 p-0 backdrop-blur-xl"
 			>
 				<ResourcePlaceholder onClose={() => setOpen(false)} />

@@ -45,6 +45,7 @@ import { useDockUnreadBadge } from "@/features/dock-badge";
 import { WorkspaceEditorSurface } from "@/features/editor";
 import { WorkspaceInspectorSidebar } from "@/features/inspector";
 import { WorkspacesSidebarContainer } from "@/features/navigation/container";
+import { ResourceUsagePill } from "@/features/navigation/resource-usage-pill";
 import { AppOnboarding } from "@/features/onboarding";
 import { ExportSessionImageButton } from "@/features/panel/export-session-image";
 import { seedNewSessionInCache } from "@/features/panel/session-cache";
@@ -3067,6 +3068,7 @@ function AppShell({
 															"settings.open",
 														)}
 													/>
+													<ResourceUsagePill />
 												</div>
 											</div>
 										</aside>
