@@ -86,6 +86,8 @@ import {
 	SIDEBAR_RESIZE_HIT_AREA,
 } from "@/shell/layout";
 import { clampZoom, useZoom, ZOOM_STEP } from "@/shell/use-zoom";
+import { HistoryScreenContainer } from "./features/history/container";
+import { KanbanScreenContainer } from "./features/kanban/container";
 import {
 	createAndCheckoutBranch,
 	createSession,
@@ -176,7 +178,12 @@ import { StreamingReasoningGapScenario } from "./test/e2e-scenarios/streaming-re
 
 const SETTINGS_RELOAD_EVENT = "helmor:reload-settings";
 const OPEN_SETTINGS_EVENT = "helmor:open-settings";
-type WorkspaceViewMode = "conversation" | "editor" | "start";
+type WorkspaceViewMode =
+	| "conversation"
+	| "editor"
+	| "start"
+	| "history"
+	| "kanban";
 const EMPTY_SESSION_RUN_STATES = new Map<string, SessionRunState>();
 const EMPTY_STRING_LIST: readonly string[] = [];
 
@@ -1410,7 +1417,11 @@ function AppShell({
 					lastWorkspaceId: workspaceId,
 				});
 			}
-			if (workspaceViewModeRef.current === "start") {
+			if (
+				workspaceViewModeRef.current === "start" ||
+				workspaceViewModeRef.current === "history" ||
+				workspaceViewModeRef.current === "kanban"
+			) {
 				setWorkspaceViewMode("conversation");
 			}
 			setRightSidebarMode(appSettings.workspaceRightSidebarMode);
@@ -2662,6 +2673,46 @@ function AppShell({
 		},
 		[appSettings.startContextPanelOpen, updateSettings],
 	);
+	const handleOpenKanban = useCallback(() => {
+		workspaceSelectionRequestRef.current += 1;
+		sessionSelectionRequestRef.current += 1;
+		selectedWorkspaceIdRef.current = null;
+		selectedSessionIdRef.current = null;
+		setSelectedWorkspaceId(null);
+		setSelectedSessionId(null);
+		setActiveTabId(null);
+		setDisplayedWorkspaceId(null);
+		setDisplayedSessionId(null);
+		setWorkspaceViewMode("kanban");
+		setWorkspacePreviewCard(null);
+		setWorkspacePreviewActive(false);
+	}, []);
+	const handleKanbanCreatePr = useCallback(
+		(workspaceId: string) => {
+			// Pragmatic v1: navigate to the workspace so the user can use
+			// the inspector's existing Create PR flow. The full action
+			// dispatch requires per-workspace inspector state (model,
+			// effort, repo prefs) that's only mounted when the workspace
+			// is selected — so we route through selection instead of
+			// dispatching create-pr directly from the board.
+			handleSelectWorkspace(workspaceId);
+		},
+		[handleSelectWorkspace],
+	);
+	const handleOpenHistory = useCallback(() => {
+		workspaceSelectionRequestRef.current += 1;
+		sessionSelectionRequestRef.current += 1;
+		selectedWorkspaceIdRef.current = null;
+		selectedSessionIdRef.current = null;
+		setSelectedWorkspaceId(null);
+		setSelectedSessionId(null);
+		setActiveTabId(null);
+		setDisplayedWorkspaceId(null);
+		setDisplayedSessionId(null);
+		setWorkspaceViewMode("history");
+		setWorkspacePreviewCard(null);
+		setWorkspacePreviewActive(false);
+	}, []);
 	useEffect(() => {
 		if (!areSettingsLoaded || appSettings.lastSurface !== "workspace-start") {
 			return;
@@ -2953,7 +3004,9 @@ function AppShell({
 		[startPendingLinkedDirectories],
 	);
 	const rightSidebarAvailable =
-		workspaceViewMode !== "start" || rightSidebarMode === "context";
+		workspaceViewMode !== "history" &&
+		workspaceViewMode !== "kanban" &&
+		(workspaceViewMode !== "start" || rightSidebarMode === "context");
 	const contextPanelOpen =
 		rightSidebarAvailable &&
 		rightSidebarMode === "context" &&
@@ -2992,7 +3045,11 @@ function AppShell({
 	const restoreStartSurface =
 		areSettingsLoaded && appSettings.lastSurface === "workspace-start";
 	const workspaceSidebarAutoSelectEnabled =
-		areSettingsLoaded && workspaceViewMode !== "start" && !restoreStartSurface;
+		areSettingsLoaded &&
+		workspaceViewMode !== "start" &&
+		workspaceViewMode !== "history" &&
+		workspaceViewMode !== "kanban" &&
+		!restoreStartSurface;
 
 	return (
 		<TooltipProvider delayDuration={0}>
@@ -3033,7 +3090,9 @@ function AppShell({
 												<div className="min-h-0 flex-1">
 													<WorkspacesSidebarContainer
 														selectedWorkspaceId={
-															workspaceViewMode === "start"
+															workspaceViewMode === "start" ||
+															workspaceViewMode === "history" ||
+															workspaceViewMode === "kanban"
 																? null
 																: selectedWorkspaceId
 														}
@@ -3055,6 +3114,10 @@ function AppShell({
 														pushWorkspaceToast={pushWorkspaceToast}
 														onCollapseSidebar={() => setSidebarCollapsed(true)}
 														sidebarToggleShortcut={leftSidebarToggleShortcut}
+														onOpenHistory={handleOpenHistory}
+														historyActive={workspaceViewMode === "history"}
+														onOpenKanban={handleOpenKanban}
+														kanbanActive={workspaceViewMode === "kanban"}
 													/>
 												</div>
 												<div className="absolute right-[12px] top-[6px] z-20 flex items-center gap-[2px]">
@@ -3145,7 +3208,18 @@ function AppShell({
 													: "flex min-h-0 flex-1 flex-col"
 											}
 										>
-											{workspaceViewMode === "start" ? (
+											{workspaceViewMode === "history" ? (
+												<HistoryScreenContainer
+													onSelectWorkspace={handleSelectWorkspace}
+													pushWorkspaceToast={pushWorkspaceToast}
+												/>
+											) : workspaceViewMode === "kanban" ? (
+												<KanbanScreenContainer
+													onSelectWorkspace={handleSelectWorkspace}
+													onCreatePr={handleKanbanCreatePr}
+													pushWorkspaceToast={pushWorkspaceToast}
+												/>
+											) : workspaceViewMode === "start" ? (
 												<WorkspaceStartPage
 													repositories={repositories}
 													selectedRepository={startRepository}

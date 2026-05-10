@@ -43,6 +43,7 @@ import { workspaceDiffStatsQueryOptions } from "@/lib/query-client";
 import { cn } from "@/lib/utils";
 import { getWorkspaceBranchTone } from "@/lib/workspace-helpers";
 import { WorkspaceAvatar } from "./avatar";
+import { DiffStatsBadge } from "./diff-stats-badge";
 import { MoveToWorktreeDialog } from "./move-to-worktree-dialog";
 import {
 	branchToneClasses,
@@ -334,16 +335,10 @@ export const WorkspaceRowItem = memo(
 						aria-hidden={hasActionHandler ? "true" : undefined}
 					>
 						{showDiffStats && diffStats ? (
-							<span className="flex items-center gap-0.5 font-medium">
-								{diffStats.additions > 0 ? (
-									<span className="text-chart-2">+{diffStats.additions}</span>
-								) : null}
-								{diffStats.deletions > 0 ? (
-									<span className="text-destructive">
-										−{diffStats.deletions}
-									</span>
-								) : null}
-							</span>
+							<DiffStatsBadge
+								additions={diffStats.additions}
+								deletions={diffStats.deletions}
+							/>
 						) : null}
 						{parsedPr ? (
 							<span className="flex items-center gap-0.5 text-muted-foreground/80">
