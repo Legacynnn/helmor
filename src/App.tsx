@@ -10,7 +10,6 @@ import {
 	FolderOpen,
 	PanelLeftClose,
 	PanelLeftOpen,
-	PanelRightClose,
 	PanelRightOpen,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -3482,53 +3481,46 @@ function AppShell({
 																	<ExportSessionImageButton
 																		sessionId={selectedSessionId}
 																	/>
-																	<Tooltip>
-																		<TooltipTrigger asChild>
-																			<Button
-																				aria-label={
-																					inspectorCollapsed
-																						? "Expand right sidebar"
-																						: "Collapse right sidebar"
-																				}
-																				onClick={() =>
-																					setInspectorCollapsed(
-																						(collapsed) => !collapsed,
-																					)
-																				}
-																				variant="ghost"
-																				size="icon-xs"
-																				className="text-muted-foreground hover:text-foreground"
-																			>
-																				{inspectorCollapsed ? (
+																	{/*
+																	 * Only surface the panel-header inspector
+																	 * toggle when the inspector is collapsed —
+																	 * the inspector header carries its own close
+																	 * affordance, so showing both creates a
+																	 * redundant pair of close buttons. When
+																	 * collapsed, this is the only path back in.
+																	 */}
+																	{inspectorCollapsed ? (
+																		<Tooltip>
+																			<TooltipTrigger asChild>
+																				<Button
+																					aria-label="Expand right sidebar"
+																					onClick={() =>
+																						setInspectorCollapsed(false)
+																					}
+																					variant="ghost"
+																					size="icon-xs"
+																					className="text-muted-foreground hover:text-foreground"
+																				>
 																					<PanelRightOpen
 																						className="size-4"
 																						strokeWidth={1.8}
 																					/>
-																				) : (
-																					<PanelRightClose
-																						className="size-4"
-																						strokeWidth={1.8}
+																				</Button>
+																			</TooltipTrigger>
+																			<TooltipContent
+																				side="bottom"
+																				className="flex h-[24px] items-center gap-2 rounded-md px-2 text-[12px] leading-none"
+																			>
+																				<span>Expand right sidebar</span>
+																				{rightSidebarToggleShortcut ? (
+																					<InlineShortcutDisplay
+																						hotkey={rightSidebarToggleShortcut}
+																						className="text-background/60"
 																					/>
-																				)}
-																			</Button>
-																		</TooltipTrigger>
-																		<TooltipContent
-																			side="bottom"
-																			className="flex h-[24px] items-center gap-2 rounded-md px-2 text-[12px] leading-none"
-																		>
-																			<span>
-																				{inspectorCollapsed
-																					? "Expand right sidebar"
-																					: "Collapse right sidebar"}
-																			</span>
-																			{rightSidebarToggleShortcut ? (
-																				<InlineShortcutDisplay
-																					hotkey={rightSidebarToggleShortcut}
-																					className="text-background/60"
-																				/>
-																			) : null}
-																		</TooltipContent>
-																	</Tooltip>
+																				) : null}
+																			</TooltipContent>
+																		</Tooltip>
+																	) : null}
 																</div>
 															</div>
 														) : undefined
