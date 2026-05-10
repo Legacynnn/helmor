@@ -138,6 +138,8 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 	sidebarToggleShortcut,
 	onOpenHistory,
 	historyActive,
+	onOpenKanban,
+	kanbanActive,
 }: {
 	groups: WorkspaceGroup[];
 	repositoryGroups?: RepositoryGroup[];
@@ -176,6 +178,8 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 	sidebarToggleShortcut?: string | null;
 	onOpenHistory?: () => void;
 	historyActive?: boolean;
+	onOpenKanban?: () => void;
+	kanbanActive?: boolean;
 }) {
 	const [isAddRepositoryMenuOpen, setIsAddRepositoryMenuOpen] = useState(false);
 	const [isViewModeMenuOpen, setIsViewModeMenuOpen] = useState(false);
@@ -714,7 +718,12 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 			</div>
 
 			<nav className="mt-1 flex flex-col gap-0.5 px-2">
-				<SidebarNavItem icon={LayoutDashboard} label="Dashboard" />
+				<SidebarNavItem
+					icon={LayoutDashboard}
+					label="Dashboard"
+					onClick={onOpenKanban}
+					active={kanbanActive}
+				/>
 				<SidebarNavItem icon={ListChecks} label="Tasks" />
 				<SidebarNavItem
 					icon={History}

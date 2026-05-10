@@ -26,6 +26,8 @@ type WorkspacesSidebarContainerProps = {
 	sidebarToggleShortcut?: string | null;
 	onOpenHistory?: () => void;
 	historyActive?: boolean;
+	onOpenKanban?: () => void;
+	kanbanActive?: boolean;
 	pushWorkspaceToast: (
 		description: string,
 		title?: string,
@@ -54,6 +56,8 @@ export const WorkspacesSidebarContainer = memo(
 		pushWorkspaceToast,
 		onOpenHistory,
 		historyActive,
+		onOpenKanban,
+		kanbanActive,
 	}: WorkspacesSidebarContainerProps) {
 		const {
 			addingRepository,
@@ -130,6 +134,8 @@ export const WorkspacesSidebarContainer = memo(
 				sidebarToggleShortcut={sidebarToggleShortcut}
 				onOpenHistory={onOpenHistory}
 				historyActive={historyActive}
+				onOpenKanban={onOpenKanban}
+				kanbanActive={kanbanActive}
 			/>
 		);
 	},
