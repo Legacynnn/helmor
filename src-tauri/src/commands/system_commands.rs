@@ -491,6 +491,17 @@ pub async fn write_query_cache(key: String, value: String) -> CmdResult<()> {
 }
 
 #[tauri::command]
+pub async fn get_setting_json(key: String) -> CmdResult<Option<serde_json::Value>> {
+    run_blocking(move || crate::models::settings::load_setting_json::<serde_json::Value>(&key))
+        .await
+}
+
+#[tauri::command]
+pub async fn set_setting_json(key: String, value: serde_json::Value) -> CmdResult<()> {
+    run_blocking(move || crate::models::settings::upsert_setting_json(&key, &value)).await
+}
+
+#[tauri::command]
 pub async fn delete_query_cache(key: String) -> CmdResult<()> {
     run_blocking(move || {
         let path = query_cache_path(&key)?;

@@ -320,6 +320,8 @@ pub fn run() {
             commands::settings_commands::get_codex_rate_limits,
             commands::system_commands::get_cli_status,
             commands::system_commands::get_data_info,
+            commands::system_commands::get_setting_json,
+            commands::system_commands::set_setting_json,
             commands::system_commands::get_agent_login_status,
             commands::system_commands::get_helmor_skills_status,
             commands::system_commands::install_cli,

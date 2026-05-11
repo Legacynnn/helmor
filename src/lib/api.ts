@@ -3556,6 +3556,14 @@ export async function githubListRepoIssues(repoId: string): Promise<GhIssue[]> {
 	return await invoke<GhIssue[]>("github_list_repo_issues", { repoId });
 }
 
+export async function getSettingJson<T>(key: string): Promise<T | null> {
+	return await invoke<T | null>("get_setting_json", { key });
+}
+
+export async function setSettingJson<T>(key: string, value: T): Promise<void> {
+	await invoke<void>("set_setting_json", { key, value });
+}
+
 export { DEFAULT_WORKSPACE_GROUPS };
 
 function describeInvokeError(error: unknown, fallback: string): string {

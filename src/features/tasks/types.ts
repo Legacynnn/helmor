@@ -1,5 +1,54 @@
 export type TasksTab = "tasks" | "prs" | "issues";
 
+export type LinearStatusFilter =
+	| "all"
+	| "backlog"
+	| "unstarted"
+	| "started"
+	| "in-review";
+
+export type PrStateFilter = "open" | "draft" | "merged" | "closed";
+export type IssueStateFilter = "open" | "closed";
+
+export type AssigneeFilter = "any" | "me" | (string & {});
+
+export type LinearFilters = {
+	status: LinearStatusFilter;
+	assignee: AssigneeFilter;
+	search: string;
+};
+
+export type PrFilters = {
+	state: PrStateFilter;
+	assignee: AssigneeFilter;
+	linkedToIssue: boolean;
+	search: string;
+};
+
+export type IssueFilters = {
+	state: IssueStateFilter;
+	labels: string[];
+	assignee: AssigneeFilter;
+	search: string;
+};
+
+export type PerTabFilters = {
+	tasks: LinearFilters;
+	prs: PrFilters;
+	issues: IssueFilters;
+};
+
+export type TasksLastView = {
+	repoId: string | "all" | null;
+	tab: TasksTab;
+};
+
+export const DEFAULT_FILTERS: PerTabFilters = {
+	tasks: { status: "all", assignee: "any", search: "" },
+	prs: { state: "open", assignee: "any", linkedToIssue: false, search: "" },
+	issues: { state: "open", labels: [], assignee: "any", search: "" },
+};
+
 export type TaskListItem = {
 	/** Stable id within its source: Linear issue id, "pr:42", or "issue:7". */
 	key: string;
