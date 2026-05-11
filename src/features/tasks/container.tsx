@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type LinearAuthStatus, linearGetAuthStatus } from "@/lib/api";
 import { repositoriesQueryOptions } from "@/lib/query-client";
-import { DetailPanel } from "./components/detail-panel";
+import { DetailScreen } from "./components/detail-screen";
 import {
 	EmptyConnectLinear,
 	EmptyLinkLinearTeam,
@@ -176,11 +176,17 @@ export function TasksScreenContainer({
 					}
 				/>
 			</header>
-			<div className="flex min-h-0 flex-1">
-				<div className="min-h-0 flex-1">{body}</div>
+			<div className="min-h-0 flex-1">
 				{selectedItem ? (
-					<DetailPanel
+					<DetailScreen
 						item={selectedItem}
+						repo={
+							selectedRepoId !== "all" && selectedRepoId !== null
+								? (repos.find((r) => r.id === selectedRepoId) ?? null)
+								: selectedItem.repo
+									? (repos.find((r) => r.id === selectedItem.repo!.id) ?? null)
+									: null
+						}
 						onClose={() => setSelectedItem(null)}
 						onOpenWorkspace={(id) => {
 							onSelectWorkspace(id);
@@ -191,14 +197,16 @@ export function TasksScreenContainer({
 								repoId:
 									selectedRepoId !== "all" && selectedRepoId !== null
 										? selectedRepoId
-										: null,
+										: (item.repo?.id ?? null),
 								seedUrl: item.url,
 								seedTitle: item.title,
 								linearTaskId: item.source === "linear" ? item.key : null,
 							});
 						}}
 					/>
-				) : null}
+				) : (
+					body
+				)}
 			</div>
 		</div>
 	);
