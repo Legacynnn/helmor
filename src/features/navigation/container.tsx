@@ -28,6 +28,8 @@ type WorkspacesSidebarContainerProps = {
 	historyActive?: boolean;
 	onOpenKanban?: () => void;
 	kanbanActive?: boolean;
+	onOpenTasks?: () => void;
+	tasksActive?: boolean;
 	pushWorkspaceToast: (
 		description: string,
 		title?: string,
@@ -58,6 +60,8 @@ export const WorkspacesSidebarContainer = memo(
 		historyActive,
 		onOpenKanban,
 		kanbanActive,
+		onOpenTasks,
+		tasksActive,
 	}: WorkspacesSidebarContainerProps) {
 		const {
 			addingRepository,
@@ -136,6 +140,8 @@ export const WorkspacesSidebarContainer = memo(
 				historyActive={historyActive}
 				onOpenKanban={onOpenKanban}
 				kanbanActive={kanbanActive}
+				onOpenTasks={onOpenTasks}
+				tasksActive={tasksActive}
 			/>
 		);
 	},

@@ -89,6 +89,7 @@ import {
 import { clampZoom, useZoom, ZOOM_STEP } from "@/shell/use-zoom";
 import { HistoryScreenContainer } from "./features/history/container";
 import { KanbanScreenContainer } from "./features/kanban/container";
+import { TasksScreenContainer } from "./features/tasks";
 import {
 	type ActiveStreamSummary,
 	createAndCheckoutBranch,
@@ -186,7 +187,8 @@ type WorkspaceViewMode =
 	| "editor"
 	| "start"
 	| "history"
-	| "kanban";
+	| "kanban"
+	| "tasks";
 const EMPTY_SESSION_RUN_STATES = new Map<string, SessionRunState>();
 const EMPTY_STRING_LIST: readonly string[] = [];
 const EMPTY_ACTIVE_STREAMS: ActiveStreamSummary[] = [];
@@ -2734,6 +2736,20 @@ function AppShell({
 		setWorkspacePreviewCard(null);
 		setWorkspacePreviewActive(false);
 	}, []);
+	const handleOpenTasks = useCallback(() => {
+		workspaceSelectionRequestRef.current += 1;
+		sessionSelectionRequestRef.current += 1;
+		selectedWorkspaceIdRef.current = null;
+		selectedSessionIdRef.current = null;
+		setSelectedWorkspaceId(null);
+		setSelectedSessionId(null);
+		setActiveTabId(null);
+		setDisplayedWorkspaceId(null);
+		setDisplayedSessionId(null);
+		setWorkspaceViewMode("tasks");
+		setWorkspacePreviewCard(null);
+		setWorkspacePreviewActive(false);
+	}, []);
 	useEffect(() => {
 		if (!areSettingsLoaded || appSettings.lastSurface !== "workspace-start") {
 			return;
@@ -3139,6 +3155,8 @@ function AppShell({
 														historyActive={workspaceViewMode === "history"}
 														onOpenKanban={handleOpenKanban}
 														kanbanActive={workspaceViewMode === "kanban"}
+														onOpenTasks={handleOpenTasks}
+														tasksActive={workspaceViewMode === "tasks"}
 													/>
 												</div>
 												<div className="absolute right-[12px] top-[6px] z-20 flex items-center gap-[2px]">
@@ -3229,7 +3247,11 @@ function AppShell({
 													: "flex min-h-0 flex-1 flex-col"
 											}
 										>
-											{workspaceViewMode === "history" ? (
+											{workspaceViewMode === "tasks" ? (
+												<TasksScreenContainer
+													onOpenSettings={handleOpenSettings}
+												/>
+											) : workspaceViewMode === "history" ? (
 												<HistoryScreenContainer
 													onSelectWorkspace={handleSelectWorkspace}
 													pushWorkspaceToast={pushWorkspaceToast}
