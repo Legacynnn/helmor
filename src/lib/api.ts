@@ -212,6 +212,7 @@ export type RepositoryCreateOption = {
 	/** gh/glab account login bound to this repo, or null when none had
 	 * access at add-time. UI shows a "Connect" prompt when null. */
 	forgeLogin?: string | null;
+	linearTeamId?: string | null;
 	repoIconSrc?: string | null;
 	repoInitials?: string | null;
 };

@@ -29,6 +29,7 @@ pub struct RepositoryCreateOption {
     /// account had access at add-repo time; UI surfaces a "Connect"
     /// affordance.
     pub forge_login: Option<String>,
+    pub linear_team_id: Option<String>,
     pub repo_icon_src: Option<String>,
     pub repo_initials: String,
 }
@@ -110,7 +111,8 @@ pub fn list_repositories() -> Result<Vec<RepositoryCreateOption>> {
               forge_provider,
               forge_login,
               branch_prefix_type,
-              branch_prefix_custom
+              branch_prefix_custom,
+              linear_team_id
             FROM repos
             WHERE COALESCE(hidden, 0) = 0
             ORDER BY COALESCE(display_order, 0) ASC, LOWER(name) ASC
@@ -140,6 +142,7 @@ pub fn list_repositories() -> Result<Vec<RepositoryCreateOption>> {
                 forge_login: row.get(7)?,
                 branch_prefix_type,
                 branch_prefix_custom: row.get(9)?,
+                linear_team_id: row.get(10)?,
                 default_branch: row.get(2)?,
                 repo_icon_src: icon_src,
                 repo_initials: initials,
