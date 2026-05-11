@@ -4,7 +4,12 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { type LinearIssueDetail, linearGetTask } from "@/lib/api";
+import {
+	type LinearIssueDetail,
+	linearGetTask,
+	tasksFindWorkspaceForLinearTask,
+	tasksFindWorkspaceForPrUrl,
+} from "@/lib/api";
 import type { TaskListItem } from "../types";
 
 const PANEL_WIDTH = 520;
@@ -12,11 +17,13 @@ const PANEL_WIDTH = 520;
 export function DetailPanel({
 	item,
 	onClose,
-	footerSlot,
+	onOpenWorkspace,
+	onStartWorkspace,
 }: {
 	item: TaskListItem;
 	onClose: () => void;
-	footerSlot?: ReactNode;
+	onOpenWorkspace: (workspaceId: string) => void;
+	onStartWorkspace: (item: TaskListItem) => void;
 }) {
 	useEffect(() => {
 		const handler = (e: KeyboardEvent) => {
@@ -85,11 +92,13 @@ export function DetailPanel({
 					)}
 				</div>
 			</div>
-			{footerSlot ? (
-				<footer className="border-t border-border/50 bg-muted/20 px-3 py-2">
-					{footerSlot}
-				</footer>
-			) : null}
+			<footer className="border-t border-border/50 bg-muted/20 px-3 py-2">
+				<WorkspaceActions
+					item={item}
+					onOpenWorkspace={onOpenWorkspace}
+					onStartWorkspace={onStartWorkspace}
+				/>
+			</footer>
 		</aside>
 	);
 }
@@ -123,4 +132,48 @@ function GhBody() {
 
 function Placeholder({ children }: { children: ReactNode }) {
 	return <div className="text-xs text-muted-foreground">{children}</div>;
+}
+
+function WorkspaceActions({
+	item,
+	onOpenWorkspace,
+	onStartWorkspace,
+}: {
+	item: TaskListItem;
+	onOpenWorkspace: (workspaceId: string) => void;
+	onStartWorkspace: (item: TaskListItem) => void;
+}) {
+	const linked = useQuery<string | null>({
+		queryKey: ["tasks", "linkedWorkspace", item.source, item.key],
+		queryFn: async () => {
+			if (item.source === "linear") {
+				return await tasksFindWorkspaceForLinearTask(item.key);
+			}
+			if (item.source === "github-pr") {
+				return await tasksFindWorkspaceForPrUrl(item.url);
+			}
+			return null;
+		},
+		staleTime: 30_000,
+	});
+
+	return (
+		<div className="flex items-center gap-2">
+			{linked.data ? (
+				<Button
+					size="sm"
+					onClick={() => onOpenWorkspace(linked.data as string)}
+				>
+					Open workspace
+				</Button>
+			) : null}
+			<Button
+				size="sm"
+				variant="outline"
+				onClick={() => onStartWorkspace(item)}
+			>
+				Start workspace from this
+			</Button>
+		</div>
+	);
 }

@@ -19,8 +19,17 @@ import type { TaskListItem, TasksTab } from "./types";
 
 export function TasksScreenContainer({
 	onOpenSettings,
+	onSelectWorkspace,
+	onStartWorkspaceFromTask,
 }: {
 	onOpenSettings: () => void;
+	onSelectWorkspace: (workspaceId: string) => void;
+	onStartWorkspaceFromTask: (opts: {
+		repoId: string | null;
+		seedUrl: string;
+		seedTitle: string;
+		linearTaskId: string | null;
+	}) => void;
 }) {
 	const reposQuery = useQuery(repositoriesQueryOptions());
 	const repos = reposQuery.data ?? [];
@@ -162,6 +171,21 @@ export function TasksScreenContainer({
 					<DetailPanel
 						item={selectedItem}
 						onClose={() => setSelectedItem(null)}
+						onOpenWorkspace={(id) => {
+							onSelectWorkspace(id);
+							setSelectedItem(null);
+						}}
+						onStartWorkspace={(item) => {
+							onStartWorkspaceFromTask({
+								repoId:
+									selectedRepoId !== "all" && selectedRepoId !== null
+										? selectedRepoId
+										: null,
+								seedUrl: item.url,
+								seedTitle: item.title,
+								linearTaskId: item.source === "linear" ? item.key : null,
+							});
+						}}
 					/>
 				) : null}
 			</div>

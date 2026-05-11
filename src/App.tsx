@@ -2817,6 +2817,25 @@ function AppShell({
 		},
 		[appSettings.kanbanViewState, updateSettings],
 	);
+	const handleStartWorkspaceFromTask = useCallback(
+		(opts: {
+			repoId: string | null;
+			seedUrl: string;
+			seedTitle: string;
+			linearTaskId: string | null;
+		}) => {
+			void opts.seedUrl;
+			void opts.seedTitle;
+			void opts.linearTaskId;
+			if (opts.repoId) {
+				setStartRepositoryId(opts.repoId);
+			}
+			handleOpenWorkspaceStart();
+			// TODO: pre-attach seedUrl as a context card on the new workspace
+			// and persist linearTaskId on it once created.
+		},
+		[handleOpenWorkspaceStart],
+	);
 	// Add-repo no longer auto-creates a workspace — when the backend
 	// hands back `selectedWorkspaceId: null`, drop into the start page
 	// with the freshly added repo selected.
@@ -3250,6 +3269,10 @@ function AppShell({
 											{workspaceViewMode === "tasks" ? (
 												<TasksScreenContainer
 													onOpenSettings={handleOpenSettings}
+													onSelectWorkspace={handleSelectWorkspace}
+													onStartWorkspaceFromTask={
+														handleStartWorkspaceFromTask
+													}
 												/>
 											) : workspaceViewMode === "history" ? (
 												<HistoryScreenContainer
