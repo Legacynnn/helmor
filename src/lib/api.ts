@@ -3414,6 +3414,38 @@ export type LinearTeam = {
 	name: string;
 };
 
+export type LinearIssueState = {
+	id: string;
+	name: string;
+	/** One of: backlog, unstarted, started, completed, canceled, triage. */
+	type: string;
+	color: string;
+};
+
+export type LinearAssignee = {
+	id: string;
+	name: string;
+	avatarUrl: string | null;
+};
+
+export type LinearLabel = {
+	id: string;
+	name: string;
+	color: string;
+};
+
+export type LinearIssue = {
+	id: string;
+	identifier: string;
+	title: string;
+	url: string;
+	priority: number;
+	updatedAt: string;
+	state: LinearIssueState;
+	assignee: LinearAssignee | null;
+	labels: { nodes: LinearLabel[] };
+};
+
 export type LinearAuthStatus = {
 	connected: boolean;
 	viewer: LinearViewer | null;
@@ -3433,6 +3465,10 @@ export async function linearGetAuthStatus(): Promise<LinearAuthStatus> {
 
 export async function linearListTeams(): Promise<LinearTeam[]> {
 	return await invoke<LinearTeam[]>("linear_list_teams");
+}
+
+export async function linearListTasks(teamId: string): Promise<LinearIssue[]> {
+	return await invoke<LinearIssue[]>("linear_list_tasks", { teamId });
 }
 
 export async function linearSetRepoTeam(
