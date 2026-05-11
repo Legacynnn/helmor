@@ -653,18 +653,7 @@ fn fetch_issue_detail(login: &str, external_id: &str) -> Result<Option<InboxItem
     let response = serde_json::from_str::<IssueRestResponse>(&stdout)
         .with_context(|| "Failed to decode GitHub issue detail response".to_string())?;
     Ok(Some(InboxItemDetail::GithubIssue(Box::new(
-        GithubIssueDetail {
-            external_id: external_id.to_string(),
-            title: response.title,
-            body: response.body,
-            url: response.html_url,
-            state: response.state,
-            state_reason: response.state_reason,
-            author_login: response.user.map(|user| user.login),
-            created_at: response.created_at,
-            updated_at: response.updated_at,
-            closed_at: response.closed_at,
-        },
+        issue_detail_from_rest(response, external_id),
     ))))
 }
 
@@ -1067,7 +1056,7 @@ fn fetch_exact_issue_item(
     }))
 }
 
-fn parse_external_reference(external_id: &str) -> Result<(String, String, i64)> {
+pub(super) fn parse_external_reference(external_id: &str) -> Result<(String, String, i64)> {
     let Some((repo_with_owner, number)) = external_id.rsplit_once('#') else {
         return Err(anyhow!("invalid GitHub PR reference: {external_id}"));
     };
@@ -1103,8 +1092,8 @@ struct PullRequestRestResponse {
 }
 
 #[derive(Debug, Deserialize)]
-struct PullRequestRestUser {
-    login: String,
+pub(super) struct PullRequestRestUser {
+    pub login: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1114,27 +1103,45 @@ struct PullRequestRestRef {
 }
 
 #[derive(Debug, Deserialize)]
-struct IssueRestResponse {
-    node_id: String,
-    html_url: String,
-    title: String,
-    body: Option<String>,
-    state: String,
-    state_reason: Option<String>,
-    user: Option<PullRequestRestUser>,
+pub(super) struct IssueRestResponse {
+    pub node_id: String,
+    pub html_url: String,
+    pub title: String,
+    pub body: Option<String>,
+    pub state: String,
+    pub state_reason: Option<String>,
+    pub user: Option<PullRequestRestUser>,
     #[serde(default)]
-    assignees: Vec<PullRequestRestUser>,
+    pub assignees: Vec<PullRequestRestUser>,
     #[serde(default)]
-    labels: Vec<GithubRestLabel>,
-    pull_request: Option<serde_json::Value>,
-    created_at: Option<String>,
-    updated_at: Option<String>,
-    closed_at: Option<String>,
+    pub labels: Vec<GithubRestLabel>,
+    pub pull_request: Option<serde_json::Value>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub closed_at: Option<String>,
+}
+
+pub(super) fn issue_detail_from_rest(
+    response: IssueRestResponse,
+    external_id: &str,
+) -> GithubIssueDetail {
+    GithubIssueDetail {
+        external_id: external_id.to_string(),
+        title: response.title,
+        body: response.body,
+        url: response.html_url,
+        state: response.state,
+        state_reason: response.state_reason,
+        author_login: response.user.map(|user| user.login),
+        created_at: response.created_at,
+        updated_at: response.updated_at,
+        closed_at: response.closed_at,
+    }
 }
 
 #[derive(Debug, Deserialize)]
-struct GithubRestLabel {
-    name: String,
+pub(super) struct GithubRestLabel {
+    pub name: String,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,3 +1,5 @@
+use crate::forge::github::inbox::detail::GithubIssueDetail;
+use crate::forge::github::IssueUpdate;
 use crate::forge::{
     self,
     accounts::{self, ForgeAccount},
@@ -146,6 +148,41 @@ pub async fn get_inbox_item_detail(
         backend.get_inbox_item_detail(&login, host.as_deref(), source, &external_id)
     })
     .await
+}
+
+/// List the comments on a GitHub issue (oldest-first). Used by the
+/// tasks detail screen so users can read the in-issue conversation
+/// without leaving Helmor. Returns an empty list on auth failure so
+/// callers can degrade to the "Connect" CTA.
+#[tauri::command]
+pub async fn list_github_issue_comments(
+    login: String,
+    external_id: String,
+) -> CmdResult<Vec<PrCommentInfo>> {
+    run_blocking(move || forge::github::list_issue_comments(&login, &external_id)).await
+}
+
+/// Post a new comment on a GitHub issue. Returns the created comment so
+/// the caller can splice it into the local cache.
+#[tauri::command]
+pub async fn create_github_issue_comment(
+    login: String,
+    external_id: String,
+    body: String,
+) -> CmdResult<PrCommentInfo> {
+    run_blocking(move || forge::github::create_issue_comment(&login, &external_id, &body)).await
+}
+
+/// PATCH a GitHub issue. Returns the refreshed issue detail so the
+/// caller can write it into the React Query cache without a follow-up
+/// GET. Only fields present in `update` are sent to GitHub.
+#[tauri::command]
+pub async fn update_github_issue(
+    login: String,
+    external_id: String,
+    update: IssueUpdate,
+) -> CmdResult<GithubIssueDetail> {
+    run_blocking(move || forge::github::update_issue(&login, &external_id, update)).await
 }
 
 /// Resolve the gh/glab account bound to a workspace's parent repo and

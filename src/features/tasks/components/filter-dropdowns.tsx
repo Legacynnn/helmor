@@ -1,4 +1,11 @@
-import { ChevronDown } from "lucide-react";
+import {
+	ChevronDown,
+	CircleDot,
+	Link2,
+	type LucideIcon,
+	Search,
+	UserRound,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,10 +57,12 @@ function assigneeLabel(filter: AssigneeFilter): string {
 }
 
 function FilterButton({
+	icon: Icon,
 	label,
 	value,
 	children,
 }: {
+	icon: LucideIcon;
 	label: string;
 	value: string;
 	children: ReactNode;
@@ -61,14 +70,38 @@ function FilterButton({
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" size="sm" className="gap-1 px-2">
+				<Button variant="ghost" size="sm" className="gap-1.5 px-2">
+					<Icon className="size-3 text-muted-foreground" strokeWidth={1.8} />
 					<span className="text-muted-foreground">{label}:</span>
 					<span>{value}</span>
-					<ChevronDown className="size-3" />
+					<ChevronDown className="size-2.5" />
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start">{children}</DropdownMenuContent>
 		</DropdownMenu>
+	);
+}
+
+function SearchInput({
+	value,
+	onChange,
+}: {
+	value: string;
+	onChange: (value: string) => void;
+}) {
+	return (
+		<div className="relative ml-auto w-44 min-w-36 sm:w-56">
+			<Search
+				className="pointer-events-none absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-muted-foreground"
+				strokeWidth={1.8}
+			/>
+			<Input
+				placeholder="Search"
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				className="h-7 w-full pl-8"
+			/>
+		</div>
 	);
 }
 
@@ -82,8 +115,8 @@ export function LinearFilterRow({
 	const statusLabel =
 		LINEAR_STATUS_OPTIONS.find((o) => o.key === filters.status)?.label ?? "All";
 	return (
-		<div className="flex items-center gap-1">
-			<FilterButton label="Status" value={statusLabel}>
+		<div className="flex min-w-0 flex-1 items-center gap-1">
+			<FilterButton icon={CircleDot} label="Status" value={statusLabel}>
 				{LINEAR_STATUS_OPTIONS.map((o) => (
 					<DropdownMenuItem
 						key={o.key}
@@ -93,7 +126,11 @@ export function LinearFilterRow({
 					</DropdownMenuItem>
 				))}
 			</FilterButton>
-			<FilterButton label="Assignee" value={assigneeLabel(filters.assignee)}>
+			<FilterButton
+				icon={UserRound}
+				label="Assignee"
+				value={assigneeLabel(filters.assignee)}
+			>
 				{ASSIGNEE_OPTIONS.map((o) => (
 					<DropdownMenuItem
 						key={o.key}
@@ -103,11 +140,9 @@ export function LinearFilterRow({
 					</DropdownMenuItem>
 				))}
 			</FilterButton>
-			<Input
-				placeholder="Search…"
+			<SearchInput
 				value={filters.search}
-				onChange={(e) => onChange({ ...filters, search: e.target.value })}
-				className="h-7 w-32"
+				onChange={(search) => onChange({ ...filters, search })}
 			/>
 		</div>
 	);
@@ -123,8 +158,8 @@ export function PrFilterRow({
 	const stateLabel =
 		PR_STATE_OPTIONS.find((o) => o.key === filters.state)?.label ?? "Open";
 	return (
-		<div className="flex items-center gap-1">
-			<FilterButton label="State" value={stateLabel}>
+		<div className="flex min-w-0 flex-1 items-center gap-1">
+			<FilterButton icon={CircleDot} label="State" value={stateLabel}>
 				{PR_STATE_OPTIONS.map((o) => (
 					<DropdownMenuItem
 						key={o.key}
@@ -134,7 +169,11 @@ export function PrFilterRow({
 					</DropdownMenuItem>
 				))}
 			</FilterButton>
-			<FilterButton label="Assignee" value={assigneeLabel(filters.assignee)}>
+			<FilterButton
+				icon={UserRound}
+				label="Assignee"
+				value={assigneeLabel(filters.assignee)}
+			>
 				{ASSIGNEE_OPTIONS.map((o) => (
 					<DropdownMenuItem
 						key={o.key}
@@ -146,10 +185,11 @@ export function PrFilterRow({
 			</FilterButton>
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
-					<Button variant="ghost" size="sm" className="gap-1 px-2">
+					<Button variant="ghost" size="sm" className="gap-1.5 px-2">
+						<Link2 className="size-3 text-muted-foreground" strokeWidth={1.8} />
 						<span className="text-muted-foreground">Linked:</span>
 						<span>{filters.linkedToIssue ? "Yes" : "Any"}</span>
-						<ChevronDown className="size-3" />
+						<ChevronDown className="size-2.5" />
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="start">
@@ -163,11 +203,9 @@ export function PrFilterRow({
 					</DropdownMenuCheckboxItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
-			<Input
-				placeholder="Search…"
+			<SearchInput
 				value={filters.search}
-				onChange={(e) => onChange({ ...filters, search: e.target.value })}
-				className="h-7 w-32"
+				onChange={(search) => onChange({ ...filters, search })}
 			/>
 		</div>
 	);
@@ -183,8 +221,8 @@ export function IssueFilterRow({
 	const stateLabel =
 		ISSUE_STATE_OPTIONS.find((o) => o.key === filters.state)?.label ?? "Open";
 	return (
-		<div className="flex items-center gap-1">
-			<FilterButton label="State" value={stateLabel}>
+		<div className="flex min-w-0 flex-1 items-center gap-1">
+			<FilterButton icon={CircleDot} label="State" value={stateLabel}>
 				{ISSUE_STATE_OPTIONS.map((o) => (
 					<DropdownMenuItem
 						key={o.key}
@@ -194,7 +232,11 @@ export function IssueFilterRow({
 					</DropdownMenuItem>
 				))}
 			</FilterButton>
-			<FilterButton label="Assignee" value={assigneeLabel(filters.assignee)}>
+			<FilterButton
+				icon={UserRound}
+				label="Assignee"
+				value={assigneeLabel(filters.assignee)}
+			>
 				{ASSIGNEE_OPTIONS.map((o) => (
 					<DropdownMenuItem
 						key={o.key}
@@ -204,11 +246,9 @@ export function IssueFilterRow({
 					</DropdownMenuItem>
 				))}
 			</FilterButton>
-			<Input
-				placeholder="Search…"
+			<SearchInput
 				value={filters.search}
-				onChange={(e) => onChange({ ...filters, search: e.target.value })}
-				className="h-7 w-32"
+				onChange={(search) => onChange({ ...filters, search })}
 			/>
 		</div>
 	);

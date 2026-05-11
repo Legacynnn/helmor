@@ -1,7 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ArrowLeft, Check, Clock3, Copy, ExternalLink } from "lucide-react";
+import {
+	ArrowLeft,
+	Check,
+	Clock3,
+	Copy,
+	ExternalLink,
+	Pencil,
+} from "lucide-react";
 import { Suspense, useCallback, useEffect, useState } from "react";
+import { HelmorLogoAnimated } from "@/components/helmor-logo-animated";
 import { LazyStreamdown } from "@/components/streamdown-loader";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +29,10 @@ import {
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { TaskListItem } from "../types";
+import { EditableBody } from "./editable-body";
+import { EditableTitle } from "./editable-title";
+import { IssueComments } from "./issue-comments";
+import { StatusBadgeMenu } from "./status-badge-menu";
 
 function parseGitHubOwnerRepo(
 	remoteUrl: string | null | undefined,
@@ -99,6 +111,8 @@ export function DetailScreen({
 		return () => window.removeEventListener("keydown", handler);
 	}, [onClose]);
 
+	const [editSignal, setEditSignal] = useState(0);
+
 	const linearQuery = useQuery<LinearIssueDetail>({
 		queryKey: ["tasks", "detail", "linear", item.key],
 		queryFn: () => linearGetTask(item.key),
@@ -154,7 +168,7 @@ export function DetailScreen({
 				: "task";
 
 	return (
-		<article className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-y-auto px-4 [contain:content] [scrollbar-gutter:stable]">
+		<article className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-y-auto px-4 [contain:content] [scrollbar-gutter:stable]">
 			<header className="shrink-0 py-1.5">
 				<div className="flex min-w-0 items-center justify-between gap-4">
 					<div className="flex min-w-0 flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
@@ -168,15 +182,34 @@ export function DetailScreen({
 							<ArrowLeft className="size-[13px]" strokeWidth={1.8} />
 							Back
 						</Button>
-						<span
-							className="rounded-full border border-current/25 px-2 py-0.5 text-[12px] font-semibold"
-							style={{
-								color: item.status.color,
-								backgroundColor: `${item.status.color}1f`,
-							}}
-						>
-							{item.status.label}
-						</span>
+						<StatusBadgeMenu
+							status={item.status}
+							state={
+								ghQuery.data?.type === "github_issue"
+									? ghQuery.data.data.state
+									: item.status.key.toLowerCase()
+							}
+							updatedAt={
+								ghQuery.data?.type === "github_issue"
+									? (ghQuery.data.data.updatedAt ?? null)
+									: null
+							}
+							detailRef={detailRef}
+							detailQueryKey={
+								detailRef
+									? [
+											"tasks",
+											"detail",
+											"github",
+											detailRef.provider,
+											detailRef.login,
+											detailRef.source,
+											detailRef.externalId,
+										]
+									: ["tasks", "detail", "github", "disabled", item.key]
+							}
+							editable={item.source === "github-issue" && !!detailRef}
+						/>
 						<span className="font-mono text-[12px] text-muted-foreground">
 							{item.displayId}
 						</span>
@@ -195,9 +228,38 @@ export function DetailScreen({
 						linkedWorkspaceId={linked.data ?? null}
 						onOpenWorkspace={onOpenWorkspace}
 						onStartWorkspace={onStartWorkspace}
+						canEdit={item.source === "github-issue" && !!detailRef}
+						onEdit={() => setEditSignal((n) => n + 1)}
 					/>
 				</div>
-				<h1 className="mt-2 text-base font-medium">{item.title}</h1>
+				<EditableTitle
+					title={
+						ghQuery.data?.type === "github_issue"
+							? ghQuery.data.data.title
+							: item.title
+					}
+					updatedAt={
+						ghQuery.data?.type === "github_issue"
+							? (ghQuery.data.data.updatedAt ?? null)
+							: null
+					}
+					detailRef={detailRef}
+					detailQueryKey={
+						detailRef
+							? [
+									"tasks",
+									"detail",
+									"github",
+									detailRef.provider,
+									detailRef.login,
+									detailRef.source,
+									detailRef.externalId,
+								]
+							: ["tasks", "detail", "github", "disabled", item.key]
+					}
+					editable={item.source === "github-issue" && !!detailRef}
+					editSignal={editSignal}
+				/>
 			</header>
 			<div
 				className={cn(
@@ -206,10 +268,37 @@ export function DetailScreen({
 				)}
 			>
 				{isLoading ? (
-					<div className="text-[13px] text-muted-foreground">Loading…</div>
+					<HelmorLogoAnimated size={48} className="opacity-80" />
 				) : error ? (
 					<div className="text-center text-[13px] text-muted-foreground">
 						{error instanceof Error ? error.message : String(error)}
+					</div>
+				) : item.source === "github-issue" && detailRef ? (
+					<div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+						<EditableBody
+							body={body}
+							updatedAt={
+								ghQuery.data?.type === "github_issue"
+									? (ghQuery.data.data.updatedAt ?? null)
+									: null
+							}
+							detailRef={detailRef}
+							detailQueryKey={[
+								"tasks",
+								"detail",
+								"github",
+								detailRef.provider,
+								detailRef.login,
+								detailRef.source,
+								detailRef.externalId,
+							]}
+							editable
+							editSignal={editSignal}
+						/>
+						<IssueComments
+							login={detailRef.login}
+							externalId={detailRef.externalId}
+						/>
 					</div>
 				) : (
 					<MarkdownBody body={markdownBody} />
@@ -226,6 +315,8 @@ function DetailActions({
 	linkedWorkspaceId,
 	onOpenWorkspace,
 	onStartWorkspace,
+	canEdit,
+	onEdit,
 }: {
 	item: TaskListItem;
 	markdownBody: string;
@@ -233,6 +324,8 @@ function DetailActions({
 	linkedWorkspaceId: string | null;
 	onOpenWorkspace: (workspaceId: string) => void;
 	onStartWorkspace: (item: TaskListItem) => void;
+	canEdit: boolean;
+	onEdit: () => void;
 }) {
 	const [copied, setCopied] = useState(false);
 	const handleCopy = useCallback(() => {
@@ -265,6 +358,23 @@ function DetailActions({
 			>
 				Start workspace
 			</Button>
+			{canEdit ? (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-xs"
+							aria-label="Edit issue"
+							onClick={onEdit}
+							className="size-7 cursor-pointer rounded-md text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+						>
+							<Pencil className="size-[13px]" strokeWidth={1.8} />
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent side="top">Edit</TooltipContent>
+				</Tooltip>
+			) : null}
 			<Tooltip>
 				<TooltipTrigger asChild>
 					<Button

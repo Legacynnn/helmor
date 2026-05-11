@@ -48,7 +48,7 @@ pub async fn fetch_teams(api_key: &str) -> Result<Vec<LinearTeam>, LinearError> 
 }
 
 pub const TASKS_QUERY: &str = r#"
-query Tasks($teamId: String!) {
+query Tasks($teamId: ID!) {
   issues(
     filter: { team: { id: { eq: $teamId } }, state: { type: { nin: ["completed", "canceled"] } } }
     orderBy: updatedAt
@@ -220,6 +220,14 @@ mod tests {
         assert_eq!(task.assignee.as_ref().unwrap().name, "Dan");
         assert_eq!(task.labels.nodes.len(), 1);
         assert_eq!(task.labels.nodes[0].name, "bug");
+    }
+
+    #[test]
+    fn tasks_query_uses_linear_id_scalar_for_team_filter() {
+        assert!(
+            TASKS_QUERY.contains("query Tasks($teamId: ID!)"),
+            "Linear validates the team id filter as GraphQL ID, not String"
+        );
     }
 
     #[test]

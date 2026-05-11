@@ -28,9 +28,14 @@ mod api;
 mod comments;
 mod context;
 pub mod inbox;
+mod issue_comments;
+mod issue_edit;
 pub mod lists;
 mod pull_request;
 mod types;
+
+pub use issue_comments::{create_issue_comment, list_issue_comments};
+pub use issue_edit::{update_issue, IssueUpdate};
 
 use self::actions::{
     build_check_insert_text, query_check_run_detail, query_workspace_pr_action_status,

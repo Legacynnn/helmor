@@ -1,24 +1,72 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, UserCircle2 } from "lucide-react";
+import { CachedAvatar } from "@/components/cached-avatar";
+import { cn } from "@/lib/utils";
+import { TaskStatusIcon } from "../status-icon";
 import type { TaskListItem } from "../types";
 
-const PRIORITY_GLYPH: Record<NonNullable<TaskListItem["priority"]>, string> = {
-	urgent: "■",
-	high: "▮",
-	medium: "▬",
-	low: "▭",
-	none: "·",
+const PRIORITY_LEVELS: Record<NonNullable<TaskListItem["priority"]>, number> = {
+	urgent: 4,
+	high: 3,
+	medium: 2,
+	low: 1,
+	none: 0,
 };
 
-function relative(dateIso: string): string {
-	const then = new Date(dateIso).getTime();
-	if (Number.isNaN(then)) return "";
-	const diffSec = Math.round((Date.now() - then) / 1000);
-	const day = 86_400;
-	if (diffSec < day) return "today";
-	if (diffSec < day * 7) return `${Math.round(diffSec / day)}d ago`;
-	if (diffSec < day * 30) return `${Math.round(diffSec / (day * 7))}w ago`;
-	if (diffSec < day * 365) return `${Math.round(diffSec / (day * 30))}mo ago`;
-	return `${Math.round(diffSec / (day * 365))}y ago`;
+function formatShortDate(dateIso: string): string {
+	const date = new Date(dateIso);
+	if (Number.isNaN(date.getTime())) return "";
+	return new Intl.DateTimeFormat(undefined, {
+		month: "short",
+		day: "numeric",
+	}).format(date);
+}
+
+function PriorityIndicator({
+	priority,
+}: {
+	priority: NonNullable<TaskListItem["priority"]>;
+}) {
+	const active = PRIORITY_LEVELS[priority];
+	return (
+		<span
+			className="flex h-5 w-5 shrink-0 items-end justify-center gap-[2px] text-muted-foreground/65"
+			aria-hidden="true"
+			title={priority}
+		>
+			{[1, 2, 3].map((level) => (
+				<span
+					key={level}
+					className={cn(
+						"w-[3px] rounded-full bg-current",
+						level === 1 ? "h-1.5" : level === 2 ? "h-2.5" : "h-3.5",
+						active >= level ? "opacity-100" : "opacity-25",
+						priority === "urgent" && "text-destructive",
+					)}
+				/>
+			))}
+		</span>
+	);
+}
+
+function AssigneeAvatar({ assignee }: { assignee: TaskListItem["assignee"] }) {
+	if (!assignee) {
+		return (
+			<span className="flex size-6 shrink-0 items-center justify-center text-muted-foreground/70">
+				<UserCircle2 className="size-5" strokeWidth={1.7} />
+			</span>
+		);
+	}
+
+	const fallback = assignee.login.slice(0, 2).toUpperCase();
+	return (
+		<CachedAvatar
+			src={assignee.avatarUrl}
+			alt={assignee.login}
+			fallback={fallback}
+			className="size-6 shrink-0 rounded-full"
+			fallbackClassName="text-[10px]"
+		/>
+	);
 }
 
 export function ItemRow({
@@ -30,49 +78,64 @@ export function ItemRow({
 	onSelect: (item: TaskListItem) => void;
 	isSelected: boolean;
 }) {
+	const openItem = () => onSelect(item);
+
 	return (
-		<button
-			type="button"
+		<div
+			role="button"
+			tabIndex={0}
 			data-selected={isSelected}
-			onClick={() => onSelect(item)}
-			className="group flex w-full cursor-pointer items-center gap-2 border-b border-border/50 px-4 py-1.5 text-left text-xs hover:bg-muted/40 data-[selected=true]:bg-muted/60"
+			onClick={openItem}
+			onKeyDown={(event) => {
+				if (event.target !== event.currentTarget) return;
+				if (event.key === "Enter" || event.key === " ") {
+					event.preventDefault();
+					openItem();
+				}
+			}}
+			className="group grid min-h-12 w-full cursor-pointer grid-cols-[1.5rem_4.5rem_minmax(12rem,1fr)_auto_auto] items-center gap-x-1 border-b border-border/35 px-4 py-2 text-left text-[13px] transition-colors hover:bg-muted/35 data-[selected=true]:bg-muted/55"
 		>
-			<span
-				className="w-3 shrink-0 text-center text-muted-foreground"
-				aria-hidden="true"
-				title={item.priority ?? "none"}
-			>
-				{PRIORITY_GLYPH[item.priority ?? "none"]}
+			<span className="flex size-6 items-center justify-center">
+				<PriorityIndicator priority={item.priority ?? "none"} />
 			</span>
-			{item.repo ? (
-				<span className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
-					{item.repo.name}
-				</span>
-			) : null}
-			<span className="w-24 shrink-0 truncate font-mono text-[11px] text-muted-foreground">
+			<span className="truncate font-mono text-[12px] text-muted-foreground">
 				{item.displayId}
 			</span>
-			<span className="min-w-0 flex-1 truncate">{item.title}</span>
-			<span className="ml-auto flex shrink-0 items-center gap-1.5">
+			<div className="flex min-w-0 items-center gap-1.5">
+				<span aria-label={item.status.label} title={item.status.label}>
+					<TaskStatusIcon status={item.status} />
+				</span>
+				<span className="min-w-0 truncate font-medium text-foreground/90">
+					{item.title}
+				</span>
+				{item.repo ? (
+					<span className="hidden shrink-0 rounded-md border border-border/50 bg-muted/45 px-1.5 py-0.5 text-[10px] text-muted-foreground xl:inline">
+						{item.repo.name}
+					</span>
+				) : null}
+			</div>
+			<div className="hidden max-w-[17rem] shrink-0 items-center justify-end gap-1.5 lg:flex">
 				{item.labels.slice(0, 3).map((label) => (
 					<span
 						key={label.name}
-						className="rounded bg-muted px-1.5 py-0.5 text-[10px]"
-						style={{ color: label.color }}
+						className="max-w-28 truncate rounded-full border px-2 py-0.5 text-[11px] font-medium"
+						style={{
+							color: label.color,
+							borderColor: `color-mix(in oklab, ${label.color} 35%, transparent)`,
+							backgroundImage: `linear-gradient(135deg, color-mix(in oklab, ${label.color} 22%, transparent), color-mix(in oklab, ${label.color} 6%, transparent))`,
+						}}
 					>
 						{label.name}
 					</span>
 				))}
-				{item.assignee ? (
-					<span className="size-5 shrink-0 rounded-full bg-muted text-center text-[10px] leading-5">
-						{item.assignee.login.slice(0, 1).toUpperCase()}
-					</span>
-				) : null}
-				<span className="w-16 shrink-0 text-right text-[11px] text-muted-foreground">
-					{relative(item.updatedAt)}
+			</div>
+			<span className="flex shrink-0 items-center justify-end gap-2.5 text-[12px] text-muted-foreground">
+				<AssigneeAvatar assignee={item.assignee} />
+				<span className="min-w-14 text-right">
+					{formatShortDate(item.updatedAt)}
 				</span>
-				<ChevronRight className="size-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+				<ChevronRight className="size-3 opacity-0 transition-opacity group-hover:opacity-100" />
 			</span>
-		</button>
+		</div>
 	);
 }

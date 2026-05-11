@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { HelmorLogoAnimated } from "@/components/helmor-logo-animated";
 import { type LinearAuthStatus, linearGetAuthStatus } from "@/lib/api";
 import { repositoriesQueryOptions } from "@/lib/query-client";
 import { DetailScreen } from "./components/detail-screen";
@@ -29,6 +30,7 @@ export function TasksScreenContainer({
 		seedUrl: string;
 		seedTitle: string;
 		linearTaskId: string | null;
+		item: TaskListItem;
 	}) => void;
 }) {
 	const reposQuery = useQuery(repositoriesQueryOptions());
@@ -121,8 +123,8 @@ export function TasksScreenContainer({
 		}
 		if (tasks.isLoading) {
 			return (
-				<div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-					Loading…
+				<div className="flex h-full items-center justify-center">
+					<HelmorLogoAnimated size={48} className="opacity-80" />
 				</div>
 			);
 		}
@@ -152,7 +154,7 @@ export function TasksScreenContainer({
 
 	return (
 		<div className="flex h-full flex-col">
-			<header className="flex items-center gap-3 border-b border-border/50 px-4 py-2">
+			<header className="flex min-w-0 items-center gap-3 border-b border-border/50 px-4 py-2">
 				<RepoSwitcher
 					repos={repos}
 					selectedId={selectedRepoId}
@@ -201,6 +203,7 @@ export function TasksScreenContainer({
 								seedUrl: item.url,
 								seedTitle: item.title,
 								linearTaskId: item.source === "linear" ? item.key : null,
+								item,
 							});
 						}}
 					/>

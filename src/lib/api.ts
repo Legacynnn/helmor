@@ -2186,6 +2186,63 @@ export async function listWorkspaceChangeRequestComments(
 	}
 }
 
+export async function listGithubIssueComments(
+	login: string,
+	externalId: string,
+): Promise<PrCommentInfo[]> {
+	try {
+		return await invoke<PrCommentInfo[]>("list_github_issue_comments", {
+			login,
+			externalId,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to load issue comments."),
+		);
+	}
+}
+
+export async function createGithubIssueComment(
+	login: string,
+	externalId: string,
+	body: string,
+): Promise<PrCommentInfo> {
+	try {
+		return await invoke<PrCommentInfo>("create_github_issue_comment", {
+			login,
+			externalId,
+			body,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to post issue comment."),
+		);
+	}
+}
+
+export type IssueUpdate = {
+	title?: string;
+	body?: string;
+	state?: "open" | "closed";
+	stateReason?: "completed" | "not_planned" | "reopened";
+};
+
+export async function updateGithubIssue(
+	login: string,
+	externalId: string,
+	update: IssueUpdate,
+): Promise<GitHubIssueDetail> {
+	try {
+		return await invoke<GitHubIssueDetail>("update_github_issue", {
+			login,
+			externalId,
+			update,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to update issue."));
+	}
+}
+
 export async function listWorkspaceCommitsAhead(
 	workspaceId: string,
 ): Promise<WorkspaceCommitInfo[]> {

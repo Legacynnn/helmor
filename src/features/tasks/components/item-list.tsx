@@ -1,12 +1,13 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
+import { TaskStatusIcon } from "../status-icon";
 import type { TaskListItem } from "../types";
 import { ItemRow } from "./item-row";
 
 type Group = {
 	key: string;
 	label: string;
-	color: string;
+	status: TaskListItem["status"];
 	items: TaskListItem[];
 };
 
@@ -20,7 +21,7 @@ function groupByStatus(items: TaskListItem[]): Group[] {
 			map.set(item.status.key, {
 				key: item.status.key,
 				label: item.status.label,
-				color: item.status.color,
+				status: item.status,
 				items: [item],
 			});
 		}
@@ -52,7 +53,7 @@ export function ItemList({
 	}
 
 	return (
-		<div className="flex flex-col overflow-auto">
+		<div className="flex flex-col overflow-auto bg-background">
 			{groups.map((group) => {
 				const isCollapsed = collapsedGroups.includes(group.key);
 				return (
@@ -60,18 +61,18 @@ export function ItemList({
 						<button
 							type="button"
 							onClick={() => onToggleCollapse(group.key, !isCollapsed)}
-							className="flex w-full cursor-pointer items-center gap-2 bg-muted/30 px-3 py-1 text-left text-xs font-medium"
+							className="flex h-10 w-full cursor-pointer items-center gap-2 px-3 text-left text-xs font-medium shadow-[inset_0_-1px_0_rgb(255_255_255_/_0.04)] backdrop-blur-md transition-colors hover:brightness-110"
+							style={{
+								background:
+									"linear-gradient(135deg, rgb(255 255 255 / 0.10) 0%, rgb(255 255 255 / 0.025) 48%, rgb(255 255 255 / 0.075) 100%), linear-gradient(135deg, rgb(0 0 0 / 0.10) 0%, rgb(0 0 0 / 0.02) 56%, rgb(0 0 0 / 0.07) 100%), var(--muted)",
+							}}
 						>
 							{isCollapsed ? (
 								<ChevronRight className="size-3" />
 							) : (
 								<ChevronDown className="size-3" />
 							)}
-							<span
-								className="size-2 rounded-full"
-								style={{ background: group.color }}
-								aria-hidden="true"
-							/>
+							<TaskStatusIcon status={group.status} />
 							<span>{group.label}</span>
 							<span className="text-muted-foreground">
 								{group.items.length}

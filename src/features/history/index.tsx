@@ -1,5 +1,6 @@
 import { ChevronDown, Search } from "lucide-react";
 import { memo, useId, useMemo, useState } from "react";
+import { HelmorLogoAnimated } from "@/components/helmor-logo-animated";
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -93,8 +94,8 @@ export const HistoryScreen = memo(function HistoryScreen({
 
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				{loading && totalRows === 0 ? (
-					<div className="px-6 py-12 text-center text-[13px] text-muted-foreground">
-						Loading history…
+					<div className="flex items-center justify-center px-6 py-12">
+						<HelmorLogoAnimated size={48} className="opacity-80" />
 					</div>
 				) : totalRows === 0 ? (
 					<div className="px-6 py-12 text-center text-[13px] text-muted-foreground">
