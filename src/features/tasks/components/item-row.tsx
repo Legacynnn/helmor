@@ -44,6 +44,11 @@ export function ItemRow({
 			>
 				{PRIORITY_GLYPH[item.priority ?? "none"]}
 			</span>
+			{item.repo ? (
+				<span className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+					{item.repo.name}
+				</span>
+			) : null}
 			<span className="w-24 shrink-0 truncate font-mono text-[11px] text-muted-foreground">
 				{item.displayId}
 			</span>

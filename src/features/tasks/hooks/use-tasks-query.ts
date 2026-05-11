@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import {
 	type GhIssue,
 	type GhPr,
@@ -6,6 +6,7 @@ import {
 	githubListRepoPrs,
 	type LinearIssue,
 	linearListTasks,
+	type RepositoryCreateOption,
 } from "@/lib/api";
 import { helmorQueryKeys } from "@/lib/query-client";
 import { ghIssueToItem } from "../adapters/github-issue";
@@ -105,20 +106,23 @@ function applyFilters(
 
 export function useTasksQuery(args: {
 	tab: TasksTab;
-	repoId: string | null;
+	repoId: string | "all" | null;
 	linearTeamId: string | null;
 	filters: PerTabFilters;
+	repos: RepositoryCreateOption[];
 }): Result {
+	const isAllRepos = args.repoId === "all";
+	const repoId = isAllRepos ? null : args.repoId;
 	const linearTeamId = args.linearTeamId;
-	const repoId = args.repoId;
 
+	// ── SINGLE-REPO BRANCH ──────────────────────────────────────────────────
 	const linear = useQuery<LinearIssue[]>({
 		queryKey:
 			repoId && linearTeamId
 				? helmorQueryKeys.tasks.linear(repoId, linearTeamId)
 				: ["tasks", "linear", "disabled"],
 		queryFn: () => linearListTasks(linearTeamId as string),
-		enabled: args.tab === "tasks" && !!repoId && !!linearTeamId,
+		enabled: !isAllRepos && args.tab === "tasks" && !!repoId && !!linearTeamId,
 		staleTime: STALE_TIME,
 	});
 
@@ -127,7 +131,7 @@ export function useTasksQuery(args: {
 			? helmorQueryKeys.tasks.githubPrs(repoId)
 			: ["tasks", "githubPrs", "disabled"],
 		queryFn: () => githubListRepoPrs(repoId as string),
-		enabled: args.tab === "prs" && !!repoId,
+		enabled: !isAllRepos && args.tab === "prs" && !!repoId,
 		staleTime: STALE_TIME,
 	});
 
@@ -136,32 +140,113 @@ export function useTasksQuery(args: {
 			? helmorQueryKeys.tasks.githubIssues(repoId)
 			: ["tasks", "githubIssues", "disabled"],
 		queryFn: () => githubListRepoIssues(repoId as string),
-		enabled: args.tab === "issues" && !!repoId,
+		enabled: !isAllRepos && args.tab === "issues" && !!repoId,
 		staleTime: STALE_TIME,
 	});
 
-	const active =
-		args.tab === "tasks" ? linear : args.tab === "prs" ? prs : issues;
+	// ── ALL-REPOS BRANCH ────────────────────────────────────────────────────
+	const linearRepos = isAllRepos
+		? args.repos.filter((r) => r.linearTeamId)
+		: [];
+	const ghRepos = isAllRepos ? args.repos.filter((r) => r.forgeLogin) : [];
 
-	const rawItems: TaskListItem[] = (() => {
-		if (args.tab === "tasks") {
-			return (linear.data ?? []).map(linearIssueToItem);
-		}
-		if (args.tab === "prs") {
-			return (prs.data ?? []).map(ghPrToItem);
-		}
-		return (issues.data ?? []).map(ghIssueToItem);
-	})();
+	const linearAllQueries = useQueries({
+		queries: linearRepos.map((r) => ({
+			queryKey: helmorQueryKeys.tasks.linear(r.id, r.linearTeamId as string),
+			queryFn: () => linearListTasks(r.linearTeamId as string),
+			enabled: args.tab === "tasks" && isAllRepos,
+			staleTime: STALE_TIME,
+		})),
+	});
 
-	const items = applyFilters(args.tab, rawItems, args.filters);
+	const prAllQueries = useQueries({
+		queries: ghRepos.map((r) => ({
+			queryKey: helmorQueryKeys.tasks.githubPrs(r.id),
+			queryFn: () => githubListRepoPrs(r.id),
+			enabled: args.tab === "prs" && isAllRepos,
+			staleTime: STALE_TIME,
+		})),
+	});
 
-	return {
-		items,
-		isLoading: active.isLoading,
-		isError: active.isError,
-		error: active.error,
-		refetch: () => {
+	const issueAllQueries = useQueries({
+		queries: ghRepos.map((r) => ({
+			queryKey: helmorQueryKeys.tasks.githubIssues(r.id),
+			queryFn: () => githubListRepoIssues(r.id),
+			enabled: args.tab === "issues" && isAllRepos,
+			staleTime: STALE_TIME,
+		})),
+	});
+
+	// ── BUILD RESULT ────────────────────────────────────────────────────────
+	let items: TaskListItem[];
+	let isLoading: boolean;
+	let isError: boolean;
+	let error: unknown;
+	let refetch: () => void;
+
+	if (isAllRepos) {
+		const activeQueries =
+			args.tab === "tasks"
+				? linearAllQueries
+				: args.tab === "prs"
+					? prAllQueries
+					: issueAllQueries;
+		const activeRepos = args.tab === "tasks" ? linearRepos : ghRepos;
+
+		const adapted: TaskListItem[] = [];
+		activeQueries.forEach((q, i) => {
+			const repo = activeRepos[i];
+			if (!repo || !q.data) return;
+			const tag = { id: repo.id, name: repo.name };
+			if (args.tab === "tasks") {
+				for (const d of q.data as LinearIssue[]) {
+					adapted.push({ ...linearIssueToItem(d), repo: tag });
+				}
+			} else if (args.tab === "prs") {
+				for (const d of q.data as GhPr[]) {
+					adapted.push({ ...ghPrToItem(d), repo: tag });
+				}
+			} else {
+				for (const d of q.data as GhIssue[]) {
+					adapted.push({ ...ghIssueToItem(d), repo: tag });
+				}
+			}
+		});
+
+		adapted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+		items = adapted;
+		isLoading = activeQueries.some((q) => q.isLoading);
+		isError = activeQueries.some((q) => q.isError);
+		error = activeQueries.find((q) => q.isError)?.error ?? null;
+		refetch = () => {
+			activeQueries.forEach((q) => {
+				void q.refetch();
+			});
+		};
+	} else {
+		const active =
+			args.tab === "tasks" ? linear : args.tab === "prs" ? prs : issues;
+
+		const rawItems: TaskListItem[] = (() => {
+			if (args.tab === "tasks") {
+				return (linear.data ?? []).map(linearIssueToItem);
+			}
+			if (args.tab === "prs") {
+				return (prs.data ?? []).map(ghPrToItem);
+			}
+			return (issues.data ?? []).map(ghIssueToItem);
+		})();
+
+		items = rawItems;
+		isLoading = active.isLoading;
+		isError = active.isError;
+		error = active.error;
+		refetch = () => {
 			void active.refetch();
-		},
-	};
+		};
+	}
+
+	const filtered = applyFilters(args.tab, items, args.filters);
+
+	return { items: filtered, isLoading, isError, error, refetch };
 }

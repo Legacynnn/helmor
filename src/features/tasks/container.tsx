@@ -33,7 +33,9 @@ export function TasksScreenContainer({
 }) {
 	const reposQuery = useQuery(repositoriesQueryOptions());
 	const repos = reposQuery.data ?? [];
-	const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null);
+	const [selectedRepoId, setSelectedRepoId] = useState<string | "all" | null>(
+		null,
+	);
 	const [activeTab, setActiveTab] = useState<TasksTab>("tasks");
 	const [selectedItem, setSelectedItem] = useState<TaskListItem | null>(null);
 
@@ -83,8 +85,10 @@ export function TasksScreenContainer({
 	const tasks = useTasksQuery({
 		tab: activeTab,
 		repoId: selectedRepoId,
-		linearTeamId: selectedRepo?.linearTeamId ?? null,
+		linearTeamId:
+			selectedRepoId === "all" ? null : (selectedRepo?.linearTeamId ?? null),
 		filters: filtersHook.filters,
+		repos,
 	});
 
 	useDetailKeyboard({
@@ -94,19 +98,26 @@ export function TasksScreenContainer({
 	});
 
 	const body = (() => {
-		if (!selectedRepo) {
-			return <ErrorState message="Select a repository" />;
-		}
-		if (activeTab === "tasks") {
+		if (selectedRepoId !== "all") {
+			if (!selectedRepo) {
+				return <ErrorState message="Select a repository" />;
+			}
+			if (activeTab === "tasks") {
+				if (linearAuthQuery.data && !linearAuthQuery.data.connected) {
+					return <EmptyConnectLinear onOpenSettings={onOpenSettings} />;
+				}
+				if (!selectedRepo.linearTeamId) {
+					return <EmptyLinkLinearTeam repoId={selectedRepo.id} />;
+				}
+			}
+			if (activeTab !== "tasks" && !selectedRepo.forgeLogin) {
+				return <EmptyNoGitHubLogin />;
+			}
+		} else if (activeTab === "tasks") {
+			// In "all repos" mode, still check Linear connection
 			if (linearAuthQuery.data && !linearAuthQuery.data.connected) {
 				return <EmptyConnectLinear onOpenSettings={onOpenSettings} />;
 			}
-			if (!selectedRepo.linearTeamId) {
-				return <EmptyLinkLinearTeam repoId={selectedRepo.id} />;
-			}
-		}
-		if (activeTab !== "tasks" && !selectedRepo.forgeLogin) {
-			return <EmptyNoGitHubLogin />;
 		}
 		if (tasks.isLoading) {
 			return (
@@ -145,7 +156,7 @@ export function TasksScreenContainer({
 				<RepoSwitcher
 					repos={repos}
 					selectedId={selectedRepoId}
-					onSelect={setSelectedRepoId}
+					onSelect={(id) => setSelectedRepoId(id)}
 				/>
 				<div className="h-4 w-px bg-border" />
 				<TabBar

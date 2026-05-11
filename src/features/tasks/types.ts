@@ -67,4 +67,6 @@ export type TaskListItem = {
 	assignee?: { login: string; avatarUrl: string | null };
 	updatedAt: string;
 	url: string;
+	/** Set by the fan-out hook when repoId === "all". Adapters never set this. */
+	repo?: { id: string; name: string };
 };
