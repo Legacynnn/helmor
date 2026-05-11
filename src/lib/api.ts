@@ -3478,6 +3478,49 @@ export async function linearSetRepoTeam(
 	await invoke<void>("linear_set_repo_team", { repoId, teamId });
 }
 
+// ─── GitHub Tasks ────────────────────────────────────────────────────────────
+
+export type GhUser = {
+	login: string;
+	name?: string | null;
+};
+
+export type GhLabel = {
+	name: string;
+	color: string;
+};
+
+export type GhPr = {
+	number: number;
+	title: string;
+	url: string;
+	state: string;
+	isDraft: boolean;
+	updatedAt: string;
+	author?: GhUser | null;
+	assignees: GhUser[];
+	labels: GhLabel[];
+};
+
+export type GhIssue = {
+	number: number;
+	title: string;
+	url: string;
+	state: string;
+	updatedAt: string;
+	author?: GhUser | null;
+	assignees: GhUser[];
+	labels: GhLabel[];
+};
+
+export async function githubListRepoPrs(repoId: string): Promise<GhPr[]> {
+	return await invoke<GhPr[]>("github_list_repo_prs", { repoId });
+}
+
+export async function githubListRepoIssues(repoId: string): Promise<GhIssue[]> {
+	return await invoke<GhIssue[]>("github_list_repo_issues", { repoId });
+}
+
 export { DEFAULT_WORKSPACE_GROUPS };
 
 function describeInvokeError(error: unknown, fallback: string): string {

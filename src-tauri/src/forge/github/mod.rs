@@ -28,6 +28,7 @@ mod api;
 mod comments;
 mod context;
 pub mod inbox;
+pub mod lists;
 mod pull_request;
 mod types;
 

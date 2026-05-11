@@ -356,6 +356,8 @@ pub fn run() {
             commands::forge_commands::close_workspace_change_request,
             commands::forge_commands::update_workspace_change_request,
             commands::forge_commands::list_workspace_change_request_comments,
+            commands::github_list_commands::github_list_repo_issues,
+            commands::github_list_commands::github_list_repo_prs,
             commands::linear_commands::linear_clear_api_key,
             commands::linear_commands::linear_get_auth_status,
             commands::linear_commands::linear_list_tasks,
