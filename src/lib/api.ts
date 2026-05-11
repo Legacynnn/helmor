@@ -3447,6 +3447,10 @@ export type LinearIssue = {
 	labels: { nodes: LinearLabel[] };
 };
 
+export type LinearIssueDetail = LinearIssue & {
+	description: string;
+};
+
 export type LinearAuthStatus = {
 	connected: boolean;
 	viewer: LinearViewer | null;
@@ -3462,6 +3466,10 @@ export async function linearClearApiKey(): Promise<void> {
 
 export async function linearGetAuthStatus(): Promise<LinearAuthStatus> {
 	return await invoke<LinearAuthStatus>("linear_get_auth_status");
+}
+
+export async function linearGetTask(id: string): Promise<LinearIssueDetail> {
+	return await invoke<LinearIssueDetail>("linear_get_task", { id });
 }
 
 export async function linearListTeams(): Promise<LinearTeam[]> {

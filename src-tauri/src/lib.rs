@@ -360,6 +360,7 @@ pub fn run() {
             commands::github_list_commands::github_list_repo_prs,
             commands::linear_commands::linear_clear_api_key,
             commands::linear_commands::linear_get_auth_status,
+            commands::linear_commands::linear_get_task,
             commands::linear_commands::linear_list_tasks,
             commands::linear_commands::linear_list_teams,
             commands::linear_commands::linear_set_api_key,

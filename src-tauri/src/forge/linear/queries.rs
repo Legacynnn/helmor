@@ -99,6 +99,49 @@ pub async fn fetch_tasks(
     parse_tasks(data)
 }
 
+pub const TASK_DETAIL_QUERY: &str = r#"
+query Task($id: String!) {
+  issue(id: $id) {
+    id
+    identifier
+    title
+    url
+    priority
+    updatedAt
+    description
+    state { id name type color }
+    assignee { id name avatarUrl }
+    labels { nodes { id name color } }
+  }
+}
+"#;
+
+#[derive(Debug, Deserialize)]
+struct TaskEnvelope {
+    issue: Option<super::types::LinearIssueDetail>,
+}
+
+pub fn parse_task(data: Value) -> Result<super::types::LinearIssueDetail, LinearError> {
+    let env: TaskEnvelope =
+        serde_json::from_value(data).map_err(|e| LinearError::Parse(format!("task: {e}")))?;
+    env.issue
+        .ok_or_else(|| LinearError::Parse("issue not found".into()))
+}
+
+pub async fn fetch_task(
+    api_key: &str,
+    id: &str,
+) -> Result<super::types::LinearIssueDetail, LinearError> {
+    let data: Value = graphql(
+        LINEAR_API_URL,
+        api_key,
+        TASK_DETAIL_QUERY,
+        json!({ "id": id }),
+    )
+    .await?;
+    parse_task(data)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,5 +250,33 @@ mod tests {
         assert_eq!(tasks.len(), 1);
         assert!(tasks[0].assignee.is_none());
         assert_eq!(tasks[0].labels.nodes.len(), 0);
+    }
+
+    #[test]
+    fn parses_task_detail() {
+        let data = json!({
+            "issue": {
+                "id": "i1",
+                "identifier": "SUPER-187",
+                "title": "Fix something",
+                "url": "https://linear.app/x/issue/SUPER-187",
+                "priority": 2,
+                "updatedAt": "2026-03-23T10:00:00Z",
+                "description": "## Steps\n- Repro\n- Fix",
+                "state": { "id": "s1", "name": "In Progress", "type": "started", "color": "#5e6ad2" },
+                "assignee": null,
+                "labels": { "nodes": [] }
+            }
+        });
+        let task = parse_task(data).expect("parse");
+        assert_eq!(task.identifier, "SUPER-187");
+        assert!(task.description.contains("Repro"));
+    }
+
+    #[test]
+    fn parses_task_detail_missing_issue() {
+        let data = json!({ "issue": null });
+        let err = parse_task(data).expect_err("should fail");
+        assert!(matches!(err, LinearError::Parse(_)));
     }
 }

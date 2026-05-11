@@ -91,3 +91,19 @@ pub struct LinearIssue {
 pub struct LinearLabelConnection {
     pub nodes: Vec<LinearLabel>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinearIssueDetail {
+    pub id: String,
+    pub identifier: String,
+    pub title: String,
+    pub url: String,
+    pub priority: i32,
+    pub updated_at: String,
+    pub state: LinearIssueState,
+    pub assignee: Option<LinearAssignee>,
+    pub labels: LinearLabelConnection,
+    /// Markdown description. May be empty string.
+    pub description: String,
+}

@@ -1,5 +1,5 @@
 use super::common::{run_blocking, CmdResult};
-use crate::forge::linear::types::{LinearAuthStatus, LinearIssue, LinearTeam};
+use crate::forge::linear::types::{LinearAuthStatus, LinearIssue, LinearIssueDetail, LinearTeam};
 use crate::forge::linear::{auth, queries};
 use crate::models;
 
@@ -44,6 +44,16 @@ pub async fn linear_list_tasks(team_id: String) -> CmdResult<Vec<LinearIssue>> {
         .await?
         .ok_or_else(|| anyhow::anyhow!("Linear API key not configured"))?;
     queries::fetch_tasks(&key, &team_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()).into())
+}
+
+#[tauri::command]
+pub async fn linear_get_task(id: String) -> CmdResult<LinearIssueDetail> {
+    let key = run_blocking(auth::get_api_key)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Linear API key not configured"))?;
+    queries::fetch_task(&key, &id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()).into())
 }
