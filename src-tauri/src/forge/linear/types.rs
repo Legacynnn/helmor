@@ -42,3 +42,52 @@ pub enum LinearError {
     #[error("Failed to parse Linear response: {0}")]
     Parse(String),
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinearIssueState {
+    pub id: String,
+    pub name: String,
+    /// One of: backlog, unstarted, started, completed, canceled, triage.
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub color: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinearAssignee {
+    pub id: String,
+    pub name: String,
+    pub avatar_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinearLabel {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinearIssue {
+    pub id: String,
+    /// Human-readable identifier like "SUPER-187".
+    pub identifier: String,
+    pub title: String,
+    pub url: String,
+    /// 0 = no priority, 1 = urgent, 2 = high, 3 = medium, 4 = low (Linear's scale).
+    pub priority: i32,
+    pub updated_at: String,
+    pub state: LinearIssueState,
+    pub assignee: Option<LinearAssignee>,
+    pub labels: LinearLabelConnection,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinearLabelConnection {
+    pub nodes: Vec<LinearLabel>,
+}

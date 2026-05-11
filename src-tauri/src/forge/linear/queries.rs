@@ -47,6 +47,58 @@ pub async fn fetch_teams(api_key: &str) -> Result<Vec<LinearTeam>, LinearError> 
     parse_teams(data)
 }
 
+pub const TASKS_QUERY: &str = r#"
+query Tasks($teamId: String!) {
+  issues(
+    filter: { team: { id: { eq: $teamId } }, state: { type: { nin: ["completed", "canceled"] } } }
+    orderBy: updatedAt
+    first: 50
+  ) {
+    nodes {
+      id
+      identifier
+      title
+      url
+      priority
+      updatedAt
+      state { id name type color }
+      assignee { id name avatarUrl }
+      labels { nodes { id name color } }
+    }
+  }
+}
+"#;
+
+#[derive(Debug, Deserialize)]
+struct TasksEnvelope {
+    issues: TasksConnection,
+}
+
+#[derive(Debug, Deserialize)]
+struct TasksConnection {
+    nodes: Vec<super::types::LinearIssue>,
+}
+
+pub fn parse_tasks(data: Value) -> Result<Vec<super::types::LinearIssue>, LinearError> {
+    serde_json::from_value::<TasksEnvelope>(data)
+        .map(|e| e.issues.nodes)
+        .map_err(|e| LinearError::Parse(format!("tasks: {e}")))
+}
+
+pub async fn fetch_tasks(
+    api_key: &str,
+    team_id: &str,
+) -> Result<Vec<super::types::LinearIssue>, LinearError> {
+    let data: Value = graphql(
+        LINEAR_API_URL,
+        api_key,
+        TASKS_QUERY,
+        json!({ "teamId": team_id }),
+    )
+    .await?;
+    parse_tasks(data)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,5 +135,77 @@ mod tests {
         let data = json!({ "viewer": { "id": "u1" } }); // missing name/email
         let err = parse_viewer(data).expect_err("should fail");
         assert!(matches!(err, LinearError::Parse(_)));
+    }
+
+    #[test]
+    fn parses_tasks_response() {
+        let data = json!({
+            "issues": {
+                "nodes": [
+                    {
+                        "id": "i1",
+                        "identifier": "SUPER-187",
+                        "title": "Fix something",
+                        "url": "https://linear.app/x/issue/SUPER-187",
+                        "priority": 1,
+                        "updatedAt": "2026-03-23T10:00:00Z",
+                        "state": {
+                            "id": "s1",
+                            "name": "In Progress",
+                            "type": "started",
+                            "color": "#5e6ad2"
+                        },
+                        "assignee": {
+                            "id": "u1",
+                            "name": "Dan",
+                            "avatarUrl": "https://example.com/dan.png"
+                        },
+                        "labels": {
+                            "nodes": [
+                                { "id": "l1", "name": "bug", "color": "#eb5757" }
+                            ]
+                        }
+                    }
+                ]
+            }
+        });
+        let tasks = parse_tasks(data).expect("parse");
+        assert_eq!(tasks.len(), 1);
+        let task = &tasks[0];
+        assert_eq!(task.identifier, "SUPER-187");
+        assert_eq!(task.state.kind, "started");
+        assert_eq!(task.assignee.as_ref().unwrap().name, "Dan");
+        assert_eq!(task.labels.nodes.len(), 1);
+        assert_eq!(task.labels.nodes[0].name, "bug");
+    }
+
+    #[test]
+    fn parses_task_with_null_assignee_and_empty_labels() {
+        let data = json!({
+            "issues": {
+                "nodes": [
+                    {
+                        "id": "i1",
+                        "identifier": "SUPER-188",
+                        "title": "Untriaged",
+                        "url": "https://linear.app/x/issue/SUPER-188",
+                        "priority": 0,
+                        "updatedAt": "2026-03-23T10:00:00Z",
+                        "state": {
+                            "id": "s1",
+                            "name": "Backlog",
+                            "type": "backlog",
+                            "color": "#bec2c8"
+                        },
+                        "assignee": null,
+                        "labels": { "nodes": [] }
+                    }
+                ]
+            }
+        });
+        let tasks = parse_tasks(data).expect("parse");
+        assert_eq!(tasks.len(), 1);
+        assert!(tasks[0].assignee.is_none());
+        assert_eq!(tasks[0].labels.nodes.len(), 0);
     }
 }
