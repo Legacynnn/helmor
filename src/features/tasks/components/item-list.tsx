@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { TaskListItem } from "../types";
 import { ItemRow } from "./item-row";
 
@@ -28,9 +28,16 @@ function groupByStatus(items: TaskListItem[]): Group[] {
 	return Array.from(map.values());
 }
 
-export function ItemList({ items }: { items: TaskListItem[] }) {
+export function ItemList({
+	items,
+	collapsedGroups,
+	onToggleCollapse,
+}: {
+	items: TaskListItem[];
+	collapsedGroups: string[];
+	onToggleCollapse: (groupKey: string, collapsed: boolean) => void;
+}) {
 	const groups = useMemo(() => groupByStatus(items), [items]);
-	const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
 	if (items.length === 0) {
 		return (
@@ -43,17 +50,12 @@ export function ItemList({ items }: { items: TaskListItem[] }) {
 	return (
 		<div className="flex flex-col overflow-auto">
 			{groups.map((group) => {
-				const isCollapsed = collapsed[group.key] === true;
+				const isCollapsed = collapsedGroups.includes(group.key);
 				return (
 					<section key={group.key}>
 						<button
 							type="button"
-							onClick={() =>
-								setCollapsed((prev) => ({
-									...prev,
-									[group.key]: !prev[group.key],
-								}))
-							}
+							onClick={() => onToggleCollapse(group.key, !isCollapsed)}
 							className="flex w-full cursor-pointer items-center gap-2 bg-muted/30 px-3 py-1 text-left text-xs font-medium"
 						>
 							{isCollapsed ? (

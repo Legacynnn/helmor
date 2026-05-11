@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type LinearAuthStatus, linearGetAuthStatus } from "@/lib/api";
 import { repositoriesQueryOptions } from "@/lib/query-client";
 import {
@@ -11,6 +11,7 @@ import {
 import { ItemList } from "./components/item-list";
 import { RepoSwitcher } from "./components/repo-switcher";
 import { TabBar } from "./components/tab-bar";
+import { useTasksFilters } from "./hooks/use-tasks-filters";
 import { useTasksQuery } from "./hooks/use-tasks-query";
 import type { TasksTab } from "./types";
 
@@ -41,10 +42,37 @@ export function TasksScreenContainer({
 		[repos, selectedRepoId],
 	);
 
+	const filtersHook = useTasksFilters(selectedRepoId);
+
+	// Restore last view (once when hydration completes)
+	const restoredRef = useRef(false);
+	useEffect(() => {
+		if (!filtersHook.hydrated || restoredRef.current) return;
+		restoredRef.current = true;
+		if (filtersHook.lastView?.repoId) {
+			setSelectedRepoId(filtersHook.lastView.repoId);
+		}
+		if (filtersHook.lastView?.tab) {
+			setActiveTab(filtersHook.lastView.tab);
+		}
+	}, [filtersHook.hydrated, filtersHook.lastView]);
+
+	// Save last view whenever repo/tab changes
+	useEffect(() => {
+		if (!filtersHook.hydrated) return;
+		filtersHook.saveLastView({ repoId: selectedRepoId, tab: activeTab });
+	}, [
+		selectedRepoId,
+		activeTab,
+		filtersHook.hydrated,
+		filtersHook.saveLastView,
+	]);
+
 	const tasks = useTasksQuery({
 		tab: activeTab,
 		repoId: selectedRepoId,
 		linearTeamId: selectedRepo?.linearTeamId ?? null,
+		filters: filtersHook.filters,
 	});
 
 	const body = (() => {
@@ -80,7 +108,15 @@ export function TasksScreenContainer({
 				/>
 			);
 		}
-		return <ItemList items={tasks.items} />;
+		return (
+			<ItemList
+				items={tasks.items}
+				collapsedGroups={filtersHook.collapsedGroups[activeTab] ?? []}
+				onToggleCollapse={(key, collapsed) =>
+					filtersHook.setCollapsedGroups(activeTab, key, collapsed)
+				}
+			/>
+		);
 	})();
 
 	return (
@@ -92,7 +128,22 @@ export function TasksScreenContainer({
 					onSelect={setSelectedRepoId}
 				/>
 				<div className="h-4 w-px bg-border" />
-				<TabBar active={activeTab} onChange={setActiveTab} />
+				<TabBar
+					active={activeTab}
+					onChange={setActiveTab}
+					linearFilters={filtersHook.filters.tasks}
+					prFilters={filtersHook.filters.prs}
+					issueFilters={filtersHook.filters.issues}
+					onLinearFiltersChange={(next) =>
+						filtersHook.setFilters((prev) => ({ ...prev, tasks: next }))
+					}
+					onPrFiltersChange={(next) =>
+						filtersHook.setFilters((prev) => ({ ...prev, prs: next }))
+					}
+					onIssueFiltersChange={(next) =>
+						filtersHook.setFilters((prev) => ({ ...prev, issues: next }))
+					}
+				/>
 			</header>
 			<div className="min-h-0 flex-1">{body}</div>
 		</div>
