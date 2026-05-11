@@ -551,6 +551,17 @@ pub fn update_repository_forge_login(repo_id: &str, login: Option<&str>) -> Resu
     Ok(())
 }
 
+pub fn update_repository_linear_team_id(repo_id: &str, team_id: Option<&str>) -> Result<()> {
+    let connection = db::write_conn()?;
+    connection
+        .execute(
+            "UPDATE repos SET linear_team_id = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![team_id, repo_id],
+        )
+        .with_context(|| format!("Failed to update linear_team_id for {repo_id}"))?;
+    Ok(())
+}
+
 pub fn update_repository_default_branch(repo_id: &str, default_branch: &str) -> Result<()> {
     let connection = db::write_conn()?;
     let updated = connection
