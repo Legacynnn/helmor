@@ -29,6 +29,7 @@ mod detect;
 pub mod github;
 mod gitlab;
 pub mod inbox;
+pub mod linear;
 mod provider;
 pub(crate) mod remote;
 mod types;
