@@ -28,14 +28,14 @@ pub async fn graphql<T: DeserializeOwned>(
         .await?;
 
     let status = response.status();
+    if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
+        return Err(LinearError::Unauthorized);
+    }
+
     let body: Value = response
         .json()
         .await
         .map_err(|e| LinearError::Parse(format!("response not JSON: {e}")))?;
-
-    if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
-        return Err(LinearError::Unauthorized);
-    }
 
     if let Some(errors) = body.get("errors") {
         return Err(LinearError::GraphQl(errors.to_string()));
