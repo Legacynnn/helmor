@@ -3400,6 +3400,48 @@ export async function resizeTerminal(
 	});
 }
 
+// ─── Linear ───────────────────────────────────────────────────────────────────
+
+export type LinearViewer = {
+	id: string;
+	name: string;
+	email: string;
+};
+
+export type LinearTeam = {
+	id: string;
+	key: string;
+	name: string;
+};
+
+export type LinearAuthStatus = {
+	connected: boolean;
+	viewer: LinearViewer | null;
+};
+
+export async function linearSetApiKey(key: string): Promise<void> {
+	await invoke<void>("linear_set_api_key", { key });
+}
+
+export async function linearClearApiKey(): Promise<void> {
+	await invoke<void>("linear_clear_api_key");
+}
+
+export async function linearGetAuthStatus(): Promise<LinearAuthStatus> {
+	return await invoke<LinearAuthStatus>("linear_get_auth_status");
+}
+
+export async function linearListTeams(): Promise<LinearTeam[]> {
+	return await invoke<LinearTeam[]>("linear_list_teams");
+}
+
+export async function linearSetRepoTeam(
+	repoId: string,
+	teamId: string | null,
+): Promise<void> {
+	await invoke<void>("linear_set_repo_team", { repoId, teamId });
+}
+
 export { DEFAULT_WORKSPACE_GROUPS };
 
 function describeInvokeError(error: unknown, fallback: string): string {
