@@ -32,10 +32,14 @@ export function ItemList({
 	items,
 	collapsedGroups,
 	onToggleCollapse,
+	selectedKey,
+	onSelectItem,
 }: {
 	items: TaskListItem[];
 	collapsedGroups: string[];
 	onToggleCollapse: (groupKey: string, collapsed: boolean) => void;
+	selectedKey: string | null;
+	onSelectItem: (item: TaskListItem) => void;
 }) {
 	const groups = useMemo(() => groupByStatus(items), [items]);
 
@@ -76,7 +80,12 @@ export function ItemList({
 						{isCollapsed
 							? null
 							: group.items.map((item) => (
-									<ItemRow key={item.key} item={item} />
+									<ItemRow
+										key={item.key}
+										item={item}
+										onSelect={onSelectItem}
+										isSelected={item.key === selectedKey}
+									/>
 								))}
 					</section>
 				);

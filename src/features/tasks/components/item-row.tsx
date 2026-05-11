@@ -1,4 +1,3 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { ChevronRight } from "lucide-react";
 import type { TaskListItem } from "../types";
 
@@ -22,12 +21,21 @@ function relative(dateIso: string): string {
 	return `${Math.round(diffSec / (day * 365))}y ago`;
 }
 
-export function ItemRow({ item }: { item: TaskListItem }) {
+export function ItemRow({
+	item,
+	onSelect,
+	isSelected,
+}: {
+	item: TaskListItem;
+	onSelect: (item: TaskListItem) => void;
+	isSelected: boolean;
+}) {
 	return (
 		<button
 			type="button"
-			onClick={() => void openUrl(item.url)}
-			className="group flex w-full cursor-pointer items-center gap-2 border-b border-border/50 px-4 py-1.5 text-left text-xs hover:bg-muted/40"
+			data-selected={isSelected}
+			onClick={() => onSelect(item)}
+			className="group flex w-full cursor-pointer items-center gap-2 border-b border-border/50 px-4 py-1.5 text-left text-xs hover:bg-muted/40 data-[selected=true]:bg-muted/60"
 		>
 			<span
 				className="w-3 shrink-0 text-center text-muted-foreground"

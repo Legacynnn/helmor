@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type LinearAuthStatus, linearGetAuthStatus } from "@/lib/api";
 import { repositoriesQueryOptions } from "@/lib/query-client";
+import { DetailPanel } from "./components/detail-panel";
 import {
 	EmptyConnectLinear,
 	EmptyLinkLinearTeam,
@@ -11,9 +12,10 @@ import {
 import { ItemList } from "./components/item-list";
 import { RepoSwitcher } from "./components/repo-switcher";
 import { TabBar } from "./components/tab-bar";
+import { useDetailKeyboard } from "./hooks/use-detail-keyboard";
 import { useTasksFilters } from "./hooks/use-tasks-filters";
 import { useTasksQuery } from "./hooks/use-tasks-query";
-import type { TasksTab } from "./types";
+import type { TaskListItem, TasksTab } from "./types";
 
 export function TasksScreenContainer({
 	onOpenSettings,
@@ -24,6 +26,7 @@ export function TasksScreenContainer({
 	const repos = reposQuery.data ?? [];
 	const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState<TasksTab>("tasks");
+	const [selectedItem, setSelectedItem] = useState<TaskListItem | null>(null);
 
 	useEffect(() => {
 		if (!selectedRepoId && repos[0]) {
@@ -75,6 +78,12 @@ export function TasksScreenContainer({
 		filters: filtersHook.filters,
 	});
 
+	useDetailKeyboard({
+		items: tasks.items,
+		selected: selectedItem,
+		onSelect: setSelectedItem,
+	});
+
 	const body = (() => {
 		if (!selectedRepo) {
 			return <ErrorState message="Select a repository" />;
@@ -115,6 +124,8 @@ export function TasksScreenContainer({
 				onToggleCollapse={(key, collapsed) =>
 					filtersHook.setCollapsedGroups(activeTab, key, collapsed)
 				}
+				selectedKey={selectedItem?.key ?? null}
+				onSelectItem={setSelectedItem}
 			/>
 		);
 	})();
@@ -145,7 +156,15 @@ export function TasksScreenContainer({
 					}
 				/>
 			</header>
-			<div className="min-h-0 flex-1">{body}</div>
+			<div className="flex min-h-0 flex-1">
+				<div className="min-h-0 flex-1">{body}</div>
+				{selectedItem ? (
+					<DetailPanel
+						item={selectedItem}
+						onClose={() => setSelectedItem(null)}
+					/>
+				) : null}
+			</div>
 		</div>
 	);
 }
