@@ -159,6 +159,13 @@ export const helmorQueryKeys = {
 		["workspaceMergeBase", workspaceId] as const,
 	workspaceChangeRequestComments: (workspaceId: string) =>
 		["workspaceChangeRequestComments", workspaceId] as const,
+	tasks: {
+		linear: (repoId: string, teamId: string) =>
+			["tasks", "linear", repoId, teamId] as const,
+		githubPrs: (repoId: string) => ["tasks", "githubPrs", repoId] as const,
+		githubIssues: (repoId: string) =>
+			["tasks", "githubIssues", repoId] as const,
+	},
 };
 
 /** Persistence is opt-in per `queryOptions` via `meta: { persist: true }`.
