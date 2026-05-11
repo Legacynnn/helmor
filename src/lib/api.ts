@@ -3487,6 +3487,32 @@ export async function linearSetRepoTeam(
 	await invoke<void>("linear_set_repo_team", { repoId, teamId });
 }
 
+export async function tasksFindWorkspaceForLinearTask(
+	taskId: string,
+): Promise<string | null> {
+	return await invoke<string | null>("tasks_find_workspace_for_linear_task", {
+		taskId,
+	});
+}
+
+export async function tasksFindWorkspaceForPrUrl(
+	prUrl: string,
+): Promise<string | null> {
+	return await invoke<string | null>("tasks_find_workspace_for_pr_url", {
+		prUrl,
+	});
+}
+
+export async function tasksSetWorkspaceLinearTask(
+	workspaceId: string,
+	taskId: string | null,
+): Promise<void> {
+	await invoke<void>("tasks_set_workspace_linear_task", {
+		workspaceId,
+		taskId,
+	});
+}
+
 // ─── GitHub Tasks ────────────────────────────────────────────────────────────
 
 export type GhUser = {

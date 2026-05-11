@@ -216,6 +216,53 @@ pub fn load_archived_workspace_records() -> Result<Vec<WorkspaceRecord>> {
     Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
 }
 
+pub fn find_workspace_for_linear_task_id(task_id: &str) -> Result<Option<String>> {
+    let connection = db::read_conn()?;
+    let mut statement = connection
+        .prepare(
+            "SELECT id FROM workspaces \
+             WHERE linear_task_id = ?1 \
+               AND COALESCE(state, 'active') != 'archived' \
+             ORDER BY updated_at DESC LIMIT 1",
+        )
+        .context("prepare find_workspace_for_linear_task_id")?;
+    let mut rows = statement.query([task_id]).context("query")?;
+    if let Some(row) = rows.next().context("next")? {
+        Ok(Some(row.get::<_, String>(0)?))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn find_workspace_for_pr_url(pr_url: &str) -> Result<Option<String>> {
+    let connection = db::read_conn()?;
+    let mut statement = connection
+        .prepare(
+            "SELECT id FROM workspaces \
+             WHERE pr_url = ?1 \
+               AND COALESCE(state, 'active') != 'archived' \
+             ORDER BY updated_at DESC LIMIT 1",
+        )
+        .context("prepare find_workspace_for_pr_url")?;
+    let mut rows = statement.query([pr_url]).context("query")?;
+    if let Some(row) = rows.next().context("next")? {
+        Ok(Some(row.get::<_, String>(0)?))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn set_workspace_linear_task_id(workspace_id: &str, task_id: Option<&str>) -> Result<()> {
+    let connection = db::write_conn()?;
+    connection
+        .execute(
+            "UPDATE workspaces SET linear_task_id = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![task_id, workspace_id],
+        )
+        .with_context(|| format!("Failed to set linear_task_id on workspace {workspace_id}"))?;
+    Ok(())
+}
+
 pub(crate) fn insert_initializing_workspace_and_session(
     repository: &repos::RepositoryRecord,
     workspace_id: &str,
