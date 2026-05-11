@@ -1,5 +1,6 @@
 import { ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LinearTeamPicker } from "./linear-team-picker";
 
 export function EmptyConnectLinear({
 	onOpenSettings,
@@ -17,17 +18,11 @@ export function EmptyConnectLinear({
 	);
 }
 
-export function EmptyLinkLinearTeam({
-	onPickTeam,
-}: {
-	onPickTeam: () => void;
-}) {
+export function EmptyLinkLinearTeam({ repoId }: { repoId: string }) {
 	return (
 		<div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
 			<p>Link a Linear team to this repository to see tasks.</p>
-			<Button size="sm" onClick={onPickTeam}>
-				Link Linear team
-			</Button>
+			<LinearTeamPicker repoId={repoId} />
 		</div>
 	);
 }

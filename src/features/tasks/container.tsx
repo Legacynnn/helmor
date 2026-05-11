@@ -84,7 +84,7 @@ export function TasksScreenContainer({
 				return <EmptyConnectLinear onOpenSettings={onOpenSettings} />;
 			}
 			if (!selectedRepo.linearTeamId) {
-				return <EmptyLinkLinearTeam onPickTeam={onOpenSettings} />;
+				return <EmptyLinkLinearTeam repoId={selectedRepo.id} />;
 			}
 		}
 		if (activeTab !== "tasks" && !selectedRepo.forgeLogin) {
