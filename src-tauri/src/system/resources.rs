@@ -202,13 +202,11 @@ pub fn collect_snapshot(ctx: &CollectorContext) -> ResourceSnapshot {
     }
 
     // ------------------------------------------------------------------
-    // 2. Index script pids by leader and by pgid for workspace lookup.
+    // 2. Index script pids by leader for workspace lookup.
     // ------------------------------------------------------------------
     let mut script_by_pid: HashMap<u32, ScriptPidEntry> = HashMap::new();
-    let mut script_by_pgid: HashMap<u32, ScriptPidEntry> = HashMap::new();
     for entry in &ctx.script_pids {
         script_by_pid.insert(entry.pid, entry.clone());
-        script_by_pgid.insert(entry.pgid, entry.clone());
     }
 
     let sidecar_pid_pid = ctx.sidecar_pid.map(Pid::from_u32);
@@ -271,9 +269,13 @@ pub fn collect_snapshot(ctx: &CollectorContext) -> ResourceSnapshot {
         } else if matches!(kind, ProcessKind::Cli { .. }) {
             Attribution::SidecarAgents
         } else {
-            // Pty children of a script — same workspace as their parent.
-            let parent_script = parent_pid.and_then(|p| script_by_pid.get(&p));
-            if let Some(parent_entry) = parent_script {
+            // Descendants of a script (pty, shell, grand-children of either)
+            // share the script's workspace. Walk up the parent chain until
+            // we hit a tracked script leader, the Helmor main pid, or the
+            // depth bound.
+            let ancestor =
+                find_script_ancestor(parent_pid, &system, &script_by_pid, helmor_pid.as_u32());
+            if let Some(parent_entry) = ancestor {
                 if let Some(ws) = &parent_entry.workspace_id {
                     Attribution::Workspace {
                         repo_id: parent_entry.repo_id.clone(),
@@ -475,6 +477,29 @@ pub fn collect_snapshot(ctx: &CollectorContext) -> ResourceSnapshot {
         repositories,
         orphans,
     }
+}
+
+/// Walk up the parent chain from `start_parent` looking for a tracked
+/// script leader. Stops at the Helmor main pid, when sysinfo loses
+/// track of a parent, or when the depth bound is hit (cycle / runaway
+/// guard). Returns `None` if no script ancestor exists.
+fn find_script_ancestor<'a>(
+    start_parent: Option<u32>,
+    system: &System,
+    script_by_pid: &'a HashMap<u32, ScriptPidEntry>,
+    helmor_pid: u32,
+) -> Option<&'a ScriptPidEntry> {
+    let mut cursor = start_parent?;
+    for _ in 0..32 {
+        if cursor == helmor_pid {
+            return None;
+        }
+        if let Some(entry) = script_by_pid.get(&cursor) {
+            return Some(entry);
+        }
+        cursor = system.process(Pid::from_u32(cursor))?.parent()?.as_u32();
+    }
+    None
 }
 
 /// Heuristic name-based tagging for descendants that aren't the main
