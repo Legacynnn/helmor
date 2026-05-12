@@ -80,7 +80,7 @@ export function EditableTitle({
 	if (!editable || !isEditing) {
 		return (
 			<div className="mt-2">
-				<h1 className="min-w-0 text-base font-medium">{title}</h1>
+				<h1 className="min-w-0 text-lg font-semibold leading-tight">{title}</h1>
 			</div>
 		);
 	}
@@ -121,7 +121,7 @@ export function EditableTitle({
 				}}
 				readOnly={editor.isSaving}
 				className={cn(
-					"w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-base font-medium outline-none focus:border-foreground/40",
+					"w-full rounded-md border border-border/60 bg-background px-3 py-1.5 text-lg font-semibold leading-tight outline-none focus:border-foreground/40",
 					editor.isSaving && "opacity-70",
 				)}
 				placeholder="Issue title"
