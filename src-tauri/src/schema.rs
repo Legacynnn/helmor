@@ -628,6 +628,25 @@ fn run_migrations(connection: &Connection) -> Result<()> {
             .context("Failed to add workspaces.setup_completed_at column")?;
     }
 
+    // Migration: repos.linear_team_id — links a repo to a Linear team for
+    // the Tasks screen. NULL until the user maps one in the Tasks UI.
+    if has_table(connection, "repos") && !has_column(connection, "repos", "linear_team_id") {
+        connection
+            .execute_batch("ALTER TABLE repos ADD COLUMN linear_team_id TEXT")
+            .context("Failed to add repos.linear_team_id column")?;
+    }
+
+    // Migration: workspaces.linear_task_id — set when a workspace is created
+    // from a Linear task, so the Tasks screen can find the existing workspace
+    // for a given task on subsequent visits.
+    if has_table(connection, "workspaces")
+        && !has_column(connection, "workspaces", "linear_task_id")
+    {
+        connection
+            .execute_batch("ALTER TABLE workspaces ADD COLUMN linear_task_id TEXT")
+            .context("Failed to add workspaces.linear_task_id column")?;
+    }
+
     Ok(())
 }
 
@@ -662,6 +681,7 @@ CREATE TABLE IF NOT EXISTS repos (
     branch_prefix_type TEXT,
     branch_prefix_custom TEXT,
     run_script_mode TEXT DEFAULT 'concurrent',
+    linear_team_id TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -702,6 +722,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
     linked_directory_paths TEXT,
     mode TEXT DEFAULT 'worktree',
     setup_completed_at TEXT,
+    linear_task_id TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

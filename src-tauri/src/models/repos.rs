@@ -29,6 +29,7 @@ pub struct RepositoryCreateOption {
     /// account had access at add-repo time; UI surfaces a "Connect"
     /// affordance.
     pub forge_login: Option<String>,
+    pub linear_team_id: Option<String>,
     pub repo_icon_src: Option<String>,
     pub repo_initials: String,
 }
@@ -110,7 +111,8 @@ pub fn list_repositories() -> Result<Vec<RepositoryCreateOption>> {
               forge_provider,
               forge_login,
               branch_prefix_type,
-              branch_prefix_custom
+              branch_prefix_custom,
+              linear_team_id
             FROM repos
             WHERE COALESCE(hidden, 0) = 0
             ORDER BY COALESCE(display_order, 0) ASC, LOWER(name) ASC
@@ -140,6 +142,7 @@ pub fn list_repositories() -> Result<Vec<RepositoryCreateOption>> {
                 forge_login: row.get(7)?,
                 branch_prefix_type,
                 branch_prefix_custom: row.get(9)?,
+                linear_team_id: row.get(10)?,
                 default_branch: row.get(2)?,
                 repo_icon_src: icon_src,
                 repo_initials: initials,
@@ -548,6 +551,17 @@ pub fn update_repository_forge_login(repo_id: &str, login: Option<&str>) -> Resu
             rusqlite::params![login, repo_id],
         )
         .with_context(|| format!("Failed to update forge_login for {repo_id}"))?;
+    Ok(())
+}
+
+pub fn update_repository_linear_team_id(repo_id: &str, team_id: Option<&str>) -> Result<()> {
+    let connection = db::write_conn()?;
+    connection
+        .execute(
+            "UPDATE repos SET linear_team_id = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![team_id, repo_id],
+        )
+        .with_context(|| format!("Failed to update linear_team_id for {repo_id}"))?;
     Ok(())
 }
 

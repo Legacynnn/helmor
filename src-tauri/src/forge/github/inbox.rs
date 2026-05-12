@@ -26,7 +26,7 @@ use crate::forge::inbox::{
 
 pub mod detail;
 
-use detail::{GithubDiscussionDetail, GithubIssueDetail, GithubPullRequestDetail};
+use detail::{GithubDiscussionDetail, GithubPullRequestDetail};
 
 #[derive(Debug, Deserialize)]
 struct GithubLabelRestResponse {
@@ -645,27 +645,12 @@ fn fetch_pull_request_detail(login: &str, external_id: &str) -> Result<Option<In
 }
 
 fn fetch_issue_detail(login: &str, external_id: &str) -> Result<Option<InboxItemDetail>> {
-    let (owner, repo, number) = parse_external_reference(external_id)?;
-    let path = format!("/repos/{owner}/{repo}/issues/{number}");
-    let Some(stdout) = run_github_api(login, &path, "GitHub issue detail")? else {
+    // GraphQL pulls assignees/labels/issueType/milestone/linkedPRs in one
+    // round-trip; REST returned none of those. See `issue_graphql.rs`.
+    let Some(detail) = super::issue_graphql::fetch_issue_detail(login, external_id)? else {
         return Ok(None);
     };
-    let response = serde_json::from_str::<IssueRestResponse>(&stdout)
-        .with_context(|| "Failed to decode GitHub issue detail response".to_string())?;
-    Ok(Some(InboxItemDetail::GithubIssue(Box::new(
-        GithubIssueDetail {
-            external_id: external_id.to_string(),
-            title: response.title,
-            body: response.body,
-            url: response.html_url,
-            state: response.state,
-            state_reason: response.state_reason,
-            author_login: response.user.map(|user| user.login),
-            created_at: response.created_at,
-            updated_at: response.updated_at,
-            closed_at: response.closed_at,
-        },
-    ))))
+    Ok(Some(InboxItemDetail::GithubIssue(Box::new(detail))))
 }
 
 fn fetch_discussion_detail(login: &str, external_id: &str) -> Result<Option<InboxItemDetail>> {
@@ -1067,7 +1052,7 @@ fn fetch_exact_issue_item(
     }))
 }
 
-fn parse_external_reference(external_id: &str) -> Result<(String, String, i64)> {
+pub(super) fn parse_external_reference(external_id: &str) -> Result<(String, String, i64)> {
     let Some((repo_with_owner, number)) = external_id.rsplit_once('#') else {
         return Err(anyhow!("invalid GitHub PR reference: {external_id}"));
     };
@@ -1103,8 +1088,8 @@ struct PullRequestRestResponse {
 }
 
 #[derive(Debug, Deserialize)]
-struct PullRequestRestUser {
-    login: String,
+pub(super) struct PullRequestRestUser {
+    pub login: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1113,28 +1098,36 @@ struct PullRequestRestRef {
     ref_name: String,
 }
 
+/// REST issue payload used by inbox search (`fetch_exact_issue_item`).
+/// The detail screen no longer goes through REST -- see
+/// `issue_graphql.rs` for the richer field set; tests still construct
+/// this struct so all fields stay declared.
 #[derive(Debug, Deserialize)]
-struct IssueRestResponse {
-    node_id: String,
-    html_url: String,
-    title: String,
-    body: Option<String>,
-    state: String,
-    state_reason: Option<String>,
-    user: Option<PullRequestRestUser>,
+pub(super) struct IssueRestResponse {
+    pub node_id: String,
+    pub html_url: String,
+    pub title: String,
+    #[allow(dead_code)]
+    pub body: Option<String>,
+    pub state: String,
+    pub state_reason: Option<String>,
+    #[allow(dead_code)]
+    pub user: Option<PullRequestRestUser>,
     #[serde(default)]
-    assignees: Vec<PullRequestRestUser>,
+    pub assignees: Vec<PullRequestRestUser>,
     #[serde(default)]
-    labels: Vec<GithubRestLabel>,
-    pull_request: Option<serde_json::Value>,
-    created_at: Option<String>,
-    updated_at: Option<String>,
-    closed_at: Option<String>,
+    pub labels: Vec<GithubRestLabel>,
+    pub pull_request: Option<serde_json::Value>,
+    #[allow(dead_code)]
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    #[allow(dead_code)]
+    pub closed_at: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct GithubRestLabel {
-    name: String,
+pub(super) struct GithubRestLabel {
+    pub name: String,
 }
 
 #[derive(Debug, Deserialize)]

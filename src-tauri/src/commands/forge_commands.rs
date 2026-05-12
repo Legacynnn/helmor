@@ -1,3 +1,9 @@
+use crate::forge::github::inbox::detail::GithubIssueDetail;
+use crate::forge::github::issue_timeline::GithubTimelineEvent;
+use crate::forge::github::repo_metadata::{
+    GithubAssignableUser, GithubRepoIssueType, GithubRepoLabel, GithubRepoMilestone,
+};
+use crate::forge::github::IssueUpdate;
 use crate::forge::{
     self,
     accounts::{self, ForgeAccount},
@@ -146,6 +152,190 @@ pub async fn get_inbox_item_detail(
         backend.get_inbox_item_detail(&login, host.as_deref(), source, &external_id)
     })
     .await
+}
+
+/// List the comments on a GitHub issue (oldest-first). Used by the
+/// tasks detail screen so users can read the in-issue conversation
+/// without leaving Helmor. Returns an empty list on auth failure so
+/// callers can degrade to the "Connect" CTA.
+#[tauri::command]
+pub async fn list_github_issue_comments(
+    login: String,
+    external_id: String,
+) -> CmdResult<Vec<PrCommentInfo>> {
+    run_blocking(move || forge::github::list_issue_comments(&login, &external_id)).await
+}
+
+/// Post a new comment on a GitHub issue. Returns the created comment so
+/// the caller can splice it into the local cache.
+#[tauri::command]
+pub async fn create_github_issue_comment(
+    login: String,
+    external_id: String,
+    body: String,
+) -> CmdResult<PrCommentInfo> {
+    run_blocking(move || forge::github::create_issue_comment(&login, &external_id, &body)).await
+}
+
+/// Fetch the interleaved timeline (comments + events) for a GitHub
+/// issue. Used by the activity feed in the tasks detail screen.
+/// Returns an empty list on auth failure so callers can degrade to the
+/// "Connect" CTA.
+#[tauri::command]
+pub async fn list_github_issue_timeline(
+    login: String,
+    external_id: String,
+) -> CmdResult<Vec<GithubTimelineEvent>> {
+    run_blocking(move || {
+        Ok(
+            forge::github::issue_timeline::fetch_issue_timeline(&login, &external_id)?
+                .unwrap_or_default(),
+        )
+    })
+    .await
+}
+
+/// PATCH a GitHub issue. Returns the refreshed issue detail so the
+/// caller can write it into the React Query cache without a follow-up
+/// GET. Only fields present in `update` are sent to GitHub.
+#[tauri::command]
+pub async fn update_github_issue(
+    login: String,
+    external_id: String,
+    update: IssueUpdate,
+) -> CmdResult<GithubIssueDetail> {
+    run_blocking(move || forge::github::update_issue(&login, &external_id, update)).await
+}
+
+#[tauri::command]
+pub async fn set_github_issue_assignees(
+    login: String,
+    external_id: String,
+    logins: Vec<String>,
+    app: tauri::AppHandle,
+) -> CmdResult<GithubIssueDetail> {
+    let login_clone = login.clone();
+    let external_id_clone = external_id.clone();
+    let detail = run_blocking(move || {
+        forge::github::issue_mutations::set_issue_assignees(
+            &login_clone,
+            &external_id_clone,
+            &logins,
+        )
+    })
+    .await?;
+    ui_sync::publish(
+        &app,
+        UiMutationEvent::IssueDetailUpdated { login, external_id },
+    );
+    Ok(detail)
+}
+
+#[tauri::command]
+pub async fn set_github_issue_labels(
+    login: String,
+    external_id: String,
+    names: Vec<String>,
+    app: tauri::AppHandle,
+) -> CmdResult<GithubIssueDetail> {
+    let login_clone = login.clone();
+    let external_id_clone = external_id.clone();
+    let detail = run_blocking(move || {
+        forge::github::issue_mutations::set_issue_labels(&login_clone, &external_id_clone, &names)
+    })
+    .await?;
+    ui_sync::publish(
+        &app,
+        UiMutationEvent::IssueDetailUpdated { login, external_id },
+    );
+    Ok(detail)
+}
+
+#[tauri::command]
+pub async fn set_github_issue_milestone(
+    login: String,
+    external_id: String,
+    milestone_number: Option<i64>,
+    app: tauri::AppHandle,
+) -> CmdResult<GithubIssueDetail> {
+    let login_clone = login.clone();
+    let external_id_clone = external_id.clone();
+    let detail = run_blocking(move || {
+        forge::github::issue_mutations::set_issue_milestone(
+            &login_clone,
+            &external_id_clone,
+            milestone_number,
+        )
+    })
+    .await?;
+    ui_sync::publish(
+        &app,
+        UiMutationEvent::IssueDetailUpdated { login, external_id },
+    );
+    Ok(detail)
+}
+
+#[tauri::command]
+pub async fn set_github_issue_type(
+    login: String,
+    external_id: String,
+    issue_type_id: Option<String>,
+    app: tauri::AppHandle,
+) -> CmdResult<GithubIssueDetail> {
+    let login_clone = login.clone();
+    let external_id_clone = external_id.clone();
+    let detail = run_blocking(move || {
+        forge::github::issue_mutations::set_issue_type(
+            &login_clone,
+            &external_id_clone,
+            issue_type_id,
+        )
+    })
+    .await?;
+    ui_sync::publish(
+        &app,
+        UiMutationEvent::IssueDetailUpdated { login, external_id },
+    );
+    Ok(detail)
+}
+
+#[tauri::command]
+pub async fn list_github_assignable_users(
+    login: String,
+    owner: String,
+    repo: String,
+) -> CmdResult<Vec<GithubAssignableUser>> {
+    run_blocking(move || forge::github::repo_metadata::list_assignable_users(&login, &owner, &repo))
+        .await
+}
+
+#[tauri::command]
+pub async fn list_github_repo_labels(
+    login: String,
+    owner: String,
+    repo: String,
+) -> CmdResult<Vec<GithubRepoLabel>> {
+    run_blocking(move || forge::github::repo_metadata::list_repo_labels(&login, &owner, &repo))
+        .await
+}
+
+#[tauri::command]
+pub async fn list_github_milestones(
+    login: String,
+    owner: String,
+    repo: String,
+) -> CmdResult<Vec<GithubRepoMilestone>> {
+    run_blocking(move || forge::github::repo_metadata::list_milestones(&login, &owner, &repo)).await
+}
+
+#[tauri::command]
+pub async fn list_github_issue_types(
+    login: String,
+    owner: String,
+    repo: String,
+) -> CmdResult<Vec<GithubRepoIssueType>> {
+    run_blocking(move || forge::github::repo_metadata::list_issue_types(&login, &owner, &repo))
+        .await
 }
 
 /// Resolve the gh/glab account bound to a workspace's parent repo and

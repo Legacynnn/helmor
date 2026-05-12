@@ -212,6 +212,7 @@ export type RepositoryCreateOption = {
 	/** gh/glab account login bound to this repo, or null when none had
 	 * access at add-time. UI shows a "Connect" prompt when null. */
 	forgeLogin?: string | null;
+	linearTeamId?: string | null;
 	repoIconSrc?: string | null;
 	repoInitials?: string | null;
 };
@@ -1015,6 +1016,42 @@ export type InboxItemDetailRef = {
 	externalId: string;
 };
 
+export type GitHubUserRef = {
+	login: string;
+	name?: string | null;
+	avatarUrl?: string | null;
+	url?: string | null;
+};
+
+export type GitHubLabelRef = {
+	name: string;
+	color?: string | null;
+	description?: string | null;
+};
+
+export type GitHubIssueType = {
+	id: string;
+	name: string;
+	color?: string | null;
+	description?: string | null;
+};
+
+export type GitHubMilestone = {
+	id: string;
+	title: string;
+	dueOn?: string | null;
+	state?: string | null;
+};
+
+export type GitHubLinkedPullRequest = {
+	number: number;
+	title: string;
+	state: string;
+	isDraft: boolean;
+	url: string;
+	repoWithOwner: string;
+};
+
 export type GitHubIssueDetail = {
 	externalId: string;
 	title: string;
@@ -1023,9 +1060,17 @@ export type GitHubIssueDetail = {
 	state: string;
 	stateReason?: string | null;
 	authorLogin?: string | null;
+	authorAvatarUrl?: string | null;
 	createdAt?: string | null;
 	updatedAt?: string | null;
 	closedAt?: string | null;
+	nodeId?: string | null;
+	assignees: GitHubUserRef[];
+	labels: GitHubLabelRef[];
+	issueType?: GitHubIssueType | null;
+	milestone?: GitHubMilestone | null;
+	participants: GitHubUserRef[];
+	linkedPullRequests: GitHubLinkedPullRequest[];
 };
 
 export type GitHubPullRequestDetail = {
@@ -1557,7 +1602,8 @@ export type UiMutationEvent =
 			modelId: string | null;
 			permissionMode: string | null;
 	  }
-	| { type: "activeStreamsChanged" };
+	| { type: "activeStreamsChanged" }
+	| { type: "issueDetailUpdated"; login: string; externalId: string };
 
 export async function listenGitBranchChanged(
 	callback: (payload: GitBranchChangedPayload) => void,
@@ -2214,6 +2260,349 @@ export async function listWorkspaceChangeRequestComments(
 		throw new Error(
 			describeInvokeError(error, "Unable to load change request comments."),
 		);
+	}
+}
+
+export async function listGithubIssueComments(
+	login: string,
+	externalId: string,
+): Promise<PrCommentInfo[]> {
+	try {
+		return await invoke<PrCommentInfo[]>("list_github_issue_comments", {
+			login,
+			externalId,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to load issue comments."),
+		);
+	}
+}
+
+export async function createGithubIssueComment(
+	login: string,
+	externalId: string,
+	body: string,
+): Promise<PrCommentInfo> {
+	try {
+		return await invoke<PrCommentInfo>("create_github_issue_comment", {
+			login,
+			externalId,
+			body,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to post issue comment."),
+		);
+	}
+}
+
+export type IssueUpdate = {
+	title?: string;
+	body?: string;
+	state?: "open" | "closed";
+	stateReason?: "completed" | "not_planned" | "reopened";
+};
+
+export async function updateGithubIssue(
+	login: string,
+	externalId: string,
+	update: IssueUpdate,
+): Promise<GitHubIssueDetail> {
+	try {
+		return await invoke<GitHubIssueDetail>("update_github_issue", {
+			login,
+			externalId,
+			update,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to update issue."));
+	}
+}
+
+export type GitHubTimelineActor = {
+	login: string;
+	avatarUrl?: string | null;
+};
+
+export type GitHubTimelineReference =
+	| {
+			kind: "issue";
+			number: number;
+			title: string;
+			state: string;
+			url: string;
+			repoWithOwner: string;
+	  }
+	| {
+			kind: "pullRequest";
+			number: number;
+			title: string;
+			state: string;
+			isDraft: boolean;
+			url: string;
+			repoWithOwner: string;
+	  };
+
+export type GitHubTimelineEvent =
+	| {
+			kind: "assigned" | "unassigned";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			assigneeLogin: string;
+			assigneeName?: string | null;
+			assigneeAvatarUrl?: string | null;
+	  }
+	| {
+			kind: "labeled" | "unlabeled";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			labelName: string;
+			labelColor?: string | null;
+	  }
+	| {
+			kind: "closed";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			stateReason?: string | null;
+	  }
+	| { kind: "reopened"; actor?: GitHubTimelineActor | null; createdAt: string }
+	| {
+			kind: "renamed";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			from: string;
+			to: string;
+	  }
+	| {
+			kind: "milestoned" | "demilestoned";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			milestoneTitle: string;
+	  }
+	| {
+			kind: "crossReferenced";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			source: GitHubTimelineReference;
+	  }
+	| {
+			kind: "referenced";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			subject: GitHubTimelineReference;
+	  }
+	| {
+			kind: "comment";
+			id: string;
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			url: string;
+			body: string;
+	  }
+	| {
+			kind: "locked";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			lockReason?: string | null;
+	  }
+	| { kind: "unlocked"; actor?: GitHubTimelineActor | null; createdAt: string }
+	| { kind: "pinned"; actor?: GitHubTimelineActor | null; createdAt: string }
+	| { kind: "unpinned"; actor?: GitHubTimelineActor | null; createdAt: string }
+	| {
+			kind: "transferred";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			fromRepoWithOwner?: string | null;
+	  }
+	| {
+			kind: "markedAsDuplicate";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			duplicate?: GitHubTimelineReference | null;
+	  }
+	| {
+			kind: "unmarkedAsDuplicate";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+	  }
+	| {
+			kind: "connected" | "disconnected";
+			actor?: GitHubTimelineActor | null;
+			createdAt: string;
+			subject: GitHubTimelineReference;
+	  };
+
+export async function listGithubIssueTimeline(
+	login: string,
+	externalId: string,
+): Promise<GitHubTimelineEvent[]> {
+	try {
+		return await invoke<GitHubTimelineEvent[]>("list_github_issue_timeline", {
+			login,
+			externalId,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to load issue timeline."),
+		);
+	}
+}
+
+export type GitHubAssignableUser = {
+	login: string;
+	name?: string | null;
+	avatarUrl?: string | null;
+};
+
+export type GitHubRepoLabel = {
+	name: string;
+	color?: string | null;
+	description?: string | null;
+};
+
+export type GitHubRepoMilestone = {
+	number: number;
+	title: string;
+	dueOn?: string | null;
+	state?: string | null;
+};
+
+export type GitHubRepoIssueType = {
+	id: string;
+	name: string;
+	color?: string | null;
+	description?: string | null;
+};
+
+export async function setGithubIssueAssignees(
+	login: string,
+	externalId: string,
+	logins: string[],
+): Promise<GitHubIssueDetail> {
+	try {
+		return await invoke<GitHubIssueDetail>("set_github_issue_assignees", {
+			login,
+			externalId,
+			logins,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to update assignees."));
+	}
+}
+
+export async function setGithubIssueLabels(
+	login: string,
+	externalId: string,
+	names: string[],
+): Promise<GitHubIssueDetail> {
+	try {
+		return await invoke<GitHubIssueDetail>("set_github_issue_labels", {
+			login,
+			externalId,
+			names,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to update labels."));
+	}
+}
+
+export async function setGithubIssueMilestone(
+	login: string,
+	externalId: string,
+	milestoneNumber: number | null,
+): Promise<GitHubIssueDetail> {
+	try {
+		return await invoke<GitHubIssueDetail>("set_github_issue_milestone", {
+			login,
+			externalId,
+			milestoneNumber,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to update milestone."));
+	}
+}
+
+export async function setGithubIssueType(
+	login: string,
+	externalId: string,
+	issueTypeId: string | null,
+): Promise<GitHubIssueDetail> {
+	try {
+		return await invoke<GitHubIssueDetail>("set_github_issue_type", {
+			login,
+			externalId,
+			issueTypeId,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to update issue type."));
+	}
+}
+
+export async function listGithubAssignableUsers(
+	login: string,
+	owner: string,
+	repo: string,
+): Promise<GitHubAssignableUser[]> {
+	try {
+		return await invoke<GitHubAssignableUser[]>(
+			"list_github_assignable_users",
+			{ login, owner, repo },
+		);
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to load assignable users."),
+		);
+	}
+}
+
+export async function listGithubRepoLabels(
+	login: string,
+	owner: string,
+	repo: string,
+): Promise<GitHubRepoLabel[]> {
+	try {
+		return await invoke<GitHubRepoLabel[]>("list_github_repo_labels", {
+			login,
+			owner,
+			repo,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to load repository labels."),
+		);
+	}
+}
+
+export async function listGithubMilestones(
+	login: string,
+	owner: string,
+	repo: string,
+): Promise<GitHubRepoMilestone[]> {
+	try {
+		return await invoke<GitHubRepoMilestone[]>("list_github_milestones", {
+			login,
+			owner,
+			repo,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to load milestones."));
+	}
+}
+
+export async function listGithubIssueTypes(
+	login: string,
+	owner: string,
+	repo: string,
+): Promise<GitHubRepoIssueType[]> {
+	try {
+		return await invoke<GitHubRepoIssueType[]>("list_github_issue_types", {
+			login,
+			owner,
+			repo,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to load issue types."));
 	}
 }
 
@@ -3430,6 +3819,175 @@ export async function resizeTerminal(
 		cols,
 		rows,
 	});
+}
+
+// ─── Linear ───────────────────────────────────────────────────────────────────
+
+export type LinearViewer = {
+	id: string;
+	name: string;
+	email: string;
+};
+
+export type LinearTeam = {
+	id: string;
+	key: string;
+	name: string;
+};
+
+export type LinearIssueState = {
+	id: string;
+	name: string;
+	/** One of: backlog, unstarted, started, completed, canceled, triage. */
+	type: string;
+	color: string;
+};
+
+export type LinearAssignee = {
+	id: string;
+	name: string;
+	avatarUrl: string | null;
+};
+
+export type LinearLabel = {
+	id: string;
+	name: string;
+	color: string;
+};
+
+export type LinearIssue = {
+	id: string;
+	identifier: string;
+	title: string;
+	url: string;
+	priority: number;
+	updatedAt: string;
+	state: LinearIssueState;
+	assignee: LinearAssignee | null;
+	labels: { nodes: LinearLabel[] };
+};
+
+export type LinearIssueDetail = LinearIssue & {
+	description: string;
+};
+
+export type LinearAuthStatus = {
+	connected: boolean;
+	viewer: LinearViewer | null;
+};
+
+export async function linearSetApiKey(key: string): Promise<void> {
+	await invoke<void>("linear_set_api_key", { key });
+}
+
+export async function linearClearApiKey(): Promise<void> {
+	await invoke<void>("linear_clear_api_key");
+}
+
+export async function linearGetAuthStatus(): Promise<LinearAuthStatus> {
+	return await invoke<LinearAuthStatus>("linear_get_auth_status");
+}
+
+export async function linearGetTask(id: string): Promise<LinearIssueDetail> {
+	return await invoke<LinearIssueDetail>("linear_get_task", { id });
+}
+
+export async function linearListTeams(): Promise<LinearTeam[]> {
+	return await invoke<LinearTeam[]>("linear_list_teams");
+}
+
+export async function linearListTasks(teamId: string): Promise<LinearIssue[]> {
+	return await invoke<LinearIssue[]>("linear_list_tasks", { teamId });
+}
+
+export async function linearSetRepoTeam(
+	repoId: string,
+	teamId: string | null,
+): Promise<void> {
+	await invoke<void>("linear_set_repo_team", { repoId, teamId });
+}
+
+export async function tasksFindWorkspaceForLinearTask(
+	taskId: string,
+): Promise<string | null> {
+	return await invoke<string | null>("tasks_find_workspace_for_linear_task", {
+		taskId,
+	});
+}
+
+export async function tasksFindWorkspaceForPrUrl(
+	prUrl: string,
+): Promise<string | null> {
+	return await invoke<string | null>("tasks_find_workspace_for_pr_url", {
+		prUrl,
+	});
+}
+
+export async function tasksSetWorkspaceLinearTask(
+	workspaceId: string,
+	taskId: string | null,
+): Promise<void> {
+	await invoke<void>("tasks_set_workspace_linear_task", {
+		workspaceId,
+		taskId,
+	});
+}
+
+// ─── GitHub Tasks ────────────────────────────────────────────────────────────
+
+export type GhUser = {
+	login: string;
+	name?: string | null;
+};
+
+export type GhLabel = {
+	name: string;
+	color: string;
+};
+
+export type GhPr = {
+	number: number;
+	title: string;
+	url: string;
+	state: string;
+	isDraft: boolean;
+	updatedAt: string;
+	author?: GhUser | null;
+	assignees: GhUser[];
+	labels: GhLabel[];
+};
+
+export type GhIssueType = {
+	name: string;
+	color?: string | null;
+};
+
+export type GhIssue = {
+	number: number;
+	title: string;
+	url: string;
+	state: string;
+	updatedAt: string;
+	author?: GhUser | null;
+	assignees: GhUser[];
+	labels: GhLabel[];
+	issueType?: GhIssueType | null;
+};
+
+export async function githubListRepoPrs(repoId: string): Promise<GhPr[]> {
+	return await invoke<GhPr[]>("github_list_repo_prs", { repoId });
+}
+
+export async function githubListRepoIssues(repoId: string): Promise<GhIssue[]> {
+	return await invoke<GhIssue[]>("github_list_repo_issues", { repoId });
+}
+
+export async function getSettingJson<T>(key: string): Promise<T | null> {
+	return await invoke<T | null>("get_setting_json", { key });
+}
+
+export async function setSettingJson<T>(key: string, value: T): Promise<void> {
+	await invoke<void>("set_setting_json", { key, value });
 }
 
 export { DEFAULT_WORKSPACE_GROUPS };

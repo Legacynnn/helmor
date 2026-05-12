@@ -90,6 +90,8 @@ import {
 import { clampZoom, useZoom, ZOOM_STEP } from "@/shell/use-zoom";
 import { HistoryScreenContainer } from "./features/history/container";
 import { KanbanScreenContainer } from "./features/kanban/container";
+import { TasksScreenContainer } from "./features/tasks";
+import type { TaskListItem } from "./features/tasks/types";
 import {
 	type ActiveStreamSummary,
 	createAndCheckoutBranch,
@@ -187,7 +189,8 @@ type WorkspaceViewMode =
 	| "editor"
 	| "start"
 	| "history"
-	| "kanban";
+	| "kanban"
+	| "tasks";
 const EMPTY_SESSION_RUN_STATES = new Map<string, SessionRunState>();
 const EMPTY_STRING_LIST: readonly string[] = [];
 const EMPTY_ACTIVE_STREAMS: ActiveStreamSummary[] = [];
@@ -1432,7 +1435,8 @@ function AppShell({
 			if (
 				workspaceViewModeRef.current === "start" ||
 				workspaceViewModeRef.current === "history" ||
-				workspaceViewModeRef.current === "kanban"
+				workspaceViewModeRef.current === "kanban" ||
+				workspaceViewModeRef.current === "tasks"
 			) {
 				setWorkspaceViewMode("conversation");
 			}
@@ -2708,7 +2712,8 @@ function AppShell({
 		setWorkspaceViewMode("kanban");
 		setWorkspacePreviewCard(null);
 		setWorkspacePreviewActive(false);
-	}, []);
+		void updateSettings({ lastSurface: "workspace" });
+	}, [updateSettings]);
 	const handleKanbanCreatePr = useCallback(
 		(workspaceId: string) => {
 			// Pragmatic v1: navigate to the workspace so the user can use
@@ -2734,7 +2739,23 @@ function AppShell({
 		setWorkspaceViewMode("history");
 		setWorkspacePreviewCard(null);
 		setWorkspacePreviewActive(false);
-	}, []);
+		void updateSettings({ lastSurface: "workspace" });
+	}, [updateSettings]);
+	const handleOpenTasks = useCallback(() => {
+		workspaceSelectionRequestRef.current += 1;
+		sessionSelectionRequestRef.current += 1;
+		selectedWorkspaceIdRef.current = null;
+		selectedSessionIdRef.current = null;
+		setSelectedWorkspaceId(null);
+		setSelectedSessionId(null);
+		setActiveTabId(null);
+		setDisplayedWorkspaceId(null);
+		setDisplayedSessionId(null);
+		setWorkspaceViewMode("tasks");
+		setWorkspacePreviewCard(null);
+		setWorkspacePreviewActive(false);
+		void updateSettings({ lastSurface: "workspace" });
+	}, [updateSettings]);
 	useEffect(() => {
 		if (!areSettingsLoaded || appSettings.lastSurface !== "workspace-start") {
 			return;
@@ -2801,6 +2822,63 @@ function AppShell({
 			});
 		},
 		[appSettings.kanbanViewState, updateSettings],
+	);
+	const handleStartWorkspaceFromTask = useCallback(
+		(opts: {
+			repoId: string | null;
+			seedUrl: string;
+			seedTitle: string;
+			linearTaskId: string | null;
+			item: TaskListItem;
+		}) => {
+			if (opts.repoId) {
+				setStartRepositoryId(opts.repoId);
+			}
+			handleOpenWorkspaceStart();
+			if (!opts.repoId) return;
+			const { item } = opts;
+			const label = item.displayId
+				? `${item.title} ${item.displayId}`
+				: item.title;
+			const submitText = [
+				`Context: ${item.title}`,
+				`Source: ${item.displayId}`,
+				item.status?.label ? `State: ${item.status.label}` : null,
+				`URL: ${item.url}`,
+			]
+				.filter((line): line is string => Boolean(line))
+				.join("\n");
+			const source =
+				item.source === "linear"
+					? "linear"
+					: item.source === "github-pr"
+						? "github_pr"
+						: "github_issue";
+			const toneKey = item.status?.key;
+			const stateTone =
+				toneKey === "open" ||
+				toneKey === "closed" ||
+				toneKey === "merged" ||
+				toneKey === "draft"
+					? toneKey
+					: undefined;
+			handleInsertIntoComposer({
+				target: { contextKey: `start:repo:${opts.repoId}` },
+				items: [
+					{
+						kind: "custom-tag",
+						label,
+						submitText,
+						key: `task:${item.source}:${item.key}`,
+						source,
+						stateTone,
+						preview: { kind: "text", title: label, text: submitText },
+					},
+				],
+				behavior: "append",
+			});
+		},
+		[handleInsertIntoComposer, handleOpenWorkspaceStart],
 	);
 	// Add-repo no longer auto-creates a workspace — when the backend
 	// hands back `selectedWorkspaceId: null`, drop into the start page
@@ -3028,6 +3106,7 @@ function AppShell({
 	const rightSidebarAvailable =
 		workspaceViewMode !== "history" &&
 		workspaceViewMode !== "kanban" &&
+		workspaceViewMode !== "tasks" &&
 		(workspaceViewMode !== "start" || rightSidebarMode === "context");
 	const contextPanelOpen =
 		rightSidebarAvailable &&
@@ -3071,6 +3150,7 @@ function AppShell({
 		workspaceViewMode !== "start" &&
 		workspaceViewMode !== "history" &&
 		workspaceViewMode !== "kanban" &&
+		workspaceViewMode !== "tasks" &&
 		!restoreStartSurface;
 
 	return (
@@ -3114,7 +3194,8 @@ function AppShell({
 														selectedWorkspaceId={
 															workspaceViewMode === "start" ||
 															workspaceViewMode === "history" ||
-															workspaceViewMode === "kanban"
+															workspaceViewMode === "kanban" ||
+															workspaceViewMode === "tasks"
 																? null
 																: selectedWorkspaceId
 														}
@@ -3140,6 +3221,8 @@ function AppShell({
 														historyActive={workspaceViewMode === "history"}
 														onOpenKanban={handleOpenKanban}
 														kanbanActive={workspaceViewMode === "kanban"}
+														onOpenTasks={handleOpenTasks}
+														tasksActive={workspaceViewMode === "tasks"}
 													/>
 												</div>
 												<div className="absolute right-[12px] top-[6px] z-20 flex items-center gap-[2px]">
@@ -3230,7 +3313,15 @@ function AppShell({
 													: "flex min-h-0 flex-1 flex-col"
 											}
 										>
-											{workspaceViewMode === "history" ? (
+											{workspaceViewMode === "tasks" ? (
+												<TasksScreenContainer
+													onOpenSettings={handleOpenSettings}
+													onSelectWorkspace={handleSelectWorkspace}
+													onStartWorkspaceFromTask={
+														handleStartWorkspaceFromTask
+													}
+												/>
+											) : workspaceViewMode === "history" ? (
 												<HistoryScreenContainer
 													onSelectWorkspace={handleSelectWorkspace}
 													pushWorkspaceToast={pushWorkspaceToast}

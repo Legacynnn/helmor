@@ -58,6 +58,13 @@ pub enum UiMutationEvent {
     /// `list_active_streams`. See `agents::streaming::active_streams` for
     /// the source of truth this notification mirrors.
     ActiveStreamsChanged,
+    /// Fires when a GitHub issue's metadata (assignees / labels /
+    /// milestone / type) is mutated. Frontend invalidates the detail
+    /// + timeline queries so any other open detail screens stay in sync.
+    IssueDetailUpdated {
+        login: String,
+        external_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

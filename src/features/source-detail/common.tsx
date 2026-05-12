@@ -85,7 +85,7 @@ export function GitHubDetailPage({
 	);
 }
 
-function SourceDetailActions({
+export function SourceDetailActions({
 	card,
 	appendContextTarget,
 	markdownBody,

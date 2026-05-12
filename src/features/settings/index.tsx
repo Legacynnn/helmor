@@ -70,6 +70,7 @@ import { CursorProviderPanel } from "./panels/cursor-provider";
 import { DevToolsPanel } from "./panels/dev-tools";
 import { GlobalPreferencesPanel } from "./panels/global-preferences";
 import { InboxSettingsPanel } from "./panels/inbox";
+import { LinearPanel } from "./panels/linear";
 import { ClaudeCustomProvidersPanel } from "./panels/model-providers";
 import { RepositorySettingsPanel } from "./panels/repository-settings";
 
@@ -140,6 +141,7 @@ export type SettingsSection =
 	| "developer"
 	| "account"
 	| "inbox"
+	| "linear"
 	| `repo:${string}`;
 
 /// Display labels for settings sections in the sidebar / dialog title.
@@ -279,6 +281,7 @@ export const SettingsDialog = memo(function SettingsDialog({
 		...(isDev ? (["developer"] as const) : []),
 		"account",
 		"inbox",
+		"linear",
 		"experimental",
 	];
 
@@ -763,6 +766,8 @@ export const SettingsDialog = memo(function SettingsDialog({
 							{activeSection === "inbox" && (
 								<InboxSettingsPanel repositories={repositories} />
 							)}
+
+							{activeSection === "linear" && <LinearPanel />}
 
 							{activeRepo && (
 								<RepositorySettingsPanel
