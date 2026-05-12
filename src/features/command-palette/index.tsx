@@ -1,5 +1,5 @@
 import { FileIcon, TerminalIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import {
 	Command,
@@ -205,19 +205,21 @@ function renderCommandGroups(
 	}
 	const entries = Array.from(groups.entries());
 	return entries.map(([heading, items], idx) => (
-		<CommandGroup heading={heading} key={heading}>
+		<Fragment key={heading}>
 			{idx > 0 && <CommandSeparator />}
-			{items.map((c) => (
-				<CommandItem
-					key={c.id}
-					value={`cmd:${c.id}`}
-					onSelect={() => onSelect(c.id)}
-				>
-					<TerminalIcon className="size-4 opacity-60" />
-					<span className="truncate">{c.title}</span>
-				</CommandItem>
-			))}
-		</CommandGroup>
+			<CommandGroup heading={heading}>
+				{items.map((c) => (
+					<CommandItem
+						key={c.id}
+						value={`cmd:${c.id}`}
+						onSelect={() => onSelect(c.id)}
+					>
+						<TerminalIcon className="size-4 opacity-60" />
+						<span className="truncate">{c.title}</span>
+					</CommandItem>
+				))}
+			</CommandGroup>
+		</Fragment>
 	));
 }
 

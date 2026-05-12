@@ -28,6 +28,7 @@ export function useFileSearch(
 
 	useEffect(() => {
 		if (!enabled || !workspaceRootPath || query.trim().length === 0) {
+			requestId.current++;
 			setState(INITIAL);
 			return;
 		}

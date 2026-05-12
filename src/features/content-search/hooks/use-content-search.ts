@@ -35,11 +35,13 @@ export function useContentSearch(
 
 	useEffect(() => {
 		if (!enabled || !workspaceRootPath) {
+			requestId.current++;
 			setState(INITIAL);
 			return;
 		}
 		const trimmed = query.trim();
 		if (trimmed.length < MIN_QUERY_CHARS) {
+			requestId.current++;
 			setState({
 				status: "idle",
 				result: null,
