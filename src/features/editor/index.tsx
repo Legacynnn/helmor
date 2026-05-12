@@ -422,7 +422,7 @@ export function WorkspaceEditorSurface({
 						path: editorSession.path,
 						originalText: editorSession.originalText ?? "",
 						modifiedText: editorSession.modifiedText ?? "",
-						inline: Boolean(editorSession.inline),
+						inline: true,
 					});
 
 					if (disposed || requestId !== buildRequestIdRef.current) {
@@ -493,7 +493,7 @@ export function WorkspaceEditorSurface({
 		diffControllerRef.current.setTexts({
 			originalText: editorSession.originalText,
 			modifiedText: editorSession.modifiedText,
-			inline: Boolean(editorSession.inline),
+			inline: true,
 		});
 	}, [
 		editorSession.inline,
@@ -635,8 +635,7 @@ export function WorkspaceEditorSurface({
 			dirty: false,
 			originalText: undefined,
 			modifiedText: undefined,
-			inline:
-				next === "diff" ? (editorSession.fileStatus ?? "M") !== "M" : undefined,
+			inline: next === "diff" ? true : undefined,
 			viewMode: isMarkdownPath(editorSession.path) ? "source" : undefined,
 		});
 	};
