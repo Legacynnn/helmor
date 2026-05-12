@@ -353,6 +353,13 @@ impl ManagedSidecar {
 
     /// Unregister a listener (called automatically when the sender is dropped,
     /// but explicit cleanup avoids accumulating stale keys).
+    /// Live PID of the sidecar child, when running. Used by the resource
+    /// usage collector to walk Helmor's descendant process tree.
+    pub fn current_pid(&self) -> Option<u32> {
+        let guard = self.process.lock().ok()?;
+        guard.as_ref().map(|p| p.pid())
+    }
+
     pub fn unsubscribe(&self, request_id: &str) {
         if let Ok(mut map) = self.listeners.lock() {
             map.remove(request_id);

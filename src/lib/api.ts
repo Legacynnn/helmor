@@ -3990,6 +3990,73 @@ export async function setSettingJson<T>(key: string, value: T): Promise<void> {
 	await invoke<void>("set_setting_json", { key, value });
 }
 
+// ---------- Resource snapshot ----------
+
+export type ResourceProcessKind =
+	| { type: "main" }
+	| { type: "renderer" }
+	| { type: "sidecar" }
+	| { type: "cli"; provider: string }
+	| { type: "script"; scriptType: string }
+	| { type: "pty" }
+	| { type: "other" };
+
+export type ResourceProcessNode = {
+	pid: number;
+	parentPid: number | null;
+	name: string;
+	rawName: string;
+	kind: ResourceProcessKind;
+	cpuPercent: number;
+	memoryBytes: number;
+};
+
+export type ResourceWorkspaceUsage = {
+	workspaceId: string;
+	workspaceTitle: string;
+	branch: string | null;
+	cpuPercent: number;
+	memoryBytes: number;
+	processes: ResourceProcessNode[];
+};
+
+export type ResourceRepoGroup = {
+	repoId: string;
+	repoLabel: string;
+	repoIconSrc: string | null;
+	repoInitials: string | null;
+	cpuPercent: number;
+	memoryBytes: number;
+	workspaces: ResourceWorkspaceUsage[];
+};
+
+export type ResourceSystemTotals = {
+	totalMemoryBytes: number;
+	usedMemoryBytes: number;
+	availableMemoryBytes: number;
+	cpuCount: number;
+};
+
+export type ResourceHelmorRollup = {
+	cpuPercent: number;
+	memoryBytes: number;
+	ramShare: number;
+};
+
+export type ResourceSnapshot = {
+	capturedAtMs: number;
+	system: ResourceSystemTotals;
+	helmor: ResourceHelmorRollup;
+	repositories: ResourceRepoGroup[];
+	orphans: ResourceProcessNode[];
+};
+
+export const SIDECAR_AGENTS_REPO_ID = "__helmor_sidecar";
+
+export async function getResourceSnapshot(): Promise<ResourceSnapshot> {
+	return await invoke<ResourceSnapshot>("get_resource_snapshot");
+}
+
 export { DEFAULT_WORKSPACE_GROUPS };
 
 function describeInvokeError(error: unknown, fallback: string): string {

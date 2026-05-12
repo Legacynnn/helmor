@@ -17,6 +17,7 @@ pub mod schema;
 pub mod service;
 mod shell_env;
 pub mod sidecar;
+pub mod system;
 mod system_limits;
 pub mod ui_sync;
 pub mod updater;
@@ -70,6 +71,7 @@ pub fn run() {
         .manage(workspace::archive::ArchiveJobManager::new())
         .manage(git_watcher::GitWatcherManager::new())
         .manage(workspace::scripts::ScriptProcessManager::new())
+        .manage(system::ResourceCollector::new())
         .manage(ui_sync::UiSyncManager::new())
         .manage(global_hotkey::GlobalHotkeyState::default())
         .manage(commands::forge_commands::ForgeAuthEdgeStore::default())
@@ -319,6 +321,7 @@ pub fn run() {
             commands::settings_commands::get_claude_rate_limits,
             commands::settings_commands::get_codex_rate_limits,
             commands::system_commands::get_cli_status,
+            commands::system_commands::get_resource_snapshot,
             commands::system_commands::get_data_info,
             commands::system_commands::get_setting_json,
             commands::system_commands::set_setting_json,

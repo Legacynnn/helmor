@@ -11,7 +11,14 @@ use tauri::{
 };
 
 use crate::workspace::scripts::{ScriptContext, ScriptEvent, ScriptProcessManager};
-use crate::{agents, data_dir, git_watcher, models::db, service, sidecar};
+use crate::{
+    agents, data_dir, git_watcher,
+    models::db,
+    service, sidecar,
+    system::{
+        collect_snapshot, CollectorContext, ResourceCollector, ResourceSnapshot, WorkspaceMeta,
+    },
+};
 
 use super::common::{run_blocking, CmdResult};
 
@@ -1293,6 +1300,59 @@ pub async fn dev_reset_all_data(app: tauri::AppHandle) -> CmdResult<DevResetResu
         })
     })
     .await
+}
+
+/// Snapshot of Helmor's process tree resource usage.
+///
+/// Polled by the sidebar resource pill (every 3s while open, every 60s
+/// while closed). Pure read — no IPC events, no cache invalidation.
+#[tauri::command]
+pub async fn get_resource_snapshot(
+    collector: State<'_, ResourceCollector>,
+    sidecar_state: State<'_, sidecar::ManagedSidecar>,
+    scripts: State<'_, ScriptProcessManager>,
+) -> CmdResult<ResourceSnapshot> {
+    let helmor_pid = std::process::id();
+    let sidecar_pid = sidecar_state.current_pid();
+    let script_pids = scripts.snapshot_pids();
+
+    // Build the workspace index from the sidebar groups so labels match
+    // the rest of the UI exactly. Done outside spawn_blocking because
+    // `list_workspace_groups` is cheap (single SQL roundtrip).
+    let workspace_index = run_blocking(|| {
+        let groups = crate::workspace::workspaces::list_workspace_groups()?;
+        let mut index: HashMap<String, WorkspaceMeta> = HashMap::new();
+        for group in groups {
+            for row in group.rows {
+                index.insert(
+                    row.id,
+                    WorkspaceMeta {
+                        repo_id: row.repo_id,
+                        repo_label: row.repo_name,
+                        repo_icon_src: row.repo_icon_src,
+                        repo_initials: Some(row.repo_initials),
+                        title: row.title,
+                        branch: row.branch,
+                    },
+                );
+            }
+        }
+        Ok(index)
+    })
+    .await?;
+
+    // Hold the collector's sysinfo handle across the (cheap, in-process)
+    // collection step. sysinfo's refresh is synchronous and blocking but
+    // short; keeping it on the IPC thread avoids cloning the System into
+    // a worker.
+    let ctx = CollectorContext {
+        helmor_pid,
+        sidecar_pid,
+        script_pids,
+        workspace_index,
+        system: &collector.system,
+    };
+    Ok(collect_snapshot(&ctx))
 }
 
 #[cfg(test)]

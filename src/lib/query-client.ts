@@ -153,6 +153,7 @@ export const helmorQueryKeys = {
 	workspaceCandidateDirectories: (excludeWorkspaceId: string | null) =>
 		["workspaceCandidateDirectories", excludeWorkspaceId ?? ""] as const,
 	activeStreams: ["activeStreams"] as const,
+	resourceSnapshot: ["system", "resource-snapshot"] as const,
 	workspaceCommitsAhead: (workspaceId: string) =>
 		["workspaceCommitsAhead", workspaceId] as const,
 	workspaceMergeBase: (workspaceId: string) =>

@@ -52,6 +52,17 @@ struct ProcessHandle {
     stdin: Arc<Mutex<std::fs::File>>,
 }
 
+/// Lightweight view of a live script process, exposed to the resource
+/// usage collector. Pure data — no shared handles.
+#[derive(Debug, Clone)]
+pub struct ScriptPidEntry {
+    pub pid: u32,
+    pub pgid: u32,
+    pub repo_id: String,
+    pub script_type: String,
+    pub workspace_id: Option<String>,
+}
+
 #[derive(Clone, Default)]
 pub struct ScriptProcessManager {
     processes: Arc<Mutex<HashMap<ProcessKey, ProcessHandle>>>,
@@ -97,6 +108,22 @@ impl ScriptProcessManager {
                 map.remove(key);
             }
         }
+    }
+
+    /// Snapshot of currently-live script processes with their owning
+    /// repo and workspace identifiers. Used by the resource usage
+    /// collector to attribute descendant PIDs back to a workspace.
+    pub fn snapshot_pids(&self) -> Vec<ScriptPidEntry> {
+        let map = self.processes.lock().expect("process map poisoned");
+        map.iter()
+            .map(|(key, handle)| ScriptPidEntry {
+                pid: handle.pid as u32,
+                pgid: handle.pgid as u32,
+                repo_id: key.0.clone(),
+                script_type: key.1.clone(),
+                workspace_id: key.2.clone(),
+            })
+            .collect()
     }
 
     /// Signal every live script that matches `repo_id` and `script_type`
