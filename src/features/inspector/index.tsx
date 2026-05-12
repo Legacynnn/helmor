@@ -552,9 +552,6 @@ export function WorkspaceInspectorSidebar({
 							workspaceRootPath={workspaceRootPath ?? null}
 							workspaceId={workspaceId ?? null}
 							activeAbsolutePath={activeFileAbsolutePath}
-							onOpenFile={(input) =>
-								handleOpenFileTab(input, { kind: "browser" })
-							}
 						/>
 					</div>
 				) : (

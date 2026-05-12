@@ -42,7 +42,10 @@ export type ShortcutId =
 	| "inspector.focusTerminal"
 	| "fileBrowser.collapseAll"
 	| "navigation.back"
-	| "navigation.forward";
+	| "navigation.forward"
+	| "palette.openFiles"
+	| "palette.openCommands"
+	| "contentSearch.toggle";
 
 export type ShortcutGroup =
 	| "Navigation"

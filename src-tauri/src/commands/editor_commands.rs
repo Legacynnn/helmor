@@ -219,3 +219,14 @@ pub async fn search_workspace_paths(
     })
     .await
 }
+
+#[tauri::command]
+pub async fn search_workspace_content(
+    workspace_root_path: String,
+    query: String,
+) -> CmdResult<editor_files::ContentSearchResult> {
+    run_blocking(move || {
+        crate::workspace::files::content_search::search_content(&workspace_root_path, &query)
+    })
+    .await
+}

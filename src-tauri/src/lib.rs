@@ -456,6 +456,7 @@ pub fn run() {
             commands::editor_commands::read_file_at_ref,
             commands::editor_commands::list_workspace_directory,
             commands::editor_commands::search_workspace_paths,
+            commands::editor_commands::search_workspace_content,
             commands::workspace_commands::set_workspace_status,
             commands::workspace_commands::list_workspace_linked_directories,
             commands::workspace_commands::set_workspace_linked_directories,

@@ -436,6 +436,35 @@ export interface PathSearchHit {
 	absolutePath: string;
 }
 
+export interface ContentMatch {
+	lineNumber: number;
+	/** Trimmed line text. Highlight via `matchRanges` (UTF-16 code-unit offsets). */
+	line: string;
+	/**
+	 * Highlight ranges as UTF-16 code-unit offsets within `line`. JS strings
+	 * are UTF-16, so `line.slice(start, end)` consumes these directly.
+	 */
+	matchRanges: Array<[number, number]>;
+	contextBefore?: string;
+	contextAfter?: string;
+}
+
+export interface ContentSearchHit {
+	absolutePath: string;
+	relativePath: string;
+	fileName: string;
+	matches: ContentMatch[];
+	/** Total matches found before the per-file cap; drives "+N more" footers. */
+	totalMatchesInFile: number;
+}
+
+export interface ContentSearchResult {
+	hits: ContentSearchHit[];
+	/** Files with at least one match before the file-count cap. */
+	totalFilesMatched: number;
+	truncated: boolean;
+}
+
 export type EditorFileStatResponse = {
 	path: string;
 	exists: boolean;
@@ -1890,6 +1919,22 @@ export async function searchWorkspacePaths(
 	query: string,
 ): Promise<PathSearchHit[]> {
 	return invoke<PathSearchHit[]>("search_workspace_paths", {
+		workspaceRootPath,
+		query,
+	});
+}
+
+/**
+ * Workspace-wide content search. Uses the same `ignore::WalkBuilder` as
+ * `searchWorkspacePaths`, so both surfaces see the same file universe.
+ * Returns smart-case literal matches with up to 1 line of context above
+ * and below each hit. Match offsets are UTF-16 code units (slice-safe).
+ */
+export async function searchWorkspaceContent(
+	workspaceRootPath: string,
+	query: string,
+): Promise<ContentSearchResult> {
+	return invoke<ContentSearchResult>("search_workspace_content", {
 		workspaceRootPath,
 		query,
 	});
