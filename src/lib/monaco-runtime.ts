@@ -236,7 +236,7 @@ export async function createDiffEditor(options: {
 			enabled: true,
 			contextLineCount: 4,
 			minimumLineCount: 2,
-			revealLineCount: 3,
+			revealLineCount: 9999,
 		},
 		lineHeight: 21,
 		minimap: { enabled: false },
@@ -255,9 +255,37 @@ export async function createDiffEditor(options: {
 		modified: modifiedModel,
 	});
 
+	// Monaco only expands the unchanged-region bar on icon-click or text
+	// double-click. Make the entire bar act as a single-click target: any
+	// click that isn't on the unfold link itself is forwarded to it.
+	const onBarClick = (event: MouseEvent) => {
+		const target = event.target as HTMLElement | null;
+		if (!target) {
+			return;
+		}
+		const bar = target.closest(".diff-hidden-lines");
+		if (!bar) {
+			return;
+		}
+		if (target.closest("a")) {
+			return;
+		}
+		const trigger = bar.querySelector<HTMLAnchorElement>(
+			".center > div:first-child a",
+		);
+		if (!trigger) {
+			return;
+		}
+		event.preventDefault();
+		event.stopPropagation();
+		trigger.click();
+	};
+	options.container.addEventListener("click", onBarClick, true);
+
 	return {
 		editor,
 		dispose() {
+			options.container.removeEventListener("click", onBarClick, true);
 			editor.dispose();
 			originalModel.dispose();
 			modifiedModel.dispose();
@@ -445,15 +473,18 @@ function installEditorTheme(monaco: MonacoModule) {
 			"scrollbarSlider.hoverBackground": "#eae5df40",
 			"scrollbarSlider.activeBackground": "#eae5df55",
 			"minimap.background": "#151210",
-			"diffEditor.insertedLineBackground": "#2ea04318",
-			"diffEditor.insertedTextBackground": "#2ea04340",
-			"diffEditor.removedLineBackground": "#da363318",
-			"diffEditor.removedTextBackground": "#da363340",
-			"diffEditorGutter.insertedLineBackground": "#2ea04326",
-			"diffEditorGutter.removedLineBackground": "#da363326",
+			"diffEditor.insertedLineBackground": "#2ea04340",
+			"diffEditor.insertedTextBackground": "#2ea04373",
+			"diffEditor.removedLineBackground": "#da363340",
+			"diffEditor.removedTextBackground": "#da363373",
+			"diffEditorGutter.insertedLineBackground": "#2ea04359",
+			"diffEditorGutter.removedLineBackground": "#da363359",
 			"diffEditorOverview.insertedForeground": "#2ea04399",
 			"diffEditorOverview.removedForeground": "#da363399",
 			"diffEditor.diagonalFill": "#faf9f608",
+			"diffEditor.unchangedRegionBackground": "#211d1a",
+			"diffEditor.unchangedRegionForeground": "#a39d96",
+			"diffEditor.unchangedRegionShadow": "#00000000",
 		},
 	});
 	monaco.editor.defineTheme("helmor-editor-light", {
@@ -495,15 +526,18 @@ function installEditorTheme(monaco: MonacoModule) {
 			"scrollbarSlider.hoverBackground": "#1a191840",
 			"scrollbarSlider.activeBackground": "#1a191855",
 			"minimap.background": "#FFFFFF",
-			"diffEditor.insertedLineBackground": "#2ea04318",
-			"diffEditor.insertedTextBackground": "#2ea04333",
-			"diffEditor.removedLineBackground": "#da363318",
-			"diffEditor.removedTextBackground": "#da363333",
-			"diffEditorGutter.insertedLineBackground": "#2ea04326",
-			"diffEditorGutter.removedLineBackground": "#da363326",
+			"diffEditor.insertedLineBackground": "#2ea0433d",
+			"diffEditor.insertedTextBackground": "#2ea04373",
+			"diffEditor.removedLineBackground": "#da36333d",
+			"diffEditor.removedTextBackground": "#da363373",
+			"diffEditorGutter.insertedLineBackground": "#2ea04359",
+			"diffEditorGutter.removedLineBackground": "#da363359",
 			"diffEditorOverview.insertedForeground": "#2ea04399",
 			"diffEditorOverview.removedForeground": "#da363399",
 			"diffEditor.diagonalFill": "#1a19180a",
+			"diffEditor.unchangedRegionBackground": "#f0eeea",
+			"diffEditor.unchangedRegionForeground": "#5a5857",
+			"diffEditor.unchangedRegionShadow": "#00000000",
 		},
 	});
 	monaco.editor.setTheme(themeId(desiredTheme));

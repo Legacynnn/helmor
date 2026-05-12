@@ -829,6 +829,14 @@ function ChangeFileRow({
 	const name = lastSlash >= 0 ? change.path.slice(lastSlash + 1) : change.path;
 	const selected = change.absolutePath === activeEditorPath;
 	const hasAction = !!action || !!onDiscard;
+	const [hovered, setHovered] = useState(false);
+	const [focused, setFocused] = useState(false);
+	const showActions = hasAction && (hovered || focused);
+	// Belt-and-suspenders: bind both pointer + mouse events. Different
+	// platforms / Radix wrappers route hover through different event
+	// systems, so we listen to both and OR them together.
+	const onEnter = useCallback(() => setHovered(true), []);
+	const onLeave = useCallback(() => setHovered(false), []);
 
 	return (
 		<FileRowContextMenu
@@ -838,13 +846,20 @@ function ChangeFileRow({
 		>
 			<div
 				ref={(el) => registerRowRef?.(change.path, el)}
+				data-hovered={hovered ? "" : undefined}
 				className={cn(
-					"group/row relative mx-1 flex h-[26px] cursor-pointer items-center gap-2 rounded-md px-2 transition-colors hover:bg-accent/60 focus:outline-none",
+					"group relative mx-1 flex h-[26px] cursor-pointer items-center gap-2 rounded-md px-2 transition-colors hover:bg-accent/60 focus:outline-none",
 					selected &&
 						cn("bg-primary/10 text-foreground", editorMode && "bg-primary/15"),
 				)}
 				role="button"
 				tabIndex={0}
+				onMouseEnter={onEnter}
+				onMouseLeave={onLeave}
+				onPointerEnter={onEnter}
+				onPointerLeave={onLeave}
+				onFocus={() => setFocused(true)}
+				onBlur={() => setFocused(false)}
 				onClick={() => onOpenEntry(entry)}
 				onKeyDown={(event) => {
 					if (event.key === "Enter" || event.key === " ") {
@@ -860,26 +875,33 @@ function ChangeFileRow({
 				}}
 			>
 				<FileIcon name={name} kind="file" className="size-3.5" />
-				<span className="min-w-0 flex-1 truncate text-[11.5px] leading-[18px]">
-					<ShinyFlash active={flashingPaths.has(change.path)}>
-						{dir ? (
-							<span className="text-muted-foreground/70">{dir}</span>
-						) : null}
-						<span
-							className={cn(
-								"font-medium text-foreground/90",
-								selected && "text-foreground",
-							)}
-						>
-							{name}
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<span className="flex min-w-0 flex-1 items-center text-[11.5px] leading-[18px]">
+							<ShinyFlash active={flashingPaths.has(change.path)}>
+								{dir ? (
+									<span className="truncate text-muted-foreground/70">
+										{dir}
+									</span>
+								) : null}
+								<span
+									className={cn(
+										"shrink-0 font-medium text-foreground/90",
+										selected && "text-foreground",
+									)}
+								>
+									{name}
+								</span>
+							</ShinyFlash>
 						</span>
-					</ShinyFlash>
-				</span>
+					</TooltipTrigger>
+					<TooltipContent side="right" sideOffset={8} className="font-mono">
+						{change.path}
+					</TooltipContent>
+				</Tooltip>
 				<span
-					className={cn(
-						"flex shrink-0 items-center gap-1.5 tabular-nums",
-						hasAction && "group-hover/row:hidden",
-					)}
+					style={{ display: showActions ? "none" : "flex" }}
+					className="shrink-0 items-center gap-1.5 tabular-nums"
 				>
 					<LineStats insertions={insertions} deletions={deletions} />
 					<span
@@ -897,12 +919,14 @@ function ChangeFileRow({
 					</span>
 				</span>
 				{hasAction && (
-					<RowHoverActions
-						path={change.path}
-						action={action}
-						onStageAction={onStageAction}
-						onDiscard={onDiscard}
-					/>
+					<span style={{ display: showActions ? "flex" : "none" }}>
+						<RowHoverActions
+							path={change.path}
+							action={action}
+							onStageAction={onStageAction}
+							onDiscard={onDiscard}
+						/>
+					</span>
 				)}
 			</div>
 		</FileRowContextMenu>
@@ -921,7 +945,7 @@ function RowHoverActions({
 	onDiscard?: (path: string) => void;
 }) {
 	return (
-		<span className="ml-auto hidden items-center gap-0.5 group-hover/row:inline-flex">
+		<span className="flex shrink-0 items-center gap-0.5">
 			{onDiscard && (
 				<RowIconButton
 					aria-label="Discard file changes"
@@ -1151,14 +1175,14 @@ function ShinyFlash({
 	}, [active]);
 
 	if (!shimmer) {
-		return <span className="truncate">{children}</span>;
+		return <span className="flex min-w-0 flex-1 items-center">{children}</span>;
 	}
 
 	return (
 		<AnimatedShinyText
 			key={counterRef.current}
 			shimmerWidth={60}
-			className="!mx-0 !max-w-none truncate !text-neutral-500/80 ![animation-duration:1s] ![animation-iteration-count:3] ![animation-name:shiny-text-continuous] ![animation-timing-function:ease-in-out] dark:!text-neutral-500/80 dark:via-white via-black"
+			className="!mx-0 flex min-w-0 flex-1 items-center !max-w-none truncate !text-neutral-500/80 ![animation-duration:1s] ![animation-iteration-count:3] ![animation-name:shiny-text-continuous] ![animation-timing-function:ease-in-out] dark:!text-neutral-500/80 dark:via-white via-black"
 		>
 			{children}
 		</AnimatedShinyText>

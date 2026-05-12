@@ -26,6 +26,8 @@
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	-webkit-text-size-adjust: 100%;
+	/* lucide-react ChevronsUpDown — used to override Monaco codicons in the diff editor. */
+	--helmor-chevrons-up-down: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
 }
 
 html,
@@ -668,6 +670,111 @@ html[data-os="macos"] #root {
 .monaco-editor .overflowingContentWidgets,
 .monaco-editor .overflowingOverlayWidgets {
 	z-index: 60;
+}
+
+/*
+ * In inline diff mode Monaco renders the "original" editor as a narrow strip
+ * on the left that shows the original-side line numbers, then the "modified"
+ * editor (with its own gutter + line numbers) to the right. The user only
+ * wants a single line-number column, so collapse the original strip and pull
+ * the modified pane flush to the left. We can't use Monaco's `compactMode`
+ * for this because it also strips the expand-region icon.
+ */
+.helmor-editor-canvas .monaco-diff-editor .editor.original {
+	width: 0 !important;
+	min-width: 0 !important;
+	overflow: hidden !important;
+}
+.helmor-editor-canvas .monaco-diff-editor .editor.modified {
+	left: 0 !important;
+	width: 100% !important;
+}
+
+/*
+ * Custom styling for Monaco's "hidden unchanged lines" widget in the diff
+ * editor. Replaces the default centered pill with a flat bar that has a
+ * single chevrons-up-down indicator on the left, matching the rest of the
+ * Helmor surface. Click anywhere on the bar (Monaco's own handler) expands
+ * the entire region — revealLineCount is tuned to a large value so one
+ * click reveals everything.
+ */
+.monaco-editor .diff-hidden-lines-widget {
+	width: 100%;
+}
+.monaco-editor .diff-hidden-lines .top,
+.monaco-editor .diff-hidden-lines .bottom {
+	height: 0;
+	background: transparent;
+}
+.monaco-editor .diff-hidden-lines .center {
+	min-height: 22px;
+	display: flex !important;
+	align-items: center;
+	font-size: 12px;
+	font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+	/* Kill Monaco's gradient shadows on the inner bar — we want a flat fill. */
+	box-shadow: none !important;
+}
+.monaco-editor .diff-hidden-lines .center > div:first-child {
+	/* Monaco inline-sizes this column to `layoutInfoContentLeft` — the full
+	   fold + line-number + decorations strip. Right-align so the icon sits
+	   over the line-number digits, which Monaco right-aligns inside that
+	   strip with ~10px of trailing decorations gutter. */
+	justify-content: flex-end !important;
+}
+.monaco-editor .diff-hidden-lines .center > div:first-child a {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	/* margin-right (not padding on the parent) reliably nudges the icon left
+	   past Monaco's decorations gutter so it lines up with line-number text. */
+	margin-right: 14px;
+	color: color-mix(in oklab, var(--foreground) 70%, transparent);
+	background: transparent;
+	cursor: pointer;
+	transition: color 120ms ease;
+}
+.monaco-editor .diff-hidden-lines .center:hover > div:first-child a,
+.monaco-editor .diff-hidden-lines .center > div:first-child a:hover {
+	color: var(--foreground);
+}
+.monaco-editor .diff-hidden-lines .center > div:first-child a .codicon {
+	/* Hide Monaco's codicon glyph; paint a lucide ChevronsUpDown via mask. */
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	font-size: 0;
+	line-height: 0;
+	background-color: currentColor;
+	-webkit-mask: var(--helmor-chevrons-up-down) center / 14px 14px no-repeat;
+	mask: var(--helmor-chevrons-up-down) center / 14px 14px no-repeat;
+}
+.monaco-editor .diff-hidden-lines .center > div:first-child a .codicon::before {
+	content: none;
+}
+.monaco-editor .diff-hidden-lines .center > div:nth-child(2) {
+	justify-content: flex-start !important;
+	padding-left: 10px;
+	gap: 8px;
+}
+.monaco-editor .diff-hidden-lines .center > div:nth-child(2) span {
+	cursor: pointer;
+	transition: color 120ms ease;
+}
+.monaco-editor .diff-hidden-lines .center:hover > div:nth-child(2) span,
+.monaco-editor .diff-hidden-lines .center > div:nth-child(2) span:hover {
+	color: var(--foreground);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	text-decoration-thickness: 1px;
+	text-decoration-color: color-mix(
+		in oklab,
+		var(--foreground) 35%,
+		transparent
+	);
+}
+.monaco-editor .diff-hidden-lines .breadcrumb-item {
+	opacity: 0.75;
 }
 
 .scrollbar-stable {

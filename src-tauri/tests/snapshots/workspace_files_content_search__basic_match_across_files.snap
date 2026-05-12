@@ -1,0 +1,41 @@
+---
+source: tests/workspace_files_content_search.rs
+expression: normalize(result)
+---
+hits:
+  - absolutePath: "<ABS>"
+    relativePath: README.md
+    fileName: README.md
+    matches:
+      - lineNumber: 3
+        line: Says hello to the world.
+        matchRanges:
+          - - 5
+            - 10
+        contextBefore: ""
+    totalMatchesInFile: 1
+  - absolutePath: "<ABS>"
+    relativePath: src/index.ts
+    fileName: index.ts
+    matches:
+      - lineNumber: 2
+        line: "export const greeting = \"hello\";"
+        matchRanges:
+          - - 25
+            - 30
+        contextBefore: "import { foo } from \"./bar\";"
+    totalMatchesInFile: 1
+  - absolutePath: "<ABS>"
+    relativePath: src/widget.tsx
+    fileName: widget.tsx
+    matches:
+      - lineNumber: 2
+        line: "  return <div>hello world</div>;"
+        matchRanges:
+          - - 14
+            - 19
+        contextBefore: "export function Widget() {"
+        contextAfter: "}"
+    totalMatchesInFile: 1
+totalFilesMatched: 3
+truncated: false
