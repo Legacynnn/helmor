@@ -8,12 +8,13 @@
 //! the issue node ID (extra round-trip) while REST accepts the human
 //! number directly and returns the refreshed issue in one call.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use serde::Deserialize;
 
 use super::accounts as gh_accounts;
 use super::api::{looks_like_auth_rejection, GITHUB_HOST};
-use super::inbox::{issue_detail_from_rest, parse_external_reference, IssueRestResponse};
+use super::inbox::parse_external_reference;
+use super::issue_graphql::fetch_issue_detail;
 use crate::forge::command::command_detail;
 use crate::forge::github::inbox::detail::GithubIssueDetail;
 
@@ -107,7 +108,8 @@ pub fn update_issue(
         return Err(anyhow!("`gh api` failed updating issue: {detail}"));
     }
 
-    let response: IssueRestResponse = serde_json::from_str(&output.stdout)
-        .with_context(|| "Failed to decode updated GitHub issue response".to_string())?;
-    Ok(issue_detail_from_rest(response, external_id))
+    // REST PATCH already succeeded; pull the enriched view back via
+    // GraphQL so the caller cache picks up assignees/labels/type/etc.
+    // in one round-trip.
+    fetch_issue_detail(login, external_id)?.ok_or_else(|| anyhow!("Issue not found after update"))
 }

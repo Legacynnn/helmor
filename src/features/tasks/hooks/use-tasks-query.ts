@@ -19,6 +19,7 @@ const STALE_TIME = 60_000;
 type Result = {
 	items: TaskListItem[];
 	isLoading: boolean;
+	isFetching: boolean;
 	isError: boolean;
 	error: unknown;
 	refetch: () => void;
@@ -180,6 +181,7 @@ export function useTasksQuery(args: {
 	// ── BUILD RESULT ────────────────────────────────────────────────────────
 	let items: TaskListItem[];
 	let isLoading: boolean;
+	let isFetching: boolean;
 	let isError: boolean;
 	let error: unknown;
 	let refetch: () => void;
@@ -216,6 +218,7 @@ export function useTasksQuery(args: {
 		adapted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 		items = adapted;
 		isLoading = activeQueries.some((q) => q.isLoading);
+		isFetching = activeQueries.some((q) => q.isFetching);
 		isError = activeQueries.some((q) => q.isError);
 		error = activeQueries.find((q) => q.isError)?.error ?? null;
 		refetch = () => {
@@ -239,6 +242,7 @@ export function useTasksQuery(args: {
 
 		items = rawItems;
 		isLoading = active.isLoading;
+		isFetching = active.isFetching;
 		isError = active.isError;
 		error = active.error;
 		refetch = () => {
@@ -248,5 +252,5 @@ export function useTasksQuery(args: {
 
 	const filtered = applyFilters(args.tab, items, args.filters);
 
-	return { items: filtered, isLoading, isError, error, refetch };
+	return { items: filtered, isLoading, isFetching, isError, error, refetch };
 }

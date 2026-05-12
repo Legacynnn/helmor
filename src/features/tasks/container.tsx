@@ -1,8 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HelmorLogoAnimated } from "@/components/helmor-logo-animated";
+import { Button } from "@/components/ui/button";
 import { type LinearAuthStatus, linearGetAuthStatus } from "@/lib/api";
 import { repositoriesQueryOptions } from "@/lib/query-client";
+import { cn } from "@/lib/utils";
 import { DetailScreen } from "./components/detail-screen";
 import {
 	EmptyConnectLinear,
@@ -163,7 +166,10 @@ export function TasksScreenContainer({
 				<div className="h-4 w-px bg-border" />
 				<TabBar
 					active={activeTab}
-					onChange={setActiveTab}
+					onChange={(next) => {
+						setActiveTab(next);
+						setSelectedItem(null);
+					}}
 					linearFilters={filtersHook.filters.tasks}
 					prFilters={filtersHook.filters.prs}
 					issueFilters={filtersHook.filters.issues}
@@ -177,6 +183,21 @@ export function TasksScreenContainer({
 						filtersHook.setFilters((prev) => ({ ...prev, issues: next }))
 					}
 				/>
+				<div className="ml-auto flex items-center">
+					<Button
+						variant="ghost"
+						size="icon"
+						className="size-7"
+						onClick={() => tasks.refetch()}
+						disabled={tasks.isFetching}
+						title="Refresh"
+						aria-label="Refresh tasks"
+					>
+						<RefreshCw
+							className={cn("size-4", tasks.isFetching && "animate-spin")}
+						/>
+					</Button>
+				</div>
 			</header>
 			<div className="min-h-0 flex-1">
 				{selectedItem ? (

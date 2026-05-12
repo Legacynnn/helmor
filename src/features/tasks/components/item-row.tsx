@@ -1,4 +1,13 @@
-import { ChevronRight, UserCircle2 } from "lucide-react";
+import {
+	CheckCircle2,
+	ChevronRight,
+	CircleDot,
+	GitMerge,
+	GitPullRequest,
+	GitPullRequestClosed,
+	GitPullRequestDraft,
+	UserCircle2,
+} from "lucide-react";
 import { CachedAvatar } from "@/components/cached-avatar";
 import { cn } from "@/lib/utils";
 import { TaskStatusIcon } from "../status-icon";
@@ -11,6 +20,55 @@ const PRIORITY_LEVELS: Record<NonNullable<TaskListItem["priority"]>, number> = {
 	low: 1,
 	none: 0,
 };
+
+export function GhLeadingIcon({
+	source,
+	statusKey,
+}: {
+	source: TaskListItem["source"];
+	statusKey: string;
+}) {
+	if (source === "github-issue") {
+		const closed = statusKey === "closed";
+		const Icon = closed ? CheckCircle2 : CircleDot;
+		return (
+			<Icon
+				className={cn(
+					"size-[15px] shrink-0",
+					closed ? "text-[#8957e5]" : "text-[#3fb950]",
+				)}
+				strokeWidth={2}
+				aria-hidden="true"
+			/>
+		);
+	}
+	if (source === "github-pr") {
+		const Icon =
+			statusKey === "merged"
+				? GitMerge
+				: statusKey === "closed"
+					? GitPullRequestClosed
+					: statusKey === "draft"
+						? GitPullRequestDraft
+						: GitPullRequest;
+		const tone =
+			statusKey === "merged"
+				? "text-[#8957e5]"
+				: statusKey === "closed"
+					? "text-[#f85149]"
+					: statusKey === "draft"
+						? "text-muted-foreground"
+						: "text-[#3fb950]";
+		return (
+			<Icon
+				className={cn("size-[15px] shrink-0", tone)}
+				strokeWidth={2}
+				aria-hidden="true"
+			/>
+		);
+	}
+	return null;
+}
 
 function formatShortDate(dateIso: string): string {
 	const date = new Date(dateIso);
@@ -96,18 +154,51 @@ export function ItemRow({
 			className="group grid min-h-12 w-full cursor-pointer grid-cols-[1.5rem_4.5rem_minmax(12rem,1fr)_auto_auto] items-center gap-x-1 border-b border-border/35 px-4 py-2 text-left text-[13px] transition-colors hover:bg-muted/35 data-[selected=true]:bg-muted/55"
 		>
 			<span className="flex size-6 items-center justify-center">
-				<PriorityIndicator priority={item.priority ?? "none"} />
+				{item.source === "linear" ? (
+					<PriorityIndicator priority={item.priority ?? "none"} />
+				) : (
+					<GhLeadingIcon source={item.source} statusKey={item.status.key} />
+				)}
 			</span>
 			<span className="truncate font-mono text-[12px] text-muted-foreground">
 				{item.displayId}
 			</span>
 			<div className="flex min-w-0 items-center gap-1.5">
-				<span aria-label={item.status.label} title={item.status.label}>
-					<TaskStatusIcon status={item.status} />
-				</span>
+				{item.source === "linear" ? (
+					<span aria-label={item.status.label} title={item.status.label}>
+						<TaskStatusIcon status={item.status} />
+					</span>
+				) : null}
 				<span className="min-w-0 truncate font-medium text-foreground/90">
 					{item.title}
 				</span>
+				{item.type ? (
+					<>
+						<span
+							aria-hidden="true"
+							className="h-3.5 w-px shrink-0 bg-border/70"
+						/>
+						<span
+							className="inline-flex max-w-28 shrink-0 items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold"
+							title={`Type: ${item.type.name}`}
+							style={{
+								color: item.type.color,
+								borderColor: `color-mix(in oklab, ${item.type.color} 45%, transparent)`,
+								backgroundImage: `linear-gradient(135deg, color-mix(in oklab, ${item.type.color} 26%, transparent), color-mix(in oklab, ${item.type.color} 8%, transparent))`,
+								boxShadow: `0 0 0 1px color-mix(in oklab, ${item.type.color} 12%, transparent), 0 0 10px color-mix(in oklab, ${item.type.color} 22%, transparent)`,
+							}}
+						>
+							<span
+								className="size-1.5 shrink-0 rounded-full"
+								style={{
+									backgroundColor: item.type.color,
+									boxShadow: `0 0 6px color-mix(in oklab, ${item.type.color} 70%, transparent)`,
+								}}
+							/>
+							<span className="truncate">{item.type.name}</span>
+						</span>
+					</>
+				) : null}
 				{item.repo ? (
 					<span className="hidden shrink-0 rounded-md border border-border/50 bg-muted/45 px-1.5 py-0.5 text-[10px] text-muted-foreground xl:inline">
 						{item.repo.name}

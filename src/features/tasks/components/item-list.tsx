@@ -2,12 +2,13 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
 import { TaskStatusIcon } from "../status-icon";
 import type { TaskListItem } from "../types";
-import { ItemRow } from "./item-row";
+import { GhLeadingIcon, ItemRow } from "./item-row";
 
 type Group = {
 	key: string;
 	label: string;
 	status: TaskListItem["status"];
+	source: TaskListItem["source"];
 	items: TaskListItem[];
 };
 
@@ -22,6 +23,7 @@ function groupByStatus(items: TaskListItem[]): Group[] {
 				key: item.status.key,
 				label: item.status.label,
 				status: item.status,
+				source: item.source,
 				items: [item],
 			});
 		}
@@ -72,7 +74,14 @@ export function ItemList({
 							) : (
 								<ChevronDown className="size-3" />
 							)}
-							<TaskStatusIcon status={group.status} />
+							{group.source === "linear" ? (
+								<TaskStatusIcon status={group.status} />
+							) : (
+								<GhLeadingIcon
+									source={group.source}
+									statusKey={group.status.key}
+								/>
+							)}
 							<span>{group.label}</span>
 							<span className="text-muted-foreground">
 								{group.items.length}

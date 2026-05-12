@@ -26,7 +26,7 @@ use crate::forge::inbox::{
 
 pub mod detail;
 
-use detail::{GithubDiscussionDetail, GithubIssueDetail, GithubPullRequestDetail};
+use detail::{GithubDiscussionDetail, GithubPullRequestDetail};
 
 #[derive(Debug, Deserialize)]
 struct GithubLabelRestResponse {
@@ -645,16 +645,12 @@ fn fetch_pull_request_detail(login: &str, external_id: &str) -> Result<Option<In
 }
 
 fn fetch_issue_detail(login: &str, external_id: &str) -> Result<Option<InboxItemDetail>> {
-    let (owner, repo, number) = parse_external_reference(external_id)?;
-    let path = format!("/repos/{owner}/{repo}/issues/{number}");
-    let Some(stdout) = run_github_api(login, &path, "GitHub issue detail")? else {
+    // GraphQL pulls assignees/labels/issueType/milestone/linkedPRs in one
+    // round-trip; REST returned none of those. See `issue_graphql.rs`.
+    let Some(detail) = super::issue_graphql::fetch_issue_detail(login, external_id)? else {
         return Ok(None);
     };
-    let response = serde_json::from_str::<IssueRestResponse>(&stdout)
-        .with_context(|| "Failed to decode GitHub issue detail response".to_string())?;
-    Ok(Some(InboxItemDetail::GithubIssue(Box::new(
-        issue_detail_from_rest(response, external_id),
-    ))))
+    Ok(Some(InboxItemDetail::GithubIssue(Box::new(detail))))
 }
 
 fn fetch_discussion_detail(login: &str, external_id: &str) -> Result<Option<InboxItemDetail>> {
@@ -1102,41 +1098,31 @@ struct PullRequestRestRef {
     ref_name: String,
 }
 
+/// REST issue payload used by inbox search (`fetch_exact_issue_item`).
+/// The detail screen no longer goes through REST -- see
+/// `issue_graphql.rs` for the richer field set; tests still construct
+/// this struct so all fields stay declared.
 #[derive(Debug, Deserialize)]
 pub(super) struct IssueRestResponse {
     pub node_id: String,
     pub html_url: String,
     pub title: String,
+    #[allow(dead_code)]
     pub body: Option<String>,
     pub state: String,
     pub state_reason: Option<String>,
+    #[allow(dead_code)]
     pub user: Option<PullRequestRestUser>,
     #[serde(default)]
     pub assignees: Vec<PullRequestRestUser>,
     #[serde(default)]
     pub labels: Vec<GithubRestLabel>,
     pub pull_request: Option<serde_json::Value>,
+    #[allow(dead_code)]
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
+    #[allow(dead_code)]
     pub closed_at: Option<String>,
-}
-
-pub(super) fn issue_detail_from_rest(
-    response: IssueRestResponse,
-    external_id: &str,
-) -> GithubIssueDetail {
-    GithubIssueDetail {
-        external_id: external_id.to_string(),
-        title: response.title,
-        body: response.body,
-        url: response.html_url,
-        state: response.state,
-        state_reason: response.state_reason,
-        author_login: response.user.map(|user| user.login),
-        created_at: response.created_at,
-        updated_at: response.updated_at,
-        closed_at: response.closed_at,
-    }
 }
 
 #[derive(Debug, Deserialize)]

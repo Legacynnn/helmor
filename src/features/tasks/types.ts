@@ -63,6 +63,8 @@ export type TaskListItem = {
 		color: string;
 	};
 	priority?: "urgent" | "high" | "medium" | "low" | "none";
+	/** GitHub issue "Type" (Bug/Feature/Task/etc.). Separate from labels. */
+	type?: { name: string; color: string };
 	labels: { name: string; color: string }[];
 	assignee?: { login: string; avatarUrl: string | null };
 	updatedAt: string;

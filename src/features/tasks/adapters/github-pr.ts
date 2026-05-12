@@ -27,7 +27,12 @@ export function ghPrToItem(pr: GhPr): TaskListItem {
 		title: pr.title,
 		status,
 		labels: pr.labels.map((l) => ({ name: l.name, color: `#${l.color}` })),
-		assignee: assignee ? { login: assignee.login, avatarUrl: null } : undefined,
+		assignee: assignee
+			? {
+					login: assignee.login,
+					avatarUrl: `https://github.com/${assignee.login}.png?size=48`,
+				}
+			: undefined,
 		updatedAt: pr.updatedAt,
 		url: pr.url,
 	};

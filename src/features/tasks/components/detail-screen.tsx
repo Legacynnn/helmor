@@ -31,7 +31,8 @@ import { cn } from "@/lib/utils";
 import type { TaskListItem } from "../types";
 import { EditableBody } from "./editable-body";
 import { EditableTitle } from "./editable-title";
-import { IssueComments } from "./issue-comments";
+import { IssueActivity } from "./issue-activity";
+import { IssueSidebar } from "./issue-sidebar";
 import { StatusBadgeMenu } from "./status-badge-menu";
 
 function parseGitHubOwnerRepo(
@@ -274,31 +275,54 @@ export function DetailScreen({
 						{error instanceof Error ? error.message : String(error)}
 					</div>
 				) : item.source === "github-issue" && detailRef ? (
-					<div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
-						<EditableBody
-							body={body}
-							updatedAt={
-								ghQuery.data?.type === "github_issue"
-									? (ghQuery.data.data.updatedAt ?? null)
-									: null
-							}
-							detailRef={detailRef}
-							detailQueryKey={[
-								"tasks",
-								"detail",
-								"github",
-								detailRef.provider,
-								detailRef.login,
-								detailRef.source,
-								detailRef.externalId,
-							]}
-							editable
-							editSignal={editSignal}
-						/>
-						<IssueComments
-							login={detailRef.login}
-							externalId={detailRef.externalId}
-						/>
+					<div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
+						<div className="flex min-w-0 flex-col gap-6">
+							<EditableBody
+								body={body}
+								updatedAt={
+									ghQuery.data?.type === "github_issue"
+										? (ghQuery.data.data.updatedAt ?? null)
+										: null
+								}
+								detailRef={detailRef}
+								detailQueryKey={[
+									"tasks",
+									"detail",
+									"github",
+									detailRef.provider,
+									detailRef.login,
+									detailRef.source,
+									detailRef.externalId,
+								]}
+								editable
+								editSignal={editSignal}
+							/>
+							<IssueActivity
+								login={detailRef.login}
+								externalId={detailRef.externalId}
+							/>
+						</div>
+						{ghQuery.data?.type === "github_issue" ? (
+							<IssueSidebar
+								issue={ghQuery.data.data}
+								repo={
+									detailRef && repo?.remoteUrl
+										? (() => {
+												const ownerRepo = parseGitHubOwnerRepo(repo.remoteUrl);
+												if (!ownerRepo) return null;
+												const [owner, name] = ownerRepo.split("/");
+												return {
+													login: detailRef.login,
+													owner,
+													repo: name,
+												};
+											})()
+										: null
+								}
+								externalId={detailRef.externalId}
+								onOpenWorkspace={onOpenWorkspace}
+							/>
+						) : null}
 					</div>
 				) : (
 					<MarkdownBody body={markdownBody} />

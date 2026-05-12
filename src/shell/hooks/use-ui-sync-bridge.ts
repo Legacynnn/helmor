@@ -202,6 +202,28 @@ function handleUiMutation(
 				queryKey: helmorQueryKeys.activeStreams,
 			});
 			return;
+		case "issueDetailUpdated":
+			void queryClient.invalidateQueries({
+				predicate: (query) => {
+					const key = query.queryKey;
+					return (
+						(key[0] === "tasks" &&
+							key[1] === "detail" &&
+							key[2] === "github" &&
+							key[4] === event.login &&
+							key[6] === event.externalId) ||
+						(key[0] === "tasks" &&
+							key[1] === "issue-timeline" &&
+							key[2] === event.login &&
+							key[3] === event.externalId) ||
+						(key[0] === "tasks" &&
+							key[1] === "issue-comments" &&
+							key[2] === event.login &&
+							key[3] === event.externalId)
+					);
+				},
+			});
+			return;
 	}
 }
 
