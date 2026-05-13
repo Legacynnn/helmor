@@ -1,4 +1,4 @@
-import { FileIcon, TerminalIcon } from "lucide-react";
+import { TerminalIcon } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 import {
@@ -11,6 +11,7 @@ import {
 	CommandList,
 	CommandSeparator,
 } from "@/components/ui/command";
+import { FileIcon } from "@/features/file-browser/file-icon";
 import { useEditorActions } from "@/shell/editor-actions-context";
 
 import { useCommandRegistry } from "./hooks/use-command-registry";
@@ -118,7 +119,7 @@ export function CommandPaletteDialog({ workspaceRootPath }: Props) {
 									value={`recent:${r.absolutePath}`}
 									onSelect={() => handleRecentPick(r)}
 								>
-									<FileIcon className="size-4 opacity-60" />
+									<FileIcon name={r.fileName} kind="file" className="size-4" />
 									<span className="truncate">{r.fileName}</span>
 									<span className="ml-auto truncate text-xs text-muted-foreground">
 										{r.relativePath}
@@ -158,7 +159,11 @@ export function CommandPaletteDialog({ workspaceRootPath }: Props) {
 											value={`file:${hit.absolutePath}`}
 											onSelect={() => handleFilePick(hit)}
 										>
-											<FileIcon className="size-4 opacity-60" />
+											<FileIcon
+												name={hit.name}
+												kind="file"
+												className="size-4"
+											/>
 											<span className="truncate">{hit.name}</span>
 											<span className="ml-auto truncate text-xs text-muted-foreground">
 												{splitPathDirectory(hit.path)}
