@@ -186,8 +186,51 @@ export function CommandPaletteDialog({ workspaceRootPath }: Props) {
 							renderCommandGroups(filteredCommands, handleCommandPick)
 						))}
 				</CommandList>
+				<PaletteFooter mode={mode} />
 			</Command>
 		</CommandDialog>
+	);
+}
+
+function PaletteFooter({ mode }: { mode: "files" | "commands" }) {
+	const selectLabel = mode === "commands" ? "Run" : "Open";
+	return (
+		<div className="flex shrink-0 items-center justify-between gap-3 border-t border-border/40 px-3 py-1.5 text-[10px] text-muted-foreground">
+			<div className="flex items-center gap-3">
+				<KbdHint keys={["↑", "↓"]} label="Navigate" />
+				<KbdHint keys={["↵"]} label={selectLabel} />
+				<KbdHint keys={["esc"]} label="Close" />
+			</div>
+			<span className="hidden sm:inline">
+				{mode === "commands" ? (
+					<>
+						Clear <kbd className="font-mono text-app-foreground">&gt;</kbd> for
+						files
+					</>
+				) : (
+					<>
+						Type <kbd className="font-mono text-app-foreground">&gt;</kbd> for
+						commands
+					</>
+				)}
+			</span>
+		</div>
+	);
+}
+
+function KbdHint({ keys, label }: { keys: string[]; label: string }) {
+	return (
+		<span className="flex items-center gap-1">
+			{keys.map((k) => (
+				<kbd
+					key={k}
+					className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-border/60 bg-muted/60 px-1 font-mono text-[10px] text-app-foreground"
+				>
+					{k}
+				</kbd>
+			))}
+			<span>{label}</span>
+		</span>
 	);
 }
 
