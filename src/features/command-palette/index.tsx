@@ -245,13 +245,17 @@ function FileRow({
 		<>
 			<FileIcon name={fileName} kind="file" className="size-4" />
 			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-				<span className="truncate text-sm text-app-foreground">{fileName}</span>
+				<span className="truncate text-sm text-app-foreground group-data-selected/command-item:text-accent-foreground">
+					{fileName}
+				</span>
 				{segments.length > 0 && (
-					<span className="truncate text-[11px] text-muted-foreground/70">
+					<span className="truncate text-[11px] text-muted-foreground/70 group-data-selected/command-item:text-accent-foreground/80">
 						{segments.map((seg, i) => (
 							<span key={`${seg}-${i}`}>
 								{i > 0 && (
-									<span className="mx-1 text-muted-foreground/40">›</span>
+									<span className="mx-1 text-muted-foreground/40 group-data-selected/command-item:text-accent-foreground/50">
+										›
+									</span>
 								)}
 								{seg}
 							</span>
@@ -260,7 +264,7 @@ function FileRow({
 				)}
 			</div>
 			{extension && (
-				<span className="ml-2 shrink-0 rounded bg-muted/60 px-1.5 py-[1px] font-mono text-[10px] uppercase text-muted-foreground">
+				<span className="ml-2 shrink-0 rounded bg-muted/60 px-1.5 py-[1px] font-mono text-[10px] uppercase text-muted-foreground group-data-selected/command-item:bg-accent-foreground/15 group-data-selected/command-item:text-accent-foreground">
 					{extension}
 				</span>
 			)}
