@@ -142,9 +142,11 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 	kanbanActive,
 	onOpenTasks,
 	tasksActive,
+	initialViewMode = "repositories",
 }: {
 	groups: WorkspaceGroup[];
 	repositoryGroups?: RepositoryGroup[];
+	initialViewMode?: SidebarViewMode;
 	archivedRows: WorkspaceRow[];
 	addingRepository?: boolean;
 	selectedWorkspaceId?: string | null;
@@ -188,8 +190,8 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 	const [isAddRepositoryMenuOpen, setIsAddRepositoryMenuOpen] = useState(false);
 	const [isViewModeMenuOpen, setIsViewModeMenuOpen] = useState(false);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
-	// View mode is in-memory only — every fresh app start defaults to "status".
-	const [viewMode, setViewMode] = useState<SidebarViewMode>("status");
+	// View mode is in-memory only — every fresh app start defaults to "repositories".
+	const [viewMode, setViewMode] = useState<SidebarViewMode>(initialViewMode);
 	const [sectionOpenState, setSectionOpenState] = useState(() => ({
 		...createInitialSectionOpenState(groups),
 		...readStoredSectionOpenState(),
