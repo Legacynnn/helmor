@@ -18,7 +18,7 @@ export type FollowUpBehavior = "steer" | "queue";
  *    response begins streaming sooner. */
 export type ClaudeThinkingDisplay = "summarized" | "omitted";
 export type AppSurface = "workspace" | "workspace-start";
-export type WorkspaceRightSidebarMode = "inspector" | "context";
+export type WorkspaceRightSidebarMode = "inspector" | "context" | "search";
 
 export type ShortcutOverrides = Record<string, string | null>;
 

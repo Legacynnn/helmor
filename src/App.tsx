@@ -39,7 +39,10 @@ import type { WorkspaceCommitButtonMode } from "@/features/commit/button";
 import { useWorkspaceCommitLifecycle } from "@/features/commit/hooks/use-commit-lifecycle";
 import { hydrateDraftCache } from "@/features/composer/draft-storage";
 import type { StartSubmitMode } from "@/features/composer/start-submit-mode";
-import { ContentSearchStateProvider } from "@/features/content-search";
+import {
+	ContentSearchPanel,
+	ContentSearchStateProvider,
+} from "@/features/content-search";
 import {
 	type ComposerCreateContext,
 	type ComposerCreatePrepareOutcome,
@@ -93,7 +96,6 @@ import {
 	PREFERRED_EDITOR_STORAGE_KEY,
 	SIDEBAR_RESIZE_HIT_AREA,
 } from "@/shell/layout";
-import { LeftSidebarContent } from "@/shell/left-sidebar-content";
 import { clampZoom, useZoom, ZOOM_STEP } from "@/shell/use-zoom";
 import { HistoryScreenContainer } from "./features/history/container";
 import { KanbanScreenContainer } from "./features/kanban/container";
@@ -3149,7 +3151,9 @@ function AppShell({
 		workspaceViewMode !== "history" &&
 		workspaceViewMode !== "kanban" &&
 		workspaceViewMode !== "tasks" &&
-		(workspaceViewMode !== "start" || rightSidebarMode === "context");
+		(workspaceViewMode !== "start" ||
+			rightSidebarMode === "context" ||
+			rightSidebarMode === "search");
 	const contextPanelOpen =
 		rightSidebarAvailable &&
 		rightSidebarMode === "context" &&
@@ -3185,6 +3189,34 @@ function AppShell({
 				handleToggleContextPanel,
 			);
 	}, [handleToggleContextPanel]);
+	const handleToggleContentSearch = useCallback(() => {
+		if (rightSidebarMode === "search" && !inspectorCollapsed) {
+			setInspectorCollapsed(true);
+			return;
+		}
+		setRightSidebarMode("search");
+		setInspectorCollapsed(false);
+		if (workspaceViewModeRef.current !== "start") {
+			void updateSettings({ workspaceRightSidebarMode: "search" });
+		}
+	}, [inspectorCollapsed, rightSidebarMode, updateSettings]);
+	const handleCloseContentSearch = useCallback(() => {
+		setRightSidebarMode("inspector");
+		if (workspaceViewModeRef.current !== "start") {
+			void updateSettings({ workspaceRightSidebarMode: "inspector" });
+		}
+	}, [updateSettings]);
+	useEffect(() => {
+		window.addEventListener(
+			"helmor:content-search-toggle",
+			handleToggleContentSearch,
+		);
+		return () =>
+			window.removeEventListener(
+				"helmor:content-search-toggle",
+				handleToggleContentSearch,
+			);
+	}, [handleToggleContentSearch]);
 	const restoreStartSurface =
 		areSettingsLoaded && appSettings.lastSurface === "workspace-start";
 	const workspaceSidebarAutoSelectEnabled =
@@ -3239,59 +3271,50 @@ function AppShell({
 															)}
 															style={{ width: `${sidebarWidth}px` }}
 														>
-															<LeftSidebarContent
-																workspaceRootPath={workspaceRootPath ?? null}
-																fallback={
-																	<WorkspacesSidebarContainer
-																		selectedWorkspaceId={
-																			workspaceViewMode === "start" ||
-																			workspaceViewMode === "history" ||
-																			workspaceViewMode === "kanban" ||
-																			workspaceViewMode === "tasks"
-																				? null
-																				: selectedWorkspaceId
-																		}
-																		autoSelectEnabled={
-																			workspaceSidebarAutoSelectEnabled
-																		}
-																		busyWorkspaceIds={effectiveBusyWorkspaceIds}
-																		interactionRequiredWorkspaceIds={
-																			interactionRequiredWorkspaceIds
-																		}
-																		newWorkspaceShortcut={newWorkspaceShortcut}
-																		addRepositoryShortcut={
-																			addRepositoryShortcut
-																		}
-																		onSelectWorkspace={handleSelectWorkspace}
-																		onOpenNewWorkspace={
-																			handleOpenWorkspaceStart
-																		}
-																		onAddRepositoryNeedsStart={
-																			handleAddRepositoryNeedsStart
-																		}
-																		onMoveLocalToWorktree={
-																			handleMoveLocalToWorktree
-																		}
-																		pushWorkspaceToast={pushWorkspaceToast}
-																		onCollapseSidebar={() =>
-																			setSidebarCollapsed(true)
-																		}
-																		sidebarToggleShortcut={
-																			leftSidebarToggleShortcut
-																		}
-																		onOpenHistory={handleOpenHistory}
-																		historyActive={
-																			workspaceViewMode === "history"
-																		}
-																		onOpenKanban={handleOpenKanban}
-																		kanbanActive={
-																			workspaceViewMode === "kanban"
-																		}
-																		onOpenTasks={handleOpenTasks}
-																		tasksActive={workspaceViewMode === "tasks"}
-																	/>
-																}
-															/>
+															<div className="min-h-0 flex-1">
+																<WorkspacesSidebarContainer
+																	selectedWorkspaceId={
+																		workspaceViewMode === "start" ||
+																		workspaceViewMode === "history" ||
+																		workspaceViewMode === "kanban" ||
+																		workspaceViewMode === "tasks"
+																			? null
+																			: selectedWorkspaceId
+																	}
+																	autoSelectEnabled={
+																		workspaceSidebarAutoSelectEnabled
+																	}
+																	busyWorkspaceIds={effectiveBusyWorkspaceIds}
+																	interactionRequiredWorkspaceIds={
+																		interactionRequiredWorkspaceIds
+																	}
+																	newWorkspaceShortcut={newWorkspaceShortcut}
+																	addRepositoryShortcut={addRepositoryShortcut}
+																	onSelectWorkspace={handleSelectWorkspace}
+																	onOpenNewWorkspace={handleOpenWorkspaceStart}
+																	onAddRepositoryNeedsStart={
+																		handleAddRepositoryNeedsStart
+																	}
+																	onMoveLocalToWorktree={
+																		handleMoveLocalToWorktree
+																	}
+																	pushWorkspaceToast={pushWorkspaceToast}
+																	onCollapseSidebar={() =>
+																		setSidebarCollapsed(true)
+																	}
+																	sidebarToggleShortcut={
+																		leftSidebarToggleShortcut
+																	}
+																	onOpenHistory={handleOpenHistory}
+																	historyActive={
+																		workspaceViewMode === "history"
+																	}
+																	onOpenKanban={handleOpenKanban}
+																	kanbanActive={workspaceViewMode === "kanban"}
+																	onOpenTasks={handleOpenTasks}
+																	tasksActive={workspaceViewMode === "tasks"}
+																/>
+															</div>
 															<div className="absolute right-[12px] top-[6px] z-20 flex items-center gap-[2px]">
 																<AppUpdateButton status={appUpdateStatus} />
 															</div>
@@ -3875,7 +3898,12 @@ function AppShell({
 															)}
 															style={{ width: `${inspectorWidth}px` }}
 														>
-															{rightSidebarMode === "context" ? (
+															{rightSidebarMode === "search" ? (
+																<ContentSearchPanel
+																	workspaceRootPath={workspaceRootPath ?? null}
+																	onClose={handleCloseContentSearch}
+																/>
+															) : rightSidebarMode === "context" ? (
 																<WorkspaceStartContextSidebar
 																	repository={
 																		workspaceViewMode === "start"

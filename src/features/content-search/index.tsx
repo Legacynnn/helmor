@@ -23,10 +23,10 @@ interface Props {
 }
 
 /**
- * Push-view that replaces the workspace list in the left sidebar when
- * Cmd+Shift+F is active. State (query, collapsed groups) lives in
- * `ContentSearchStateProvider` and is preserved across toggle for the
- * lifetime of the workspace.
+ * Right-sidebar panel rendered when `rightSidebarMode === "search"`
+ * (toggled via Cmd+Shift+F). State (query, collapsed groups) lives in
+ * `ContentSearchStateProvider` and is preserved across mode switches for
+ * the lifetime of the workspace.
  */
 export function ContentSearchPanel({ workspaceRootPath, onClose }: Props) {
 	const controller = useContentSearchController();
