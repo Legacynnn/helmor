@@ -1,4 +1,4 @@
-import { FileIcon, TerminalIcon } from "lucide-react";
+import { TerminalIcon } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 import {
@@ -11,6 +11,7 @@ import {
 	CommandList,
 	CommandSeparator,
 } from "@/components/ui/command";
+import { FileIcon } from "@/features/file-browser/file-icon";
 import { useEditorActions } from "@/shell/editor-actions-context";
 
 import { useCommandRegistry } from "./hooks/use-command-registry";
@@ -118,11 +119,10 @@ export function CommandPaletteDialog({ workspaceRootPath }: Props) {
 									value={`recent:${r.absolutePath}`}
 									onSelect={() => handleRecentPick(r)}
 								>
-									<FileIcon className="size-4 opacity-60" />
-									<span className="truncate">{r.fileName}</span>
-									<span className="ml-auto truncate text-xs text-muted-foreground">
-										{r.relativePath}
-									</span>
+									<FileRow
+										fileName={r.fileName}
+										relativePath={r.relativePath}
+									/>
 								</CommandItem>
 							))}
 						</CommandGroup>
@@ -158,11 +158,7 @@ export function CommandPaletteDialog({ workspaceRootPath }: Props) {
 											value={`file:${hit.absolutePath}`}
 											onSelect={() => handleFilePick(hit)}
 										>
-											<FileIcon className="size-4 opacity-60" />
-											<span className="truncate">{hit.name}</span>
-											<span className="ml-auto truncate text-xs text-muted-foreground">
-												{splitPathDirectory(hit.path)}
-											</span>
+											<FileRow fileName={hit.name} relativePath={hit.path} />
 										</CommandItem>
 									))}
 								</CommandGroup>
@@ -181,15 +177,99 @@ export function CommandPaletteDialog({ workspaceRootPath }: Props) {
 							renderCommandGroups(filteredCommands, handleCommandPick)
 						))}
 				</CommandList>
+				<PaletteFooter mode={mode} />
 			</Command>
 		</CommandDialog>
 	);
 }
 
-function splitPathDirectory(path: string): string {
-	const idx = path.lastIndexOf("/");
-	if (idx < 0) return "";
-	return path.slice(0, idx);
+function PaletteFooter({ mode }: { mode: "files" | "commands" }) {
+	const selectLabel = mode === "commands" ? "Run" : "Open";
+	return (
+		<div className="flex shrink-0 items-center justify-between gap-3 border-t border-border/40 px-3 py-1.5 text-[10px] text-muted-foreground">
+			<div className="flex items-center gap-3">
+				<KbdHint keys={["↑", "↓"]} label="Navigate" />
+				<KbdHint keys={["↵"]} label={selectLabel} />
+				<KbdHint keys={["esc"]} label="Close" />
+			</div>
+			<span className="hidden sm:inline">
+				{mode === "commands" ? (
+					<>
+						Clear <kbd className="font-mono text-app-foreground">&gt;</kbd> for
+						files
+					</>
+				) : (
+					<>
+						Type <kbd className="font-mono text-app-foreground">&gt;</kbd> for
+						commands
+					</>
+				)}
+			</span>
+		</div>
+	);
+}
+
+function KbdHint({ keys, label }: { keys: string[]; label: string }) {
+	return (
+		<span className="flex items-center gap-1">
+			{keys.map((k) => (
+				<kbd
+					key={k}
+					className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-border/60 bg-muted/60 px-1 font-mono text-[10px] text-app-foreground"
+				>
+					{k}
+				</kbd>
+			))}
+			<span>{label}</span>
+		</span>
+	);
+}
+
+function FileRow({
+	fileName,
+	relativePath,
+}: {
+	fileName: string;
+	relativePath: string;
+}) {
+	const lastSlash = relativePath.lastIndexOf("/");
+	const directory = lastSlash >= 0 ? relativePath.slice(0, lastSlash) : "";
+	const extension = (() => {
+		const dot = fileName.lastIndexOf(".");
+		if (dot <= 0) return null;
+		return fileName.slice(dot + 1).toLowerCase();
+	})();
+	const segments = directory.length > 0 ? directory.split("/") : [];
+
+	return (
+		<>
+			<FileIcon name={fileName} kind="file" className="size-4" />
+			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+				<span className="truncate text-sm text-app-foreground group-data-selected/command-item:text-accent-foreground">
+					{fileName}
+				</span>
+				{segments.length > 0 && (
+					<span className="truncate text-[11px] text-muted-foreground/70 group-data-selected/command-item:text-accent-foreground/80">
+						{segments.map((seg, i) => (
+							<span key={`${seg}-${i}`}>
+								{i > 0 && (
+									<span className="mx-1 text-muted-foreground/40 group-data-selected/command-item:text-accent-foreground/50">
+										›
+									</span>
+								)}
+								{seg}
+							</span>
+						))}
+					</span>
+				)}
+			</div>
+			{extension && (
+				<span className="ml-2 shrink-0 rounded bg-muted/60 px-1.5 py-[1px] font-mono text-[10px] uppercase text-muted-foreground group-data-selected/command-item:bg-accent-foreground/15 group-data-selected/command-item:text-accent-foreground">
+					{extension}
+				</span>
+			)}
+		</>
+	);
 }
 
 function renderCommandGroups(

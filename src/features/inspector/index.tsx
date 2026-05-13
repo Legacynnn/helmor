@@ -12,6 +12,7 @@ import type {
 	CommitButtonState,
 	WorkspaceCommitButtonMode,
 } from "@/features/commit/button";
+import { getShortcut } from "@/features/shortcuts/registry";
 import { InlineShortcutDisplay } from "@/features/shortcuts/shortcut-display";
 import {
 	type ShortcutHandler,
@@ -533,11 +534,13 @@ export function WorkspaceInspectorSidebar({
 					</div>
 					<div className="flex shrink-0 items-center gap-0.5">
 						<SidebarHeaderButton
-							label="Search files"
-							shortcut={null}
+							label="Search in files"
+							shortcut={getShortcut(
+								appSettings.shortcuts,
+								"contentSearch.toggle",
+							)}
 							onClick={() => {
-								// TODO(search): wire to a workspace-wide file finder.
-								console.warn("[inspector] search: not yet implemented");
+								window.dispatchEvent(new Event("helmor:content-search-toggle"));
 							}}
 							icon={<Search className="size-4" strokeWidth={1.8} />}
 						/>
