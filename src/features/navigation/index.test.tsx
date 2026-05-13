@@ -57,6 +57,7 @@ describe("WorkspacesSidebar", () => {
 		const { rerender } = render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={workspaceGroups}
 					archivedRows={[]}
 					selectedWorkspaceId="workspace-1"
@@ -73,6 +74,7 @@ describe("WorkspacesSidebar", () => {
 		rerender(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={workspaceGroups}
 					archivedRows={[]}
 					selectedWorkspaceId="workspace-1"
@@ -91,6 +93,7 @@ describe("WorkspacesSidebar", () => {
 		render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={[
 						{
 							id: "progress",
@@ -115,6 +118,7 @@ describe("WorkspacesSidebar", () => {
 		const { container } = render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={workspaceGroups}
 					archivedRows={[]}
 					onOpenNewWorkspace={onOpenNewWorkspace}
@@ -140,6 +144,7 @@ describe("WorkspacesSidebar", () => {
 		render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={workspaceGroups}
 					archivedRows={[]}
 					onOpenInFinder={onOpenInFinder}
@@ -164,6 +169,7 @@ describe("WorkspacesSidebar", () => {
 		render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={workspaceGroups}
 					archivedRows={[archivedRow]}
 					selectedWorkspaceId={null}
@@ -190,7 +196,11 @@ describe("WorkspacesSidebar", () => {
 
 		const { container } = render(
 			<TestProviders>
-				<WorkspacesSidebar groups={emptyGroups} archivedRows={[]} />
+				<WorkspacesSidebar
+					initialViewMode="status"
+					groups={emptyGroups}
+					archivedRows={[]}
+				/>
 			</TestProviders>,
 		);
 
@@ -231,6 +241,7 @@ describe("WorkspacesSidebar", () => {
 		render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={groups}
 					archivedRows={[]}
 					onArchiveWorkspace={onArchiveWorkspace}
@@ -258,6 +269,7 @@ describe("WorkspacesSidebar", () => {
 		render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={workspaceGroups}
 					archivedRows={[]}
 					onArchiveWorkspace={onArchiveWorkspace}
@@ -289,6 +301,7 @@ describe("WorkspacesSidebar", () => {
 		const { unmount } = render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={collapsedGroups}
 					archivedRows={[]}
 					selectedWorkspaceId={null}
@@ -310,6 +323,7 @@ describe("WorkspacesSidebar", () => {
 		render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={collapsedGroups}
 					archivedRows={[]}
 					selectedWorkspaceId={null}
@@ -342,6 +356,7 @@ describe("WorkspacesSidebar", () => {
 		render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={groups}
 					archivedRows={[]}
 					selectedWorkspaceId="workspace-1"
@@ -377,6 +392,7 @@ describe("WorkspacesSidebar", () => {
 		const { rerender } = render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={groups}
 					archivedRows={[]}
 					selectedWorkspaceId="workspace-1"
@@ -398,6 +414,7 @@ describe("WorkspacesSidebar", () => {
 		rerender(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={[...groups.map((g) => ({ ...g, rows: [...g.rows] }))]}
 					archivedRows={[]}
 					selectedWorkspaceId="workspace-1"
@@ -432,6 +449,7 @@ describe("WorkspacesSidebar", () => {
 		const { rerender } = render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={initialGroups}
 					archivedRows={[]}
 					selectedWorkspaceId="ws-move"
@@ -467,6 +485,7 @@ describe("WorkspacesSidebar", () => {
 		rerender(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={afterMoveGroups}
 					archivedRows={[]}
 					selectedWorkspaceId="ws-move"
@@ -504,6 +523,7 @@ describe("WorkspacesSidebar", () => {
 		const { rerender } = render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={groups}
 					archivedRows={[]}
 					selectedWorkspaceId="workspace-1"
@@ -521,6 +541,7 @@ describe("WorkspacesSidebar", () => {
 		rerender(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={groups}
 					archivedRows={[]}
 					selectedWorkspaceId="ws-completed"
@@ -538,6 +559,7 @@ describe("WorkspacesSidebar", () => {
 		render(
 			<TestProviders>
 				<WorkspacesSidebar
+					initialViewMode="status"
 					groups={workspaceGroups}
 					archivedRows={[]}
 					onArchiveWorkspace={vi.fn()}
@@ -563,7 +585,7 @@ describe("WorkspacesSidebar", () => {
 			);
 		};
 
-		it("defaults to status mode and switches to repository mode on toggle", async () => {
+		it("defaults to repository mode and switches to status mode on toggle", async () => {
 			const user = userEvent.setup();
 			render(
 				<TestProviders>
@@ -599,21 +621,19 @@ describe("WorkspacesSidebar", () => {
 
 			expect(
 				screen.getByRole("button", { name: "Change sidebar grouping" }),
-			).toHaveTextContent("Status");
-			expect(screen.getByText("In Progress")).toBeInTheDocument();
-			expect(screen.queryByText("alpha")).toBeNull();
-
-			await openViewModeMenu(user);
-			await user.click(
-				screen.getByRole("menuitemradio", { name: /Workspaces/ }),
-			);
-
+			).toHaveTextContent("Workspaces");
 			expect(screen.getByText("alpha")).toBeInTheDocument();
 			expect(screen.getByText("bravo")).toBeInTheDocument();
 			expect(screen.getByText("Empty")).toBeInTheDocument();
+
+			await openViewModeMenu(user);
+			await user.click(screen.getByRole("menuitemradio", { name: /Status/ }));
+
+			expect(screen.getByText("In Progress")).toBeInTheDocument();
+			expect(screen.queryByText("alpha")).toBeNull();
 			expect(
 				screen.getByRole("button", { name: "Change sidebar grouping" }),
-			).toHaveTextContent("Workspaces");
+			).toHaveTextContent("Status");
 		});
 
 		it("collapses a repository when its header is clicked", async () => {

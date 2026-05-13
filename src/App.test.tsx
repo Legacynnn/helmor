@@ -32,6 +32,7 @@ describe("App", () => {
 	});
 
 	it("renders the sidebar shell with tooltips, avatars, archive actions, and collapsible groups", async () => {
+		const user = userEvent.setup();
 		const { container } = render(<App />);
 
 		// App boots with githubIdentityState = "checking" and flips to
@@ -40,6 +41,14 @@ describe("App", () => {
 		const shell = await screen.findByRole("main", {
 			name: "Application shell",
 		});
+
+		// Default view mode is "repositories" — switch to status mode so the
+		// remaining assertions can target the Done / In progress groups.
+		await user.click(
+			screen.getByRole("button", { name: "Change sidebar grouping" }),
+		);
+		await user.click(screen.getByRole("menuitemradio", { name: /Status/ }));
+
 		const sidebar = screen.getByLabelText("Workspace sidebar");
 		const inspector = screen.getByLabelText("Inspector sidebar");
 		const panel = screen.getByLabelText("Workspace panel");
@@ -344,7 +353,11 @@ describe("App", () => {
 		];
 
 		renderWithProviders(
-			<WorkspacesSidebar groups={groups} archivedRows={[]} />,
+			<WorkspacesSidebar
+				initialViewMode="status"
+				groups={groups}
+				archivedRows={[]}
+			/>,
 		);
 
 		const workspaceRow = screen.getByRole("button", {
@@ -362,6 +375,7 @@ describe("App", () => {
 
 		renderWithProviders(
 			<WorkspacesSidebar
+				initialViewMode="status"
 				groups={[]}
 				archivedRows={[
 					{
@@ -387,6 +401,7 @@ describe("App", () => {
 
 		renderWithProviders(
 			<WorkspacesSidebar
+				initialViewMode="status"
 				groups={[
 					{
 						id: "progress",
@@ -418,6 +433,7 @@ describe("App", () => {
 
 		renderWithProviders(
 			<WorkspacesSidebar
+				initialViewMode="status"
 				groups={[]}
 				archivedRows={[]}
 				onOpenNewWorkspace={onOpenNewWorkspace}
@@ -437,6 +453,7 @@ describe("App", () => {
 
 		renderWithProviders(
 			<WorkspacesSidebar
+				initialViewMode="status"
 				groups={[
 					{
 						id: "progress",
@@ -472,6 +489,7 @@ describe("App", () => {
 
 		renderWithProviders(
 			<WorkspacesSidebar
+				initialViewMode="status"
 				groups={[
 					{
 						id: "progress",
@@ -505,6 +523,7 @@ describe("App", () => {
 	it("uses unread emphasis without treating ready rows as selected", () => {
 		renderWithProviders(
 			<WorkspacesSidebar
+				initialViewMode="status"
 				groups={[
 					{
 						id: "progress",
@@ -580,6 +599,7 @@ describe("App", () => {
 		];
 		const { rerender } = renderWithProviders(
 			<WorkspacesSidebar
+				initialViewMode="status"
 				groups={groups}
 				archivedRows={[]}
 				selectedWorkspaceId="review-workspace"
@@ -594,6 +614,7 @@ describe("App", () => {
 
 		rerender(
 			<WorkspacesSidebar
+				initialViewMode="status"
 				groups={groups}
 				archivedRows={[]}
 				selectedWorkspaceId="progress-workspace"
@@ -618,11 +639,16 @@ describe("App", () => {
 		];
 
 		const { rerender } = renderWithProviders(
-			<WorkspacesSidebar groups={[]} archivedRows={archivedRows} />,
+			<WorkspacesSidebar
+				initialViewMode="status"
+				groups={[]}
+				archivedRows={archivedRows}
+			/>,
 		);
 
 		rerender(
 			<WorkspacesSidebar
+				initialViewMode="status"
 				groups={[]}
 				archivedRows={archivedRows}
 				selectedWorkspaceId="archived-workspace"
@@ -642,6 +668,7 @@ describe("App", () => {
 
 		renderWithProviders(
 			<WorkspacesSidebar
+				initialViewMode="status"
 				groups={[]}
 				archivedRows={[
 					{
@@ -672,6 +699,7 @@ describe("App", () => {
 
 		renderWithProviders(
 			<WorkspacesSidebar
+				initialViewMode="status"
 				groups={[
 					{
 						id: "progress",

@@ -169,7 +169,7 @@ export function DetailScreen({
 				: "task";
 
 	return (
-		<article className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-y-auto px-4 [contain:content] [scrollbar-gutter:stable]">
+		<article className="mx-auto flex h-full w-full max-w-screen-2xl flex-col overflow-y-auto px-6 [contain:content] [scrollbar-gutter:stable]">
 			<header className="shrink-0 py-1.5">
 				<div className="flex min-w-0 items-center justify-between gap-4">
 					<div className="flex min-w-0 flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
@@ -442,7 +442,7 @@ function DetailActions({
 
 function MarkdownBody({ body }: { body: string }) {
 	return (
-		<div className="conversation-markdown max-w-3xl break-words text-[13px] leading-6 text-foreground after:block after:h-24 after:content-['']">
+		<div className="conversation-markdown max-w-4xl break-words text-[13px] leading-6 text-foreground after:block after:h-24 after:content-['']">
 			<Suspense
 				fallback={
 					<div className="conversation-streamdown whitespace-pre-wrap break-words">
