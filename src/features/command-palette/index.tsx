@@ -119,11 +119,10 @@ export function CommandPaletteDialog({ workspaceRootPath }: Props) {
 									value={`recent:${r.absolutePath}`}
 									onSelect={() => handleRecentPick(r)}
 								>
-									<FileIcon name={r.fileName} kind="file" className="size-4" />
-									<span className="truncate">{r.fileName}</span>
-									<span className="ml-auto truncate text-xs text-muted-foreground">
-										{r.relativePath}
-									</span>
+									<FileRow
+										fileName={r.fileName}
+										relativePath={r.relativePath}
+									/>
 								</CommandItem>
 							))}
 						</CommandGroup>
@@ -159,15 +158,7 @@ export function CommandPaletteDialog({ workspaceRootPath }: Props) {
 											value={`file:${hit.absolutePath}`}
 											onSelect={() => handleFilePick(hit)}
 										>
-											<FileIcon
-												name={hit.name}
-												kind="file"
-												className="size-4"
-											/>
-											<span className="truncate">{hit.name}</span>
-											<span className="ml-auto truncate text-xs text-muted-foreground">
-												{splitPathDirectory(hit.path)}
-											</span>
+											<FileRow fileName={hit.name} relativePath={hit.path} />
 										</CommandItem>
 									))}
 								</CommandGroup>
@@ -234,10 +225,47 @@ function KbdHint({ keys, label }: { keys: string[]; label: string }) {
 	);
 }
 
-function splitPathDirectory(path: string): string {
-	const idx = path.lastIndexOf("/");
-	if (idx < 0) return "";
-	return path.slice(0, idx);
+function FileRow({
+	fileName,
+	relativePath,
+}: {
+	fileName: string;
+	relativePath: string;
+}) {
+	const lastSlash = relativePath.lastIndexOf("/");
+	const directory = lastSlash >= 0 ? relativePath.slice(0, lastSlash) : "";
+	const extension = (() => {
+		const dot = fileName.lastIndexOf(".");
+		if (dot <= 0) return null;
+		return fileName.slice(dot + 1).toLowerCase();
+	})();
+	const segments = directory.length > 0 ? directory.split("/") : [];
+
+	return (
+		<>
+			<FileIcon name={fileName} kind="file" className="size-4" />
+			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+				<span className="truncate text-sm text-app-foreground">{fileName}</span>
+				{segments.length > 0 && (
+					<span className="truncate text-[11px] text-muted-foreground/70">
+						{segments.map((seg, i) => (
+							<span key={`${seg}-${i}`}>
+								{i > 0 && (
+									<span className="mx-1 text-muted-foreground/40">›</span>
+								)}
+								{seg}
+							</span>
+						))}
+					</span>
+				)}
+			</div>
+			{extension && (
+				<span className="ml-2 shrink-0 rounded bg-muted/60 px-1.5 py-[1px] font-mono text-[10px] uppercase text-muted-foreground">
+					{extension}
+				</span>
+			)}
+		</>
+	);
 }
 
 function renderCommandGroups(
