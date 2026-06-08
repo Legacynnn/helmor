@@ -1,8 +1,11 @@
+import { useRef } from "react";
 import type {
 	DashboardColumn,
 	DashboardColumnId,
 } from "./hooks/use-dashboard-board";
 import { WorkspaceKanbanCard } from "./kanban-card";
+
+const DRAG_MIME = "text/workspace-id";
 
 export type MoveWorkspaceArgs = {
 	workspaceId: string;
@@ -23,7 +26,11 @@ export function DashboardScreen({
 	runningWorkspaceIds,
 	totalRunning,
 	onOpenWorkspace,
+	onMoveWorkspace,
 }: Props) {
+	// jsdom's DataTransfer is minimal, so we keep a ref fallback for the dragged
+	// id; real browsers round-trip it through dataTransfer.
+	const draggingIdRef = useRef<string | null>(null);
 	const total = columns.reduce((n, c) => n + c.rows.length, 0);
 	return (
 		<div aria-label="Dashboard screen" className="flex min-h-0 flex-1 flex-col">
@@ -45,6 +52,20 @@ export function DashboardScreen({
 						key={column.id}
 						aria-label={`${column.label} column`}
 						className="flex w-72 shrink-0 flex-col rounded-lg bg-muted/40"
+						onDragOver={(e) => e.preventDefault()}
+						onDrop={(e) => {
+							e.preventDefault();
+							const workspaceId =
+								e.dataTransfer.getData(DRAG_MIME) || draggingIdRef.current;
+							draggingIdRef.current = null;
+							if (workspaceId) {
+								onMoveWorkspace({
+									workspaceId,
+									targetColumnId: column.id,
+									beforeWorkspaceId: null,
+								});
+							}
+						}}
 					>
 						<div className="flex items-center justify-between px-3 py-2 font-medium text-muted-foreground text-xs">
 							<span>{column.label}</span>
@@ -57,12 +78,24 @@ export function DashboardScreen({
 								</div>
 							) : (
 								column.rows.map((row) => (
-									<WorkspaceKanbanCard
+									<div
 										key={row.id}
-										row={row}
-										running={runningWorkspaceIds.has(row.id)}
-										onOpen={onOpenWorkspace}
-									/>
+										draggable
+										onDragStart={(e) => {
+											draggingIdRef.current = row.id;
+											e.dataTransfer.setData(DRAG_MIME, row.id);
+											e.dataTransfer.effectAllowed = "move";
+										}}
+										onDragEnd={() => {
+											draggingIdRef.current = null;
+										}}
+									>
+										<WorkspaceKanbanCard
+											row={row}
+											running={runningWorkspaceIds.has(row.id)}
+											onOpen={onOpenWorkspace}
+										/>
+									</div>
 								))
 							)}
 						</div>

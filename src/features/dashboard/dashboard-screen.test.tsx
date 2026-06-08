@@ -77,4 +77,28 @@ describe("DashboardScreen", () => {
 		fireEvent.click(screen.getByRole("button", { name: "a" }));
 		expect(onOpen).toHaveBeenCalledWith("a");
 	});
+
+	it("calls onMoveWorkspace with the target column id on drop", () => {
+		const onMove = vi.fn();
+		render(
+			<DashboardScreen
+				columns={columns}
+				runningWorkspaceIds={new Set()}
+				totalRunning={0}
+				onOpenWorkspace={() => {}}
+				onMoveWorkspace={onMove}
+			/>,
+		);
+		const card = screen.getByRole("button", { name: "a" });
+		const target = screen.getByLabelText("Done column");
+		fireEvent.dragStart(card, {
+			dataTransfer: { setData: () => {}, getData: () => "a" },
+		});
+		fireEvent.drop(target, { dataTransfer: { getData: () => "a" } });
+		expect(onMove).toHaveBeenCalledWith({
+			workspaceId: "a",
+			targetColumnId: "done",
+			beforeWorkspaceId: null,
+		});
+	});
 });
