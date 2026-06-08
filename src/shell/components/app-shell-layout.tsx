@@ -8,9 +8,14 @@
 import type { ComponentProps, KeyboardEvent, PointerEvent } from "react";
 import { FeedbackDialog } from "@/features/feedback";
 import type { WorkspaceDetail } from "@/lib/api";
+import type {
+	ActiveScreen,
+	ScreenActions,
+} from "@/shell/controllers/use-screen-controller";
 import type { ShellViewMode } from "@/shell/controllers/use-selection-controller";
 import { AppOverlays } from "./app-overlays";
 import { AppShellProviderStack } from "./app-shell-provider-stack";
+import { ScreenHost } from "./screen-host";
 import { ShellInspectorPane } from "./shell-inspector-pane";
 import { ShellResizeSeparator } from "./shell-resize-separator";
 import { ShellSidebarPane } from "./shell-sidebar-pane";
@@ -27,6 +32,8 @@ type Props = {
 		typeof FeedbackDialog
 	>["onSubmitPrompt"];
 	workspaceViewMode: ShellViewMode;
+	activeScreen: ActiveScreen;
+	screenActions: ScreenActions;
 	// Left sidebar + its resize separator.
 	sidebar: ComponentProps<typeof ShellSidebarPane>;
 	sidebarCollapsed: boolean;
@@ -57,6 +64,7 @@ export function AppShellLayout({
 	onOpenSettings,
 	onSubmitFeedbackPrompt,
 	workspaceViewMode,
+	activeScreen,
 	sidebar,
 	sidebarCollapsed,
 	isSidebarResizing,
@@ -109,9 +117,14 @@ export function AppShellLayout({
 						</>
 					)}
 
-					<WorkspacePaneSurface {...workspacePane} />
+					{activeScreen === "none" ? (
+						<WorkspacePaneSurface {...workspacePane} />
+					) : (
+						<ScreenHost activeScreen={activeScreen} />
+					)}
 
-					{rightSidebarAvailable &&
+					{activeScreen === "none" &&
+						rightSidebarAvailable &&
 						selectedWorkspaceDetail?.mode !== "chat" && (
 							<>
 								<ShellResizeSeparator

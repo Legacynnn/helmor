@@ -8,6 +8,7 @@
 // groups).
 import { useMemo } from "react";
 import type { SettingsSection } from "@/features/settings";
+import { useScreenController } from "@/shell/controllers/use-screen-controller";
 import { useAppShellState } from "@/shell/hooks/use-app-shell-state";
 import { AppShellLayout } from "./app-shell-layout";
 import { WorkspaceHeaderActions } from "./workspace-header-actions";
@@ -24,6 +25,7 @@ export function AppShell({
 }) {
 	const s = useAppShellState({ onOpenSettings });
 	const { sel, data, chrome, panels } = s;
+	const screen = useScreenController();
 	const selectedWorkspaceId = sel.selection.selectedWorkspaceId;
 	const selectedSessionId = sel.selection.selectedSessionId;
 	const inspectorCollapsed = sel.contextPanel.inspectorCollapsed;
@@ -104,7 +106,11 @@ export function AppShell({
 			onOpenSettings={data.handleOpenSettings}
 			onSubmitFeedbackPrompt={data.submitFeedbackPrompt}
 			workspaceViewMode={sel.selection.viewMode}
+			activeScreen={screen.activeScreen}
+			screenActions={screen.screenActions}
 			sidebar={{
+				activeScreen: screen.activeScreen,
+				screenActions: screen.screenActions,
 				collapsed: panels.sidebarCollapsed,
 				resizing: panels.isSidebarResizing,
 				width: panels.sidebarWidth,
