@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { toast } from "sonner";
 import { moveWorkspaceInSidebar } from "@/lib/api";
 import type { ScreenActions } from "@/shell/controllers/use-screen-controller";
 import type { SelectionActions } from "@/shell/controllers/use-selection-controller";
@@ -23,11 +24,17 @@ export function DashboardContainer({ selectionActions, screenActions }: Props) {
 
 	const onMoveWorkspace = useCallback((args: MoveWorkspaceArgs) => {
 		// targetColumnId equals the backend status group id ("progress" | ...).
-		void moveWorkspaceInSidebar(
+		// The UI-sync bridge invalidates the board on success; on failure the
+		// card snaps back via that same invalidation, so we only surface a toast.
+		moveWorkspaceInSidebar(
 			args.workspaceId,
 			args.targetColumnId,
 			args.beforeWorkspaceId,
-		);
+		).catch((error) => {
+			toast.error("Couldn't move workspace", {
+				description: error instanceof Error ? error.message : String(error),
+			});
+		});
 	}, []);
 
 	return (

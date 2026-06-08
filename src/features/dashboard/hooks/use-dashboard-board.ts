@@ -60,7 +60,11 @@ export function buildDashboardColumns(
 				r.status ?? groupStatus,
 				null,
 			);
-			buckets[columnId as DashboardColumnId].push(r);
+			// Guard the cast: if a future group id ever falls outside the five
+			// status columns, skip it rather than crash on `undefined.push`.
+			if (columnId in buckets) {
+				buckets[columnId as DashboardColumnId].push(r);
+			}
 		}
 	}
 	return DASHBOARD_COLUMNS.map((c) => ({ ...c, rows: buckets[c.id] }));
