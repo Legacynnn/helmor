@@ -50,6 +50,31 @@ describe("WorkspaceKanbanCard", () => {
 		expect(screen.getByText(/#42/)).toBeInTheDocument();
 	});
 
+	it("parses a GitLab merge-request number for the PR badge", () => {
+		render(
+			<WorkspaceKanbanCard
+				row={row({
+					prSyncState: "open",
+					prUrl: "https://gitlab.com/g/p/-/merge_requests/456",
+				})}
+				running={false}
+				onOpen={() => {}}
+			/>,
+		);
+		expect(screen.getByText(/#456/)).toBeInTheDocument();
+	});
+
+	it("omits the branch line when the row has no branch", () => {
+		render(
+			<WorkspaceKanbanCard
+				row={row({ branch: null })}
+				running={false}
+				onOpen={() => {}}
+			/>,
+		);
+		expect(screen.queryByText("fix/login")).not.toBeInTheDocument();
+	});
+
 	it("calls onOpen with the workspace id when clicked", () => {
 		const onOpen = vi.fn();
 		render(<WorkspaceKanbanCard row={row()} running={false} onOpen={onOpen} />);

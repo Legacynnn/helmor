@@ -11,7 +11,9 @@ type Props = {
 
 function prNumber(prUrl: string | null | undefined): string | null {
 	if (!prUrl) return null;
-	const m = prUrl.match(/\/(\d+)(?:$|[?#])/);
+	// Grab the last numeric path segment — covers GitHub `/pull/42` and
+	// GitLab `/-/merge_requests/456`, with or without a trailing slash.
+	const m = prUrl.match(/\/(\d+)\/?(?:$|[?#])/);
 	return m ? `#${m[1]}` : null;
 }
 
