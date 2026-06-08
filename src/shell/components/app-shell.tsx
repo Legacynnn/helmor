@@ -107,7 +107,6 @@ export function AppShell({
 			onSubmitFeedbackPrompt={data.submitFeedbackPrompt}
 			workspaceViewMode={sel.selection.viewMode}
 			activeScreen={screen.activeScreen}
-			screenActions={screen.screenActions}
 			sidebar={{
 				activeScreen: screen.activeScreen,
 				screenActions: screen.screenActions,

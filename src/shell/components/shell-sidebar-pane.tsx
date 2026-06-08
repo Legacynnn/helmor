@@ -9,6 +9,7 @@ import {
 import { useLayoutEffect, useRef } from "react";
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import { TrafficLightSpacer } from "@/components/chrome/traffic-light-spacer";
 import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
@@ -188,6 +189,10 @@ export function ShellSidebarPane({
 							: "translate-x-0 opacity-100",
 					)}
 				>
+					<div className="flex h-9 shrink-0 items-center pr-3 max-[960px]:hidden">
+						<TrafficLightSpacer side="left" width={94} />
+						<div data-tauri-drag-region className="h-full flex-1" />
+					</div>
 					<nav aria-label="Screens" className="flex flex-col gap-0.5 px-2 pb-2">
 						{SCREEN_NAV_ITEMS.map(({ id, label, Icon }) => {
 							const active = activeScreen === id;

@@ -8,10 +8,7 @@
 import type { ComponentProps, KeyboardEvent, PointerEvent } from "react";
 import { FeedbackDialog } from "@/features/feedback";
 import type { WorkspaceDetail } from "@/lib/api";
-import type {
-	ActiveScreen,
-	ScreenActions,
-} from "@/shell/controllers/use-screen-controller";
+import type { ActiveScreen } from "@/shell/controllers/use-screen-controller";
 import type { ShellViewMode } from "@/shell/controllers/use-selection-controller";
 import { AppOverlays } from "./app-overlays";
 import { AppShellProviderStack } from "./app-shell-provider-stack";
@@ -33,7 +30,6 @@ type Props = {
 	>["onSubmitPrompt"];
 	workspaceViewMode: ShellViewMode;
 	activeScreen: ActiveScreen;
-	screenActions: ScreenActions;
 	// Left sidebar + its resize separator.
 	sidebar: ComponentProps<typeof ShellSidebarPane>;
 	sidebarCollapsed: boolean;
