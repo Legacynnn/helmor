@@ -25,7 +25,7 @@ export function WorkspaceKanbanCard({ row, running, onOpen }: Props) {
 			type="button"
 			aria-label={row.title}
 			onClick={() => onOpen(row.id)}
-			className="flex w-full cursor-pointer flex-col gap-1.5 rounded-md border border-app-border/60 bg-app-base p-2.5 text-left transition-colors hover:border-app-border hover:bg-app-accent/5"
+			className="flex w-full cursor-pointer flex-col gap-1.5 rounded-md border border-border/60 bg-card p-2.5 text-left transition-colors hover:border-border hover:bg-accent/50"
 		>
 			<div className="flex items-start gap-2">
 				<WorkspaceAvatar
@@ -35,7 +35,7 @@ export function WorkspaceKanbanCard({ row, running, onOpen }: Props) {
 					title={row.title}
 					className="size-4 shrink-0"
 				/>
-				<span className="min-w-0 flex-1 truncate text-sm font-medium text-app-foreground">
+				<span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
 					{row.title}
 				</span>
 				{running && (
@@ -46,11 +46,11 @@ export function WorkspaceKanbanCard({ row, running, onOpen }: Props) {
 				{row.hasUnread && !running && (
 					<span
 						aria-label="Unread"
-						className="mt-1 size-1.5 shrink-0 rounded-full bg-app-accent"
+						className="mt-1 size-1.5 shrink-0 rounded-full bg-primary"
 					/>
 				)}
 			</div>
-			<div className="flex items-center gap-2 text-xs text-app-foreground/55">
+			<div className="flex items-center gap-2 text-muted-foreground text-xs">
 				{row.branch && <span className="truncate">{row.branch}</span>}
 				{pr && (
 					<span

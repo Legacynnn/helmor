@@ -206,8 +206,8 @@ export function ShellSidebarPane({
 									variant="ghost"
 									aria-current={active ? "page" : undefined}
 									className={cn(
-										"h-8 w-full justify-start gap-2 px-2 text-sm font-medium text-app-foreground/70 hover:text-app-foreground",
-										active && "bg-app-accent/15 text-app-foreground",
+										"h-8 w-full justify-start gap-2 px-2 font-medium text-muted-foreground text-sm hover:text-foreground",
+										active && "bg-accent text-accent-foreground",
 									)}
 									onClick={() => screenActions.setActiveScreen(id)}
 								>
