@@ -116,7 +116,11 @@ export function AppShellLayout({
 					{activeScreen === "none" ? (
 						<WorkspacePaneSurface {...workspacePane} />
 					) : (
-						<ScreenHost activeScreen={activeScreen} />
+						<ScreenHost
+							activeScreen={activeScreen}
+							selectionActions={workspacePane.selectionActions}
+							screenActions={sidebar.screenActions}
+						/>
 					)}
 
 					{activeScreen === "none" &&
