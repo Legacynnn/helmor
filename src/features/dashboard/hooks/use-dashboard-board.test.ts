@@ -13,10 +13,10 @@ describe("buildDashboardColumns", () => {
 	it("produces the 5 status columns in fixed order", () => {
 		const cols = buildDashboardColumns([]);
 		expect(cols.map((c) => c.id)).toEqual([
+			"backlog",
 			"progress",
 			"review",
 			"done",
-			"backlog",
 			"canceled",
 		]);
 		expect(DASHBOARD_COLUMNS.length).toBe(5);

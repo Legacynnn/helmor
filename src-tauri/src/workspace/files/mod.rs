@@ -1,4 +1,5 @@
 mod changes;
+mod diff_stats;
 mod editor;
 mod support;
 mod types;
@@ -7,6 +8,7 @@ pub use changes::{
     discard_workspace_file, list_workspace_changes, list_workspace_changes_for_workspace,
     stage_workspace_file, unstage_workspace_file,
 };
+pub use diff_stats::{list_workspace_diff_stats, WorkspaceDiffStat};
 pub use editor::{
     list_editor_files, list_workspace_files, read_editor_file, read_file_at_ref, stat_editor_file,
     write_editor_file,

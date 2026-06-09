@@ -1,8 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
-import type { WorkspaceGroup, WorkspaceRow } from "@/lib/api";
+import {
+	Ban,
+	CheckCircle2,
+	CircleDashed,
+	GitPullRequestArrow,
+	LoaderCircle,
+	type LucideIcon,
+} from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import type {
+	WorkspaceDiffStat,
+	WorkspaceGroup,
+	WorkspaceRow,
+} from "@/lib/api";
 import {
 	activeStreamsQueryOptions,
+	workspaceDiffStatsQueryOptions,
 	workspaceGroupsQueryOptions,
 } from "@/lib/query-client";
 import {
@@ -13,6 +26,12 @@ import {
 	workspaceGroupIdFromStatus,
 	workspaceStatusFromGroupId,
 } from "@/lib/workspace-helpers";
+import { loadColumnFilter, saveColumnFilter } from "./column-filter-storage";
+import {
+	loadRepoFilter,
+	type RepoOption,
+	saveRepoFilter,
+} from "./repo-filter-storage";
 
 export type DashboardColumnId =
 	| "progress"
@@ -21,20 +40,39 @@ export type DashboardColumnId =
 	| "backlog"
 	| "canceled";
 
-export const DASHBOARD_COLUMNS: ReadonlyArray<{
+/** Semantic tone key per column — mapped to concrete Tailwind classes in the
+ *  view layer (`column-tone.ts`). Kept abstract here so the hook stays about
+ *  data, not styling. */
+export type DashboardColumnTone =
+	| "progress"
+	| "review"
+	| "done"
+	| "backlog"
+	| "canceled";
+
+export type DashboardColumnMeta = {
 	id: DashboardColumnId;
 	label: string;
-}> = [
-	{ id: "progress", label: "In progress" },
-	{ id: "review", label: "Review" },
-	{ id: "done", label: "Done" },
-	{ id: "backlog", label: "Backlog" },
-	{ id: "canceled", label: "Canceled" },
+	icon: LucideIcon;
+	tone: DashboardColumnTone;
+};
+
+export const DASHBOARD_COLUMNS: ReadonlyArray<DashboardColumnMeta> = [
+	{ id: "backlog", label: "Backlog", icon: CircleDashed, tone: "backlog" },
+	{
+		id: "progress",
+		label: "In progress",
+		icon: LoaderCircle,
+		tone: "progress",
+	},
+	{ id: "review", label: "Review", icon: GitPullRequestArrow, tone: "review" },
+	{ id: "done", label: "Done", icon: CheckCircle2, tone: "done" },
+	{ id: "canceled", label: "Canceled", icon: Ban, tone: "canceled" },
 ];
 
-export type DashboardColumn = {
-	id: DashboardColumnId;
-	label: string;
+const DASHBOARD_COLUMN_IDS = DASHBOARD_COLUMNS.map((c) => c.id);
+
+export type DashboardColumn = DashboardColumnMeta & {
 	rows: WorkspaceRow[];
 };
 
@@ -70,14 +108,101 @@ export function buildDashboardColumns(
 	return DASHBOARD_COLUMNS.map((c) => ({ ...c, rows: buckets[c.id] }));
 }
 
+/** Distinct repos present across the board, sorted by display name. The filter
+ *  list is derived from the rows themselves so it always matches what's on the
+ *  board (repos with zero workspaces have nothing to show anyway). */
+export function deriveRepoOptions(columns: DashboardColumn[]): RepoOption[] {
+	const byId = new Map<string, RepoOption>();
+	for (const column of columns) {
+		for (const row of column.rows) {
+			if (!row.repoId || byId.has(row.repoId)) continue;
+			byId.set(row.repoId, {
+				id: row.repoId,
+				name: row.repoName ?? row.repoId,
+				iconSrc: row.repoIconSrc ?? null,
+				initials: row.repoInitials ?? null,
+			});
+		}
+	}
+	return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Keep only rows whose repo is selected. An empty selection means "all repos",
+ *  so the board renders unchanged until the user narrows it. */
+function filterColumnsByRepo(
+	columns: DashboardColumn[],
+	selected: ReadonlySet<string>,
+): DashboardColumn[] {
+	if (selected.size === 0) return columns;
+	return columns.map((c) => ({
+		...c,
+		rows: c.rows.filter((r) => r.repoId && selected.has(r.repoId)),
+	}));
+}
+
+function filterColumnsByStatus(
+	columns: DashboardColumn[],
+	visible: ReadonlySet<DashboardColumnId>,
+): DashboardColumn[] {
+	return columns.filter((c) => visible.has(c.id));
+}
+
 export function useDashboardBoard() {
 	const groupsQuery = useQuery(workspaceGroupsQueryOptions());
 	const streamsQuery = useQuery(activeStreamsQueryOptions());
+	const diffStatsQuery = useQuery(workspaceDiffStatsQueryOptions());
 
-	const columns = useMemo(
+	const [selectedRepoIds, setSelectedRepoIdsState] = useState<Set<string>>(() =>
+		loadRepoFilter(),
+	);
+	const [visibleColumnIds, setVisibleColumnIdsState] = useState<
+		Set<DashboardColumnId>
+	>(() => loadColumnFilter(DASHBOARD_COLUMN_IDS));
+
+	const allColumns = useMemo(
 		() => buildDashboardColumns(groupsQuery.data ?? []),
 		[groupsQuery.data],
 	);
+
+	const repos = useMemo(() => deriveRepoOptions(allColumns), [allColumns]);
+
+	// Prune selections for repos that no longer exist so the persisted set can't
+	// drift into stale ids that silently hide everything.
+	const effectiveSelection = useMemo(() => {
+		if (selectedRepoIds.size === 0) return selectedRepoIds;
+		const live = new Set(repos.map((r) => r.id));
+		const pruned = new Set([...selectedRepoIds].filter((id) => live.has(id)));
+		return pruned.size === selectedRepoIds.size ? selectedRepoIds : pruned;
+	}, [selectedRepoIds, repos]);
+
+	const columns = useMemo(
+		() =>
+			filterColumnsByStatus(
+				filterColumnsByRepo(allColumns, effectiveSelection),
+				visibleColumnIds,
+			),
+		[allColumns, effectiveSelection, visibleColumnIds],
+	);
+
+	const setSelectedRepoIds = useCallback((next: Set<string>) => {
+		setSelectedRepoIdsState(next);
+		saveRepoFilter(next);
+	}, []);
+
+	const setVisibleColumnIds = useCallback((next: Set<DashboardColumnId>) => {
+		const normalized =
+			next.size > 0 ? next : new Set<DashboardColumnId>(DASHBOARD_COLUMN_IDS);
+		setVisibleColumnIdsState(normalized);
+		saveColumnFilter(normalized, DASHBOARD_COLUMN_IDS);
+	}, []);
+
+	const diffStats = useMemo(() => {
+		const map = new Map<string, WorkspaceDiffStat>();
+		for (const stat of diffStatsQuery.data ?? []) {
+			map.set(stat.workspaceId, stat);
+		}
+		return map as ReadonlyMap<string, WorkspaceDiffStat>;
+	}, [diffStatsQuery.data]);
 
 	const runningWorkspaceIds = useMemo(
 		() =>
@@ -94,5 +219,16 @@ export function useDashboardBoard() {
 		return n;
 	}, [columns, runningWorkspaceIds]);
 
-	return { columns, runningWorkspaceIds, totalRunning };
+	return {
+		columns,
+		runningWorkspaceIds,
+		totalRunning,
+		diffStats,
+		repos,
+		selectedRepoIds: effectiveSelection,
+		setSelectedRepoIds,
+		visibleColumnIds,
+		setVisibleColumnIds,
+		columnOptions: DASHBOARD_COLUMNS,
+	};
 }
