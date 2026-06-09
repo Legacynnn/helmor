@@ -48,6 +48,11 @@ pub async fn list_workspace_changes(
 }
 
 #[tauri::command]
+pub async fn list_workspace_diff_stats() -> CmdResult<Vec<editor_files::WorkspaceDiffStat>> {
+    run_blocking(editor_files::list_workspace_diff_stats).await
+}
+
+#[tauri::command]
 pub async fn discard_workspace_file(
     workspace_root_path: String,
     relative_path: String,

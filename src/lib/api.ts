@@ -2780,6 +2780,28 @@ export async function listWorkspaceChanges(
 	}
 }
 
+/** Aggregate diff size for one workspace vs. its target branch, including
+ *  uncommitted working-tree edits. Powers the dashboard kanban card footer. */
+export type WorkspaceDiffStat = {
+	workspaceId: string;
+	insertions: number;
+	deletions: number;
+	filesChanged: number;
+};
+
+/** Per-workspace diff stats for the whole board. Cheap (one git diff each) and
+ *  fetched only while the dashboard is mounted, so it never touches the hot
+ *  sidebar path. Failures per workspace degrade to a zeroed entry server-side. */
+export async function listWorkspaceDiffStats(): Promise<WorkspaceDiffStat[]> {
+	try {
+		return await invoke<WorkspaceDiffStat[]>("list_workspace_diff_stats");
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to load workspace diff stats."),
+		);
+	}
+}
+
 export async function discardWorkspaceFile(
 	workspaceRootPath: string,
 	relativePath: string,

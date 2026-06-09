@@ -30,6 +30,7 @@ import {
 	listSlashCommands,
 	listWorkspaceCandidateDirectories,
 	listWorkspaceChanges,
+	listWorkspaceDiffStats,
 	listWorkspaceFiles,
 	listWorkspaceLinkedDirectories,
 	loadAgentModelSections,
@@ -65,6 +66,7 @@ const PERSIST_GC_TIME = 24 * 60 * 60_000; // 24h — persisted entries live this
 
 export const helmorQueryKeys = {
 	workspaceGroups: ["workspaceGroups"] as const,
+	workspaceDiffStats: ["workspaceDiffStats"] as const,
 	archivedWorkspaces: ["archivedWorkspaces"] as const,
 	repositories: ["repositories"] as const,
 	agentModelSections: ["agentModelSections"] as const,
@@ -364,6 +366,22 @@ export function activeStreamsQueryOptions() {
 		initialData: [],
 		initialDataUpdatedAt: 0,
 		staleTime: 0,
+	});
+}
+
+/** Per-workspace aggregate diff stats for the dashboard kanban cards. Each
+ *  entry is a single git diff server-side, so this is kept off the sidebar's
+ *  `workspaceGroups` query and fetched only while the board is mounted. Refetched
+ *  periodically so card footers track edits without manual invalidation. */
+export function workspaceDiffStatsQueryOptions() {
+	return queryOptions({
+		queryKey: helmorQueryKeys.workspaceDiffStats,
+		queryFn: listWorkspaceDiffStats,
+		initialData: [],
+		initialDataUpdatedAt: 0,
+		staleTime: 15_000,
+		refetchInterval: 30_000,
+		refetchOnWindowFocus: true,
 	});
 }
 

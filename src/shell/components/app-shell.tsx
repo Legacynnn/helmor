@@ -6,8 +6,9 @@
 // P1-A note below. Lifted verbatim out of App.tsx; the bag assembly reads off
 // the `useAppShellState` result (`s` + its `sel` / `data` / `chrome` / `panels`
 // groups).
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import type { SettingsSection } from "@/features/settings";
+import { useScreenController } from "@/shell/controllers/use-screen-controller";
 import { useAppShellState } from "@/shell/hooks/use-app-shell-state";
 import { AppShellLayout } from "./app-shell-layout";
 import { WorkspaceHeaderActions } from "./workspace-header-actions";
@@ -24,6 +25,16 @@ export function AppShell({
 }) {
 	const s = useAppShellState({ onOpenSettings });
 	const { sel, data, chrome, panels } = s;
+	const screen = useScreenController();
+	// Selecting a workspace from the always-visible sidebar must drop any active
+	// top-level screen (Dashboard/Tasks/History) so the conversation surfaces.
+	const handleSelectWorkspace = useCallback(
+		(workspaceId: string | null) => {
+			screen.screenActions.openWorkspaceView();
+			sel.handleSelectWorkspace(workspaceId);
+		},
+		[screen.screenActions, sel.handleSelectWorkspace],
+	);
 	const selectedWorkspaceId = sel.selection.selectedWorkspaceId;
 	const selectedSessionId = sel.selection.selectedSessionId;
 	const inspectorCollapsed = sel.contextPanel.inspectorCollapsed;
@@ -104,7 +115,10 @@ export function AppShell({
 			onOpenSettings={data.handleOpenSettings}
 			onSubmitFeedbackPrompt={data.submitFeedbackPrompt}
 			workspaceViewMode={sel.selection.viewMode}
+			activeScreen={screen.activeScreen}
 			sidebar={{
+				activeScreen: screen.activeScreen,
+				screenActions: screen.screenActions,
 				collapsed: panels.sidebarCollapsed,
 				resizing: panels.isSidebarResizing,
 				width: panels.sidebarWidth,
@@ -119,7 +133,7 @@ export function AppShell({
 				appSettings: s.appSettings,
 				miniModePending: chrome.miniModePending,
 				miniModeToggleShortcut: chrome.miniModeToggleShortcut,
-				onSelectWorkspace: sel.handleSelectWorkspace,
+				onSelectWorkspace: handleSelectWorkspace,
 				onOpenNewWorkspace: s.handleOpenWorkspaceStart,
 				onAddRepositoryNeedsStart:
 					sel.startSurfaceActions.addRepositoryNeedsStart,

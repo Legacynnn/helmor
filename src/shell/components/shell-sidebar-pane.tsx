@@ -1,9 +1,15 @@
 // Left workspace sidebar — workspaces list, app-update button, sidebar
 // collapse, and the settings entry button at the bottom.
-import { PanelLeftClose } from "lucide-react";
+import {
+	Columns3,
+	History as HistoryIcon,
+	ListTodo,
+	PanelLeftClose,
+} from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import { TrafficLightSpacer } from "@/components/chrome/traffic-light-spacer";
 import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
@@ -21,12 +27,24 @@ import type { AppSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import type { PushWorkspaceToast } from "@/lib/workspace-toast-context";
 import { useSelectionStore } from "@/shell/controllers/selection-store-context";
+import type {
+	ActiveScreen,
+	ScreenActions,
+} from "@/shell/controllers/use-screen-controller";
 import { useEdgePeek } from "@/shell/hooks/use-edge-peek";
 import { useEdgeSwipe } from "@/shell/hooks/use-edge-swipe";
 import { EdgeSwipeLayer } from "./edge-swipe-layer";
 import { MiniModeToggleButton } from "./mini-mode-toggle-button";
 
+const SCREEN_NAV_ITEMS = [
+	{ id: "dashboard", label: "Dashboard", Icon: Columns3 },
+	{ id: "tasks", label: "Tasks", Icon: ListTodo },
+	{ id: "history", label: "History", Icon: HistoryIcon },
+] as const;
+
 type Props = {
+	activeScreen: ActiveScreen;
+	screenActions: ScreenActions;
 	collapsed: boolean;
 	resizing: boolean;
 	width: number;
@@ -57,6 +75,8 @@ type Props = {
 };
 
 export function ShellSidebarPane({
+	activeScreen,
+	screenActions,
 	collapsed,
 	resizing,
 	width,
@@ -169,6 +189,34 @@ export function ShellSidebarPane({
 							: "translate-x-0 opacity-100",
 					)}
 				>
+					<div
+						data-slot="window-safe-top"
+						className="flex h-9 shrink-0 items-center pr-3 max-[960px]:hidden"
+					>
+						<TrafficLightSpacer side="left" width={94} />
+						<div data-tauri-drag-region className="h-full flex-1" />
+					</div>
+					<nav aria-label="Screens" className="flex flex-col gap-0.5 px-2 pb-2">
+						{SCREEN_NAV_ITEMS.map(({ id, label, Icon }) => {
+							const active = activeScreen === id;
+							return (
+								<Button
+									key={id}
+									type="button"
+									variant="ghost"
+									aria-current={active ? "page" : undefined}
+									className={cn(
+										"h-8 w-full justify-start gap-2 px-2 font-medium text-muted-foreground text-sm hover:text-foreground",
+										active && "bg-accent text-accent-foreground",
+									)}
+									onClick={() => screenActions.setActiveScreen(id)}
+								>
+									<Icon className="size-4 shrink-0" />
+									<span className="truncate">{label}</span>
+								</Button>
+							);
+						})}
+					</nav>
 					<div className="min-h-0 flex-1">
 						<WorkspacesSidebarContainer
 							selectedWorkspaceId={highlightedWorkspaceId}
