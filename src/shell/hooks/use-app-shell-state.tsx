@@ -29,6 +29,7 @@ import { useShellChromeState } from "@/shell/hooks/use-shell-chrome-state";
 import { useShellStartupEffects } from "@/shell/hooks/use-shell-startup-effects";
 import { useThemeApplication } from "@/shell/hooks/use-theme-application";
 import { useUiSyncBridge } from "@/shell/hooks/use-ui-sync-bridge";
+import { useVesperWindow } from "@/shell/hooks/use-vesper-window";
 import { useWorkspaceActionControllers } from "@/shell/hooks/use-workspace-action-controllers";
 import { useWorkspaceDataControllers } from "@/shell/hooks/use-workspace-data-controllers";
 import { useWorkspaceToast } from "@/shell/hooks/use-workspace-toast";
@@ -171,6 +172,13 @@ export function useAppShellState({
 		terminalFontFamily: appSettings.terminalFontFamily,
 		chatFontSize: appSettings.chatFontSize,
 		usePointerCursors: appSettings.usePointerCursors,
+	});
+
+	// Native macOS blur for the translucent Vesper theme (no-op elsewhere).
+	useVesperWindow({
+		theme: appSettings.theme,
+		lightTheme: appSettings.lightTheme,
+		darkTheme: appSettings.darkTheme,
 	});
 
 	useGlobalShortcutHandlers({

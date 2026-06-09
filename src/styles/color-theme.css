@@ -819,3 +819,126 @@
 	--ring-default: oklch(0.72 0.13 70);
 	--sidebar-item-active-bg: oklch(0.3 0.03 75);
 }
+
+/* ── Vesper (translucent macOS dark glass) ──────────────────────────────────
+   Dark-only (the picker only offers it on macOS, and selecting it force-darks
+   the app — see use-theme-application.ts). The blur is a native
+   NSVisualEffectView behind the webview (use-vesper-window.ts), not a CSS
+   backdrop-filter.
+
+   Layering is the whole game here. The native view sits behind EVERYTHING, so a
+   pane only looks translucent if the stack of backgrounds between it and the
+   view is mostly transparent. The shell stacks several full-window layers
+   (body → main → flex → pane wrappers), and each semi-transparent dark layer
+   multiplies the darkness until the blur vanishes. So:
+     • the window backdrop (--bg-base, bound by every `bg-background` layer) is
+       fully TRANSPARENT — the blur reaches the panes;
+     • the chrome that should read as glass (sidebars, titlebar, statusbar) is a
+       SINGLE translucent --bg-surface layer (the scoped rules below zero out the
+       redundant outer pane wrappers so only one layer remains);
+     • the center reading area (chat/editor) is re-asserted OPAQUE via scoped
+       rules so text never sits on the blur — translucency stays on the sides.
+   Warm near-black (hue ~65) + peach accent (#FFC799) from the source palette. */
+.dark.theme-vesper {
+	color-scheme: dark;
+
+	/* Transparent window backdrop — lets the native blur through to the panes. */
+	--bg-base: oklch(0.17 0.004 65 / 0);
+	/* The single translucent glass layer (sidebars / titlebar / statusbar).
+	   Low alpha → the frosted desktop shows clearly; the HUD material is already
+	   dark, so white text stays legible. */
+	--bg-surface: oklch(0.2 0.005 65 / 0.5);
+	/* Elevated + overlay chrome (menus, popovers, dropdowns) stay opaque for
+	   legibility — glass belongs on the panes, not on floating UI. */
+	--bg-elevated: oklch(0.255 0.005 65);
+	--bg-overlay: oklch(0.175 0.005 65);
+
+	/* Peach accent. */
+	--accent-default: oklch(0.85 0.08 68);
+	--accent-fg: oklch(0.2 0.01 65);
+	--accent-hover: oklch(0.9 0.08 68);
+	--accent-muted: oklch(0.3 0.008 65 / 0.6);
+	--accent-muted-fg: oklch(0.985 0 0);
+
+	--border-default: oklch(1 0 0 / 10%);
+	--border-subtle: oklch(1 0 0 / 6%);
+	--border-strong: oklch(1 0 0 / 16%);
+	--ring-default: oklch(0.85 0.08 68);
+
+	/* Hover/active on the glass sidebars: light translucent washes (brighten the
+	   glass) rather than opaque blocks (which would punch holes in the blur). */
+	--sidebar-item-hover-bg: oklch(1 0 0 / 6%);
+	--sidebar-item-active-bg: oklch(1 0 0 / 11%);
+
+	/* Inputs bind --bg-base by default → would be invisible now. Give them a
+	   faint wash so the field reads over both glass and opaque surfaces. */
+	--input-bg: oklch(1 0 0 / 6%);
+
+	/* Monaco editor (file view / diff): transparent background so it shows the
+	   same slightly-translucent viewport behind it — i.e. the editor matches the
+	   main content's translucency exactly. Monaco paints editor.background from
+	   this token (monaco-runtime.ts); transparent → the 0.9 viewport shows
+	   through. In fullscreen the viewport is opaque, so the editor is too. */
+	--editor-content-bg: oklch(0.16 0.004 65 / 0);
+	--editor-gutter-bg: oklch(0.16 0.004 65 / 0);
+	--editor-tab-active-bg: oklch(0.135 0.004 65);
+	--panel-code-bg: oklch(0.185 0.004 65);
+	--panel-message-user-bg: oklch(0.225 0.004 65);
+
+	/* Terminal is translucent too (requested). xterm itself draws transparent
+	   (allowTransparency, see terminal-output.tsx); this is the single tint, a
+	   touch darker than the pane glass so the terminal still reads as a distinct
+	   surface. */
+	--terminal-chrome-bg: oklch(0.16 0.004 65 / 0.45);
+}
+
+/* Collapse each sidebar to a SINGLE translucent layer. The shell wraps the left
+   sidebar (aside → inner) and the inspector (aside → inner → content) in nested
+   panes that all carry a surface background; left stacked they'd multiply the
+   blur away. Zero out the outer wrappers so only the innermost surface
+   (`bg-sidebar`, still --bg-surface) remains over the transparent backdrop. */
+html.theme-vesper.dark [data-shell-pane="sidebar"],
+html.theme-vesper.dark [data-shell-pane="inspector"],
+html.theme-vesper.dark [data-shell-pane-inner="inspector"] {
+	background-color: transparent;
+}
+
+/* Center workspace: SLIGHTLY translucent (requested) — a subtle blur bleed, not
+   full glass, so chat/editor text stays readable. The section stays transparent
+   so the viewport is the single ~0.9-alpha layer (otherwise the two stack and
+   it reads opaque). These bind `bg-background` = the now-transparent --bg-base,
+   so they need explicit values. */
+html.theme-vesper.dark section[aria-label="Workspace panel"] {
+	background-color: transparent;
+}
+html.theme-vesper.dark [aria-label="Workspace viewport"] {
+	background-color: oklch(0.16 0.004 65 / 0.9);
+}
+
+/* Fullscreen fallback: in a fullscreen space there is no desktop behind the
+   window, so the NSVisualEffectView material greens out. use-vesper-window.ts
+   clears the native blur and adds `vesper-fullscreen`; here we re-solidify every
+   surface into a clean opaque dark theme. Higher specificity than the block
+   above so it wins regardless of order. The center/pane scoped rules above stay
+   correct (transparent wrappers over an opaque backdrop read as opaque). */
+html.vesper-fullscreen.theme-vesper.dark {
+	--bg-base: oklch(0.155 0.004 65);
+	--bg-surface: oklch(0.2 0.005 65);
+	--bg-elevated: oklch(0.255 0.005 65);
+	--bg-overlay: oklch(0.18 0.005 65);
+	--terminal-chrome-bg: oklch(0.155 0.004 65);
+}
+
+/* Center is opaque in fullscreen (no blur to bleed). Higher specificity than the
+   slightly-translucent rule above, so it wins. */
+html.vesper-fullscreen.theme-vesper.dark section[aria-label="Workspace panel"],
+html.vesper-fullscreen.theme-vesper.dark [aria-label="Workspace viewport"] {
+	background-color: oklch(0.16 0.004 65);
+}
+
+/* The window background is the base surface itself: transparent (blur shows
+   through the panes) normally, opaque in fullscreen. Specificity beats
+   index.html's `body` fallback so it wins once this sheet loads. */
+html.theme-vesper.dark body {
+	background-color: var(--bg-base);
+}

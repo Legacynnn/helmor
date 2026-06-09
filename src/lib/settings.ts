@@ -15,7 +15,11 @@ export type ColorTheme =
 	| "aubergine"
 	| "hoth"
 	| "choco-mint"
-	| "banana";
+	| "banana"
+	// Translucent macOS-only dark theme backed by native window blur. Always
+	// renders dark (see `use-theme-application`); the picker only offers it on
+	// macOS (see `appearance.tsx`).
+	| "vesper";
 
 /** Behavior when submitting a message while the agent is still responding.
  *  - `steer`: inject into the active turn (provider-native mid-turn steer).
@@ -486,6 +490,7 @@ export const VALID_COLOR_THEMES: readonly ColorTheme[] = [
 	"hoth",
 	"choco-mint",
 	"banana",
+	"vesper",
 ];
 
 // Synchronous theme read for flash-free splash boot. The full settings

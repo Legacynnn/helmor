@@ -608,6 +608,8 @@ pub fn run() {
             commands::system_commands::enter_mini_window_mode,
             commands::system_commands::exit_mini_window_mode,
             commands::system_commands::toggle_mini_window_mode,
+            commands::window_effects::set_window_vibrancy,
+            commands::window_effects::clear_window_vibrancy,
             commands::system_commands::open_agent_login_terminal,
             commands::system_commands::spawn_agent_login_terminal,
             commands::system_commands::stop_agent_login_terminal,

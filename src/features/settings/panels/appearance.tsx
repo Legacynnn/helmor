@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { isMac } from "@/lib/platform";
 import {
 	type AppSettings,
 	type ColorTheme,
@@ -104,6 +105,16 @@ const COLOR_THEME_OPTIONS: readonly ColorThemeOption[] = [
 		lightBg: "oklch(0.92 0.04 90)",
 		lightAccent: "oklch(0.45 0.18 330)",
 	},
+	{
+		// Translucent macOS-only dark glass. Peach accent (#FFC799) over a near-
+		// black base. Dark-only — picking it force-darks the app.
+		id: "vesper",
+		label: "Vesper",
+		bg: "oklch(0.20 0.012 60)",
+		accent: "oklch(0.84 0.09 65)",
+		lightBg: "oklch(0.30 0.012 60)",
+		lightAccent: "oklch(0.84 0.09 65)",
+	},
 ];
 
 function ThemeSwatch({
@@ -142,6 +153,10 @@ function ColorThemePicker({
 	const [open, setOpen] = useState(false);
 	const current =
 		COLOR_THEME_OPTIONS.find((o) => o.id === value) ?? COLOR_THEME_OPTIONS[0];
+	// Vesper relies on native macOS window blur — only offer it there.
+	const options = isMac()
+		? COLOR_THEME_OPTIONS
+		: COLOR_THEME_OPTIONS.filter((o) => o.id !== "vesper");
 
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
@@ -163,7 +178,7 @@ function ColorThemePicker({
 			</PopoverTrigger>
 			<PopoverContent align="end" sideOffset={4} className="w-[220px] p-1">
 				<div role="listbox" className="flex flex-col">
-					{COLOR_THEME_OPTIONS.map((opt) => {
+					{options.map((opt) => {
 						const selected = opt.id === value;
 						return (
 							<button

@@ -56,10 +56,15 @@ export function useThemeApplication(opts: ThemeApplicationOptions): void {
 	useEffect(() => {
 		const root = document.documentElement;
 		const apply = () => {
-			const effective = resolveTheme(theme);
+			let effective = resolveTheme(theme);
+			// The preset is chosen for the resolved appearance, but Vesper is a
+			// translucent *dark* theme — if it's the active preset we force dark
+			// so it never renders against a light scheme (matches the boot
+			// script in index.html).
+			const preset = effective === "dark" ? darkTheme : lightTheme;
+			if (preset === "vesper") effective = "dark";
 			root.classList.toggle("dark", effective === "dark");
 			root.style.colorScheme = effective;
-			const preset = effective === "dark" ? darkTheme : lightTheme;
 			for (const t of COLOR_THEME_CLASSES) {
 				if (t !== preset) root.classList.remove(`theme-${t}`);
 			}
