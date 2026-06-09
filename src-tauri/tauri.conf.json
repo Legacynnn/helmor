@@ -37,9 +37,11 @@
 				},
 				"hiddenTitle": true,
 				"center": true,
+				"transparent": true,
 				"backgroundColor": "#0E0E0E"
 			}
 		],
+		"macOSPrivateApi": true,
 		"security": {
 			"csp": null,
 			"assetProtocol": {

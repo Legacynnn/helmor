@@ -64,7 +64,16 @@ serde_json = "1"
 jsonc-parser = { version = "0.32", features = ["cst", "serde"] }
 sha2 = "0.10"
 hex = "0.4"
-tauri = { version = "2", features = ["protocol-asset", "test", "devtools"] }
+# `macos-private-api` enables the transparent-window + NSVisualEffectView path
+# used by the translucent Vesper theme (must match `macOSPrivateApi` in
+# tauri.conf.json). Helmor self-distributes (GitHub/updater), not the App Store,
+# so the private-API flag is fine.
+tauri = { version = "2", features = [
+    "protocol-asset",
+    "test",
+    "devtools",
+    "macos-private-api",
+] }
 tempfile = "3"
 tauri-plugin-deep-link = "2"
 tauri-plugin-dialog = "2"
@@ -105,6 +114,10 @@ version = "0.2"
 core-foundation = "0.10"
 security-framework = "3"
 security-framework-sys = "2"
+# Native NSVisualEffectView blur behind the webview for the translucent
+# "Vesper" theme. macOS-only; the frontend toggles it on/off per theme and
+# clears it in fullscreen. See commands/window_effects.rs.
+window-vibrancy = "0.6"
 
 [[bin]]
 name = "helmor-cli"

@@ -894,6 +894,18 @@ export async function toggleMiniWindowMode(): Promise<boolean> {
 	return await invoke("toggle_mini_window_mode");
 }
 
+/** Apply the native macOS blur (NSVisualEffectView) behind the webview for the
+ *  translucent Vesper theme. No-op on non-macOS. */
+export async function setWindowVibrancy(): Promise<void> {
+	await invoke("set_window_vibrancy");
+}
+
+/** Remove the native macOS blur, restoring an opaque window. No-op on
+ *  non-macOS. */
+export async function clearWindowVibrancy(): Promise<void> {
+	await invoke("clear_window_vibrancy");
+}
+
 export type AgentLoginProvider = "claude" | "codex" | "cursor" | "opencode";
 
 export type AgentLoginStatusResult = {

@@ -214,7 +214,12 @@ function resolveTerminalTheme(): ITheme {
 		);
 
 	return {
-		background: v("background"),
+		// Transparent so the xterm canvas never paints its own background fill.
+		// The visible terminal surface is the wrapper div's
+		// `var(--terminal-background)` (a single layer, live-updated via CSS var).
+		// Opaque themes look identical (their wrapper is opaque); Vesper shows
+		// the blur through the translucent wrapper.
+		background: "#00000000",
 		foreground: v("foreground"),
 		cursor: v("cursor"),
 		selectionBackground: v("selection"),
@@ -282,6 +287,13 @@ function TerminalOutputImpl({
 			convertEol: true,
 			// stdin enabled — forward keystrokes via onData below.
 			disableStdin: false,
+			// Allow a translucent terminal background (the Vesper theme makes
+			// --terminal-background semi-transparent so the native blur shows
+			// through). The xterm background itself is kept fully transparent
+			// (see resolveTerminalTheme) and the single tint comes from the
+			// wrapper div's `var(--terminal-background)`, so there's no double
+			// layer. For opaque themes the wrapper is opaque → no visible change.
+			allowTransparency: true,
 			scrollback: 5000,
 			fontSize,
 			fontFamily: resolveTerminalFontFamily(terminalFontFamily),

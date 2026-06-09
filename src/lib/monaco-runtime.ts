@@ -632,6 +632,14 @@ function buildHelmorTheme(isDark: boolean) {
 			"editorSuggestWidget.border": widgetBorder,
 			"editorHoverWidget.background": widgetBg,
 			"editorHoverWidget.border": widgetBorder,
+			// Sticky scroll (the pinned function/class header while scrolling) must
+			// stay OPAQUE — editor.background can be translucent (Vesper), and a
+			// see-through header lets the scrolling code bleed through and become
+			// unreadable. widgetBg (--bg-overlay) is opaque in every theme; a soft
+			// shadow separates it from the code below.
+			"editorStickyScroll.background": widgetBg,
+			"editorStickyScrollHover.background": cssVarColor("--bg-elevated"),
+			"editorStickyScroll.shadow": "#00000040",
 			"scrollbarSlider.background": scrollbarBase,
 			"scrollbarSlider.hoverBackground": scrollbarHover,
 			"scrollbarSlider.activeBackground": scrollbarActive,

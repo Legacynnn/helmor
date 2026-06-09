@@ -14,9 +14,12 @@
         var ls = localStorage
         var t = ls.getItem('helmor-theme') || 'system'
         var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme:dark)').matches)
+        var ct = ls.getItem(dark ? 'helmor-dark-theme' : 'helmor-light-theme') || 'default'
+        // Vesper is a translucent *dark* theme — force dark so the first paint
+        // matches use-theme-application's force-dark (no light-scheme flash).
+        if (ct === 'vesper') dark = true
         if (dark) root.classList.add('dark')
         root.style.colorScheme = dark ? 'dark' : 'light'
-        var ct = ls.getItem(dark ? 'helmor-dark-theme' : 'helmor-light-theme') || 'default'
         if (ct !== 'default') root.classList.add(`theme-${ct}`)
         // User font overrides
         var ui = ls.getItem('helmor-ui-font-family')
