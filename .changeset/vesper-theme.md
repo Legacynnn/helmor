@@ -5,4 +5,4 @@
 Add the Vesper theme — a translucent, macOS-only dark theme backed by native window blur.
 
 - The sidebars, titlebar, terminal, main content, and editor are translucent over a native macOS NSVisualEffectView blur (no CSS backdrop-filter), with the editor and terminal matching the main content's translucency.
-- Entering fullscreen swaps to an opaque dark background to avoid the green NSVisualEffectView cast, then restores the blur on exit.
+- Entering fullscreen (where the native blur has no desktop to sample) swaps to an in-window frosted-glass material so the sidebars, inspector, and main canvas keep their translucent look instead of flattening into a plain dark theme, then restores the native blur on exit.
