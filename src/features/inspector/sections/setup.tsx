@@ -164,6 +164,8 @@ export function SetupTab({
 						<TerminalOutput
 							terminalRef={termRef}
 							className="h-full"
+							// Flush to the panel edges — no inset around the terminal surface.
+							padding="0"
 							onData={handleData}
 							onResize={handleResize}
 						/>

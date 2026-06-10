@@ -22,6 +22,7 @@ import { useWorkspaceInspectorSidebar } from "./hooks/use-inspector";
 import { useScriptStatus } from "./hooks/use-script-status";
 import { useSetupAutoRun } from "./hooks/use-setup-auto-run";
 import { HorizontalResizeHandle, InspectorTabsSection } from "./layout";
+import { TOGGLE_TERMINAL_ZOOM_EVENT } from "./layout/use-hover-zoom";
 import type { ScriptStatus } from "./script-store";
 import { ActionsSection } from "./sections/actions";
 import { ChangesSection } from "./sections/changes";
@@ -366,33 +367,38 @@ export function WorkspaceInspectorSidebar({
 		[terminalInstances, activeTab, setActiveTab],
 	);
 	const { settings: appSettings } = useSettings();
-	// App-scoped smart toggle for the terminal panel.
-	//
-	// Target selection: if the user is already on a terminal tab (either
-	// just viewing it or actively typing in it), stay on that one — don't
-	// hop to the rightmost. Only fall back to the rightmost terminal when
-	// the panel is collapsed (so we don't know which terminal the user
-	// "meant") or when the active tab is Setup/Run (the user wasn't on a
-	// terminal at all). This preserves the current working terminal across
-	// repeated presses.
-	//
-	// Behaviour ladder:
-	//   1. No terminals yet → spawn one, expand the panel, focus it.
-	//   2. Panel collapsed → expand + ensure target is active. Mount path
-	//      will auto-focus the xterm.
-	//   3. Panel open + Setup/Run active → switch to rightmost terminal +
-	//      focus (mount path auto-focuses on isActive flip).
-	//   4. Panel open + a terminal active but focus is elsewhere → pull
-	//      focus into that already-mounted xterm.
-	//   5. Panel open + a terminal active + focus already inside the
-	//      xterm → collapse the panel (acts like the toggle-scripts
-	//      shortcut). Second press of Mod+Shift+J hides the panel.
-	const handleFocusTerminal = useCallback(() => {
-		// 1. Empty state — bootstrap a new terminal.
+	// App-scoped Cmd+Shift+J: toggle the terminal panel's zoom-expand (the
+	// same 2x enlargement as hovering the body). Before flipping the zoom we
+	// make sure there's something zoomable on screen — a terminal tab, in an
+	// open panel — so the keypress always has an effect:
+	//   - No terminals yet → spawn one (and open the panel). The new terminal
+	//     mounts; the zoom toggle then runs on the next frame.
+	//   - Panel collapsed → open it and activate the target terminal, then
+	//     toggle zoom once the panel is actually open.
+	//   - Panel open on Setup/Run → switch to the target terminal, then zoom.
+	//   - Panel open on a terminal → toggle the zoom directly (second press
+	//     collapses; `useHoverZoom` owns that state).
+	// Target selection mirrors the old focus shortcut: keep the current
+	// terminal if one is active, else fall back to the rightmost.
+	const handleToggleTerminalZoom = useCallback(() => {
+		const dispatchZoomToggle = (deferred: boolean) => {
+			if (deferred) {
+				// Wait one frame so the panel-open / tab-switch state has
+				// propagated to `useHoverZoom` (which requires `open === true`).
+				requestAnimationFrame(() =>
+					window.dispatchEvent(new Event(TOGGLE_TERMINAL_ZOOM_EVENT)),
+				);
+			} else {
+				window.dispatchEvent(new Event(TOGGLE_TERMINAL_ZOOM_EVENT));
+			}
+		};
+
+		// Empty state — bootstrap a terminal, then zoom once it has mounted.
 		if (terminalInstances.length === 0) {
 			if (!canSpawnTerminal) return;
 			if (!tabsOpen) handleToggleTabs();
 			handleAddTerminal();
+			dispatchZoomToggle(true);
 			return;
 		}
 
@@ -400,36 +406,16 @@ export function WorkspaceInspectorSidebar({
 		const target =
 			currentTerminal ?? terminalInstances[terminalInstances.length - 1];
 
-		// 2. Collapsed → expand. If activeTab already matches target (user
-		//    was on this terminal before collapsing) setActiveTab is a
-		//    no-op; either way the mount path auto-focuses.
+		let deferred = false;
 		if (!tabsOpen) {
 			handleToggleTabs();
-			if (activeTab !== target.id) setActiveTab(target.id);
-			return;
+			deferred = true;
 		}
-
-		// 3. Open but Setup/Run active → switch to rightmost.
 		if (activeTab !== target.id) {
 			setActiveTab(target.id);
-			return;
+			deferred = true;
 		}
-
-		// 4 & 5. Open + a terminal already active. Distinguish by where
-		// keyboard focus is right now.
-		const targetPanel = document.getElementById(
-			`inspector-panel-terminal-${target.id}`,
-		);
-		const focusInsideTarget =
-			targetPanel?.contains(document.activeElement) ?? false;
-
-		if (focusInsideTarget) {
-			// 5. Already focused in this terminal — second press collapses.
-			handleToggleTabs();
-		} else {
-			// 4. Pull focus into the existing, already-mounted xterm.
-			window.dispatchEvent(new Event("helmor:focus-active-terminal"));
-		}
+		dispatchZoomToggle(deferred);
 	}, [
 		terminalInstances,
 		canSpawnTerminal,
@@ -471,10 +457,10 @@ export function WorkspaceInspectorSidebar({
 			},
 			{
 				id: "inspector.focusTerminal",
-				callback: handleFocusTerminal,
+				callback: handleToggleTerminalZoom,
 				// Always enabled — handler bootstraps a terminal if none
-				// exist, expands when collapsed, focuses when not focused,
-				// and collapses when focus is already in the active xterm.
+				// exist, opens the panel when collapsed, switches to a
+				// terminal tab, then toggles the zoom-expand.
 				enabled: canSpawnTerminal || terminalInstances.length > 0,
 			},
 		],
@@ -483,7 +469,7 @@ export function WorkspaceInspectorSidebar({
 			canSpawnTerminal,
 			handleAddTerminal,
 			handleCloseTerminal,
-			handleFocusTerminal,
+			handleToggleTerminalZoom,
 			handleToggleTabs,
 			isTerminalTabActive,
 			navigateTerminal,

@@ -6,8 +6,24 @@ import {
 	InspectorTabsSection,
 	TABS_BLUR_HOLD_UNTIL_MS,
 	TABS_HOVER_ACTIVATION_MS,
+	TABS_HOVER_COLLAPSE_DELAY_MS,
 	TABS_HOVER_ZOOM_MULTIPLIER,
 } from "./layout";
+import { TOGGLE_TERMINAL_ZOOM_EVENT } from "./layout/use-hover-zoom";
+import type { TerminalInstance } from "./terminal-store";
+
+function makeTerminal(id: string): TerminalInstance {
+	return {
+		id,
+		repoId: "repo",
+		chunks: [],
+		bufferedBytes: 0,
+		truncated: false,
+		status: "running",
+		exitCode: null,
+		hoverZoomDisabled: false,
+	};
+}
 
 describe("InspectorTabsSection", () => {
 	afterEach(() => {
@@ -140,9 +156,194 @@ describe("InspectorTabsSection", () => {
 
 		fireEvent.mouseLeave(zoomContainer);
 
+		// Hover-originated zoom collapses after a grace delay, not immediately —
+		// the blur pulse (which marks the start of the collapse) only fires once
+		// the delay elapses.
+		expect(zoomContainer.firstElementChild?.firstElementChild).toHaveStyle({
+			filter: "blur(0)",
+		});
+
+		act(() => {
+			vi.advanceTimersByTime(TABS_HOVER_COLLAPSE_DELAY_MS);
+		});
+
 		expect(zoomContainer.firstElementChild?.firstElementChild).toHaveStyle({
 			filter: "blur(6px)",
 		});
+	});
+
+	it("cancels the pending collapse when the cursor returns within the grace window", () => {
+		vi.useFakeTimers();
+
+		renderWithProviders(
+			<InspectorTabsSection
+				wrapperRef={createRef<HTMLDivElement>()}
+				open
+				onToggle={vi.fn()}
+				activeTab="run"
+				onTabChange={vi.fn()}
+				setupScriptState="idle"
+				runScriptState="running"
+				runTabLabel="Run"
+				workspaceId={null}
+				runActions={[]}
+				activeRunActionId={null}
+				onSelectRunAction={vi.fn()}
+				onCreateRunAction={vi.fn()}
+				terminalInstances={[]}
+				onAddTerminal={vi.fn()}
+				onCloseTerminal={vi.fn()}
+				onToggleTerminalHoverZoom={vi.fn()}
+				canSpawnTerminal={false}
+				canHoverExpand
+			>
+				<div>Terminal body</div>
+			</InspectorTabsSection>,
+		);
+
+		const tabsBody = screen.getByLabelText("Inspector tabs body");
+		const zoomContainer = screen.getByLabelText("Inspector section Tabs")
+			.parentElement as HTMLElement;
+		const expectedZoomedSize = `${TABS_HOVER_ZOOM_MULTIPLIER * 100}%`;
+
+		fireEvent.mouseEnter(zoomContainer);
+		fireEvent.mouseEnter(tabsBody);
+		act(() => {
+			vi.advanceTimersByTime(TABS_HOVER_ACTIVATION_MS);
+			vi.advanceTimersByTime(TABS_BLUR_HOLD_UNTIL_MS);
+		});
+		expect(zoomContainer).toHaveStyle({ width: expectedZoomedSize });
+
+		// Cursor dips out, then returns before the grace delay elapses.
+		fireEvent.mouseLeave(zoomContainer);
+		act(() => {
+			vi.advanceTimersByTime(TABS_HOVER_COLLAPSE_DELAY_MS - 50);
+		});
+		fireEvent.mouseEnter(zoomContainer);
+		act(() => {
+			vi.advanceTimersByTime(TABS_HOVER_COLLAPSE_DELAY_MS);
+		});
+
+		// Still zoomed — the pending collapse was cancelled.
+		expect(zoomContainer).toHaveStyle({ width: expectedZoomedSize });
+	});
+
+	it("keyboard zoom toggles the panel and stays sticky on mouse-leave", () => {
+		vi.useFakeTimers();
+
+		renderWithProviders(
+			<InspectorTabsSection
+				wrapperRef={createRef<HTMLDivElement>()}
+				open
+				onToggle={vi.fn()}
+				activeTab="term-1"
+				onTabChange={vi.fn()}
+				setupScriptState="idle"
+				runScriptState="idle"
+				runTabLabel="Run"
+				workspaceId={null}
+				runActions={[]}
+				activeRunActionId={null}
+				onSelectRunAction={vi.fn()}
+				onCreateRunAction={vi.fn()}
+				terminalInstances={[makeTerminal("term-1")]}
+				onAddTerminal={vi.fn()}
+				onCloseTerminal={vi.fn()}
+				onToggleTerminalHoverZoom={vi.fn()}
+				canSpawnTerminal
+				canHoverExpand
+			>
+				<div>Terminal body</div>
+			</InspectorTabsSection>,
+		);
+
+		const zoomContainer = screen.getByLabelText("Inspector section Tabs")
+			.parentElement as HTMLElement;
+		const expectedZoomedSize = `${TABS_HOVER_ZOOM_MULTIPLIER * 100}%`;
+
+		// Press the shortcut (dispatched as a window event) → expands.
+		act(() => {
+			window.dispatchEvent(new Event(TOGGLE_TERMINAL_ZOOM_EVENT));
+			vi.advanceTimersByTime(TABS_BLUR_HOLD_UNTIL_MS);
+		});
+		expect(zoomContainer).toHaveStyle({ width: expectedZoomedSize });
+
+		// Mouse leaving does NOT collapse a keyboard-triggered zoom.
+		fireEvent.mouseLeave(zoomContainer);
+		act(() => {
+			vi.advanceTimersByTime(TABS_HOVER_COLLAPSE_DELAY_MS * 2);
+		});
+		expect(zoomContainer).toHaveStyle({ width: expectedZoomedSize });
+
+		// Second press collapses.
+		act(() => {
+			window.dispatchEvent(new Event(TOGGLE_TERMINAL_ZOOM_EVENT));
+			vi.advanceTimersByTime(TABS_BLUR_HOLD_UNTIL_MS);
+		});
+		expect(zoomContainer).toHaveStyle({ width: "100%" });
+	});
+
+	it("arrow keys cycle the whole tab strip (setup/run/terminals) while keyboard-zoomed", () => {
+		vi.useFakeTimers();
+		const onTabChange = vi.fn();
+
+		renderWithProviders(
+			<InspectorTabsSection
+				wrapperRef={createRef<HTMLDivElement>()}
+				open
+				onToggle={vi.fn()}
+				activeTab="term-1"
+				onTabChange={onTabChange}
+				setupScriptState="idle"
+				runScriptState="idle"
+				runTabLabel="Run"
+				workspaceId={null}
+				runActions={[]}
+				activeRunActionId={null}
+				onSelectRunAction={vi.fn()}
+				onCreateRunAction={vi.fn()}
+				terminalInstances={[makeTerminal("term-1"), makeTerminal("term-2")]}
+				onAddTerminal={vi.fn()}
+				onCloseTerminal={vi.fn()}
+				onToggleTerminalHoverZoom={vi.fn()}
+				canSpawnTerminal
+				canHoverExpand
+			>
+				<div>Terminal body</div>
+			</InspectorTabsSection>,
+		);
+
+		// Arrows do nothing before the panel is keyboard-zoomed.
+		act(() => {
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+		});
+		expect(onTabChange).not.toHaveBeenCalled();
+
+		// Expand via the shortcut. Strip order is [setup, run, term-1, term-2];
+		// from term-1, Right advances to term-2.
+		act(() => {
+			window.dispatchEvent(new Event(TOGGLE_TERMINAL_ZOOM_EVENT));
+		});
+		act(() => {
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+		});
+		expect(onTabChange).toHaveBeenCalledWith("term-2");
+
+		// Left from term-1 steps back onto the Run tab (not just terminals).
+		onTabChange.mockClear();
+		act(() => {
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft" }));
+		});
+		expect(onTabChange).toHaveBeenCalledWith("run");
+
+		// Modified arrows are ignored (reserved for Mod+Alt+Arrow prev/next).
+		onTabChange.mockClear();
+		act(() => {
+			window.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "ArrowLeft", altKey: true }),
+			);
+		});
+		expect(onTabChange).not.toHaveBeenCalled();
 	});
 
 	it("renders the Run dropdown chevron and exposes 'Create'", async () => {

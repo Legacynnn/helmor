@@ -397,7 +397,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 	},
 	{
 		id: "inspector.focusTerminal",
-		title: "Focus terminal",
+		title: "Expand terminal",
 		group: "Terminal",
 		defaultHotkey: "Mod+Shift+J",
 		scopes: ["app"],

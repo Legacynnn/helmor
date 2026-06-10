@@ -53,6 +53,12 @@ export const TABS_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
 /** 300ms is the industry-standard hover-intent threshold (VSCode/Material). */
 export const TABS_HOVER_ACTIVATION_MS = 300;
 export const TABS_HOVER_TRANSITION_MS = 400;
+/**
+ * Grace period before a hover-zoomed panel collapses after the cursor leaves.
+ * Forgives small overshoots and lets the user dip out and back in without the
+ * panel snapping shut. Keyboard-triggered zoom ignores this — it's sticky.
+ */
+export const TABS_HOVER_COLLAPSE_DELAY_MS = 500;
 /** 2x both axes — grows up-and-left from the bottom-right anchor. */
 export const TABS_HOVER_ZOOM_MULTIPLIER = 2;
 const TABS_BLUR_PEAK_PX = 6;
@@ -298,7 +304,13 @@ export function InspectorTabsSection({
 		onContainerMouseEnter: handleContainerMouseEnter,
 		onContainerMouseLeave: handleContainerMouseLeave,
 		onTabContextMenuOpenChange: handleTabContextMenuOpenChange,
-	} = useHoverZoom({ open, canHoverExpand });
+	} = useHoverZoom({
+		open,
+		canHoverExpand,
+		terminalInstances,
+		activeTab,
+		onTabChange,
+	});
 
 	const zoomedSize = `${TABS_HOVER_ZOOM_MULTIPLIER * 100}%`;
 

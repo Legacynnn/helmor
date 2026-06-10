@@ -17,8 +17,17 @@ import { suspendTerminalFit } from "@/components/terminal-output";
 import {
 	TABS_BLUR_HOLD_UNTIL_MS,
 	TABS_HOVER_ACTIVATION_MS,
+	TABS_HOVER_COLLAPSE_DELAY_MS,
 	TABS_HOVER_TRANSITION_MS,
 } from "../layout";
+import type { TerminalInstance } from "../terminal-store";
+import { useZoomArrowNav } from "./use-zoom-arrow-nav";
+
+/**
+ * Window event the Cmd+Shift+J shortcut dispatches to flip the keyboard zoom.
+ * Mirrors the existing `helmor:focus-active-terminal` cross-component channel.
+ */
+export const TOGGLE_TERMINAL_ZOOM_EVENT = "helmor:toggle-terminal-zoom";
 
 export type HoverZoomController = {
 	isHoverExpanded: boolean;
@@ -34,9 +43,15 @@ export type HoverZoomController = {
 export function useHoverZoom({
 	open,
 	canHoverExpand,
+	terminalInstances,
+	activeTab,
+	onTabChange,
 }: {
 	open: boolean;
 	canHoverExpand: boolean;
+	terminalInstances: TerminalInstance[];
+	activeTab: string;
+	onTabChange: (tabId: string) => void;
 }): HoverZoomController {
 	// `isHoverExpanded` drives the CSS-transitionable properties (width /
 	// height / box-shadow). Flipping it to `false` immediately starts the
@@ -53,9 +68,21 @@ export function useHoverZoom({
 	// where xterm's canvas is being GPU-scaled and then re-fit.
 	const [isContentBlurred, setIsContentBlurred] = useState(false);
 
+	// Tracks whether the active zoom was started by the keyboard shortcut
+	// (sticky — never auto-collapses on mouse-leave, enables arrow tab-nav) or
+	// by hover (collapses on mouse-leave after a grace delay). `null` when the
+	// panel is at its resting size.
+	const zoomSourceRef = useRef<"hover" | "keyboard" | null>(null);
+	// Mirror of `zoomSourceRef === "keyboard"` as state so the arrow-nav hook
+	// can switch its listener on/off.
+	const [isKeyboardZoom, setIsKeyboardZoom] = useState(false);
+
 	const hoverTimerRef = useRef<number | null>(null);
 	const presentationClearTimerRef = useRef<number | null>(null);
 	const blurClearTimerRef = useRef<number | null>(null);
+	// Pending hover-collapse timer — gives the user a grace window to dip the
+	// cursor out of the panel and back in without it snapping shut.
+	const leaveTimerRef = useRef<number | null>(null);
 	const pointerInsideContainerRef = useRef(false);
 	// Tracks whether the user is actively selecting text. When true,
 	// prevents the panel from collapsing on mouse-leave so text selection
@@ -89,6 +116,13 @@ export function useHoverZoom({
 		if (blurClearTimerRef.current !== null) {
 			window.clearTimeout(blurClearTimerRef.current);
 			blurClearTimerRef.current = null;
+		}
+	}, []);
+
+	const clearLeaveTimer = useCallback(() => {
+		if (leaveTimerRef.current !== null) {
+			window.clearTimeout(leaveTimerRef.current);
+			leaveTimerRef.current = null;
 		}
 	}, []);
 
@@ -173,6 +207,7 @@ export function useHoverZoom({
 		if (isHoverExpanded) return;
 		clearHoverTimer();
 		hoverTimerRef.current = window.setTimeout(() => {
+			zoomSourceRef.current = "hover";
 			beginZoomAnimation();
 			setZoomTarget(true);
 			hoverTimerRef.current = null;
@@ -194,29 +229,47 @@ export function useHoverZoom({
 
 	const onContainerMouseEnter = useCallback(() => {
 		pointerInsideContainerRef.current = true;
-	}, []);
+		// Cursor came back within the grace window — cancel the pending collapse.
+		clearLeaveTimer();
+	}, [clearLeaveTimer]);
+
+	// Collapse the panel and reset the zoom source. Shared by the hover-leave
+	// path, the keyboard toggle, and the Escape handler.
+	const collapseZoom = useCallback(() => {
+		zoomSourceRef.current = null;
+		setIsKeyboardZoom(false);
+		beginZoomAnimation();
+		setZoomTarget(false);
+	}, [beginZoomAnimation, setZoomTarget]);
 
 	// Un-zoom fires only when the cursor leaves the whole panel (header +
 	// body). Moving from body up into the header keeps the zoom alive so
 	// the Stop/Rerun action and the tab switcher stay reachable while
 	// zoomed. Skip collapsing if the user is actively selecting text.
+	// Keyboard-triggered zoom is sticky — it never collapses on mouse-leave.
 	const onContainerMouseLeave = useCallback(() => {
 		pointerInsideContainerRef.current = false;
 		const hadPendingHoverIntent = hoverTimerRef.current !== null;
 		clearHoverTimer();
+		if (zoomSourceRef.current === "keyboard") return;
 		if (isSelectingRef.current) return;
 		if (isTabContextMenuOpenRef.current) return;
 		if (hadPendingHoverIntent || (!isHoverExpanded && !isZoomPresented)) {
 			return;
 		}
-		beginZoomAnimation();
-		setZoomTarget(false);
+		// Defer the collapse so a quick out-and-back-in doesn't snap the panel
+		// shut. `onContainerMouseEnter` cancels this if the cursor returns.
+		clearLeaveTimer();
+		leaveTimerRef.current = window.setTimeout(() => {
+			leaveTimerRef.current = null;
+			collapseZoom();
+		}, TABS_HOVER_COLLAPSE_DELAY_MS);
 	}, [
-		beginZoomAnimation,
 		clearHoverTimer,
+		clearLeaveTimer,
+		collapseZoom,
 		isHoverExpanded,
 		isZoomPresented,
-		setZoomTarget,
 	]);
 
 	// On close, re-evaluate whether to collapse — the mouseleave that
@@ -225,13 +278,83 @@ export function useHoverZoom({
 		(menuOpen: boolean) => {
 			isTabContextMenuOpenRef.current = menuOpen;
 			if (menuOpen) return;
+			if (zoomSourceRef.current === "keyboard") return;
 			if (pointerInsideContainerRef.current) return;
 			if (!isHoverExpanded && !isZoomPresented) return;
-			beginZoomAnimation();
-			setZoomTarget(false);
+			collapseZoom();
 		},
-		[beginZoomAnimation, isHoverExpanded, isZoomPresented, setZoomTarget],
+		[collapseZoom, isHoverExpanded, isZoomPresented],
 	);
+
+	// Switch the active inspector tab by a relative offset (wrap-around)
+	// across the WHOLE strip — Setup, Run, then each terminal — so the arrows
+	// flip between every tab, not just terminals. Live while the panel is
+	// keyboard-zoomed.
+	const navigateTab = useCallback(
+		(offset: -1 | 1) => {
+			const tabIds = ["setup", "run", ...terminalInstances.map((t) => t.id)];
+			const idx = tabIds.indexOf(activeTab);
+			if (idx === -1) return;
+			const len = tabIds.length;
+			const next = tabIds[(idx + offset + len) % len];
+			if (next && next !== activeTab) onTabChange(next);
+		},
+		[terminalInstances, activeTab, onTabChange],
+	);
+
+	// Cmd+Shift+J toggle: expand if resting, collapse if already zoomed.
+	// Expanding only requires the panel to be open — the shortcut handler
+	// ensures a terminal tab is active before dispatching, so this bypasses
+	// the hover-only `terminalHoverExpansion` setting by design.
+	const toggleKeyboardZoom = useCallback(() => {
+		clearHoverTimer();
+		clearLeaveTimer();
+		if (isHoverExpanded || isZoomPresented) {
+			collapseZoom();
+			return;
+		}
+		if (!open) return;
+		zoomSourceRef.current = "keyboard";
+		setIsKeyboardZoom(true);
+		beginZoomAnimation();
+		setZoomTarget(true);
+	}, [
+		beginZoomAnimation,
+		clearHoverTimer,
+		clearLeaveTimer,
+		collapseZoom,
+		isHoverExpanded,
+		isZoomPresented,
+		open,
+		setZoomTarget,
+	]);
+
+	// Bridge from the Cmd+Shift+J shortcut (dispatched in the inspector) to the
+	// zoom state that lives here. Mirrors the `helmor:focus-active-terminal`
+	// window-event channel already used for cross-component terminal control.
+	useEffect(() => {
+		const handleToggle = () => toggleKeyboardZoom();
+		window.addEventListener(TOGGLE_TERMINAL_ZOOM_EVENT, handleToggle);
+		return () =>
+			window.removeEventListener(TOGGLE_TERMINAL_ZOOM_EVENT, handleToggle);
+	}, [toggleKeyboardZoom]);
+
+	// Escape collapses a keyboard-zoomed panel, matching the toggle's mental
+	// model. Capture phase so it wins over anything inside the panel.
+	useEffect(() => {
+		if (!isKeyboardZoom) return;
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key !== "Escape") return;
+			event.preventDefault();
+			event.stopPropagation();
+			collapseZoom();
+		};
+		window.addEventListener("keydown", handleKeyDown, true);
+		return () => window.removeEventListener("keydown", handleKeyDown, true);
+	}, [isKeyboardZoom, collapseZoom]);
+
+	// Left/Right tab navigation, live only while keyboard-zoomed.
+	useZoomArrowNav({ active: isKeyboardZoom, onNavigate: navigateTab });
 
 	// When the panel collapses we must drop any pending/active zoom so it
 	// doesn't linger over neighbouring sections. Also release any
@@ -241,7 +364,10 @@ export function useHoverZoom({
 			clearHoverTimer();
 			clearPresentationClearTimer();
 			clearBlurTimer();
+			clearLeaveTimer();
 			releaseTerminalFitLock();
+			zoomSourceRef.current = null;
+			setIsKeyboardZoom(false);
 			setIsHoverExpanded(false);
 			setIsZoomPresented(false);
 			setIsContentBlurred(false);
@@ -249,6 +375,7 @@ export function useHoverZoom({
 	}, [
 		clearBlurTimer,
 		clearHoverTimer,
+		clearLeaveTimer,
 		clearPresentationClearTimer,
 		open,
 		releaseTerminalFitLock,
@@ -256,21 +383,24 @@ export function useHoverZoom({
 
 	// If the active tab no longer has output worth zooming (e.g. user
 	// switched from Run to Setup), force the panel back to its resting
-	// size through the normal collapse transition.
+	// size through the normal collapse transition. Keyboard-driven zoom is
+	// sticky, though — the user explicitly expanded the panel and is arrowing
+	// across the whole tab strip, so a non-zoomable tab must not collapse it.
 	useEffect(() => {
 		if (canHoverExpand) return;
+		if (zoomSourceRef.current === "keyboard") return;
 		clearHoverTimer();
+		clearLeaveTimer();
 		if (pointerInsideContainerRef.current) return;
 		if (!isHoverExpanded && !isZoomPresented) return;
-		beginZoomAnimation();
-		setZoomTarget(false);
+		collapseZoom();
 	}, [
-		beginZoomAnimation,
 		canHoverExpand,
 		clearHoverTimer,
+		clearLeaveTimer,
+		collapseZoom,
 		isHoverExpanded,
 		isZoomPresented,
-		setZoomTarget,
 	]);
 
 	// Clear the selection flag on any mouseup, even if it happens outside
@@ -290,11 +420,13 @@ export function useHoverZoom({
 			clearHoverTimer();
 			clearPresentationClearTimer();
 			clearBlurTimer();
+			clearLeaveTimer();
 			releaseTerminalFitLock();
 		};
 	}, [
 		clearBlurTimer,
 		clearHoverTimer,
+		clearLeaveTimer,
 		clearPresentationClearTimer,
 		releaseTerminalFitLock,
 	]);
