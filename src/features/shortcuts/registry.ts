@@ -63,6 +63,14 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		editable: true,
 	},
 	{
+		id: "session.newTerminal",
+		title: "New terminal session",
+		group: "Session",
+		defaultHotkey: "Mod+Shift+T",
+		scopes: ["chat"],
+		editable: true,
+	},
+	{
 		id: "session.close",
 		title: "Close current session",
 		group: "Session",
@@ -74,7 +82,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		id: "session.reopenClosed",
 		title: "Reopen closed session",
 		group: "Session",
-		defaultHotkey: "Mod+Shift+T",
+		defaultHotkey: "Mod+Control+T",
 		scopes: ["app"],
 		editable: true,
 	},

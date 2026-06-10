@@ -116,6 +116,22 @@ describe("shortcut registry", () => {
 		expect(new Set<ShortcutId>(ids).size).toBe(ids.length);
 	});
 
+	it("defines the terminal-session launcher shortcut and frees Mod+Shift+T", () => {
+		const reopen = SHORTCUT_DEFINITIONS.find(
+			(d) => d.id === "session.reopenClosed",
+		);
+		const newTerminal = SHORTCUT_DEFINITIONS.find(
+			(d) => d.id === "session.newTerminal",
+		);
+
+		expect(reopen?.defaultHotkey).toBe("Mod+Control+T");
+		expect(newTerminal?.defaultHotkey).toBe("Mod+Shift+T");
+		expect(newTerminal?.scopes).toEqual(["chat"]);
+
+		// No internal conflicts after the move.
+		expect(getShortcutConflicts({}).disabledIds.size).toBe(0);
+	});
+
 	it("lets Shift+Tab dual-bind across start-composer and workspace-composer", () => {
 		// `composer.togglePlanMode` lives on workspace-composer and
 		// `startSurface.cycleRepository` lives on start-composer. They share
