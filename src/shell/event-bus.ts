@@ -33,6 +33,9 @@ export type ShellEvent =
 	| { type: "focus-composer" }
 	| { type: "toggle-context-panel" }
 	| { type: "focus-active-terminal" }
+	// Opens the header's session launcher popover. `tab` selects which tab to
+	// focus; omitted = "conversation".
+	| { type: "open-new-session"; tab?: "conversation" | "terminal" }
 	// Imperative archive from surfaces outside the sidebar controller (reuses its optimistic path).
 	| { type: "request-archive-workspace"; workspaceId: string };
 
