@@ -48,7 +48,15 @@ function renderPopover(
 	);
 }
 
-afterEach(() => cleanup());
+afterEach(async () => {
+	cleanup();
+	// Radix Popover/Tooltip schedule async focus-restoration on unmount (rAF in
+	// jsdom). Flush it while this test environment is still alive — otherwise the
+	// deferred React commit runs after teardown, and React's getActiveElementDeep
+	// throws "instanceof" against the destroyed window (surfacing as an uncaught
+	// error attributed to whatever test file runs next).
+	await new Promise((resolve) => setTimeout(resolve, 50));
+});
 
 beforeEach(() => {
 	vi.clearAllMocks();
