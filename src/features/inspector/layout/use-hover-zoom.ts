@@ -77,6 +77,13 @@ export function useHoverZoom({
 	// can switch its listener on/off.
 	const [isKeyboardZoom, setIsKeyboardZoom] = useState(false);
 
+	// Last requested zoom direction (true = expand, false = collapse). Updated
+	// synchronously inside `setZoomTarget` so a redundant same-direction call —
+	// e.g. two collapse triggers firing for one close (the canHoverExpand
+	// effect re-running + a pending mouse-leave timer) — becomes a no-op
+	// instead of firing the blur pulse a second time.
+	const zoomTargetRef = useRef(false);
+
 	const hoverTimerRef = useRef<number | null>(null);
 	const presentationClearTimerRef = useRef<number | null>(null);
 	const blurClearTimerRef = useRef<number | null>(null);
@@ -182,6 +189,11 @@ export function useHoverZoom({
 	// box.
 	const setZoomTarget = useCallback(
 		(target: boolean) => {
+			// Idempotent: ignore a request that matches the direction we're
+			// already heading. Prevents a duplicate blur pulse when more than one
+			// path asks for the same collapse/expand within a single animation.
+			if (zoomTargetRef.current === target) return;
+			zoomTargetRef.current = target;
 			triggerContentBlurPulse();
 			if (target) {
 				clearPresentationClearTimer();
@@ -367,6 +379,7 @@ export function useHoverZoom({
 			clearLeaveTimer();
 			releaseTerminalFitLock();
 			zoomSourceRef.current = null;
+			zoomTargetRef.current = false;
 			setIsKeyboardZoom(false);
 			setIsHoverExpanded(false);
 			setIsZoomPresented(false);
@@ -392,7 +405,12 @@ export function useHoverZoom({
 		clearHoverTimer();
 		clearLeaveTimer();
 		if (pointerInsideContainerRef.current) return;
-		if (!isHoverExpanded && !isZoomPresented) return;
+		// Bail once the collapse has begun. `isHoverExpanded` flips to false the
+		// instant the shrink starts, but `isZoomPresented` stays true for the
+		// whole animation — so checking both would let this effect re-run
+		// mid-collapse and fire a SECOND `collapseZoom()` (a duplicate blur
+		// pulse). Keying off `isHoverExpanded` alone makes the collapse fire once.
+		if (!isHoverExpanded) return;
 		collapseZoom();
 	}, [
 		canHoverExpand,
@@ -400,7 +418,6 @@ export function useHoverZoom({
 		clearLeaveTimer,
 		collapseZoom,
 		isHoverExpanded,
-		isZoomPresented,
 	]);
 
 	// Clear the selection flag on any mouseup, even if it happens outside

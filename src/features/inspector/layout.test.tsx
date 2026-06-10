@@ -172,6 +172,71 @@ describe("InspectorTabsSection", () => {
 		});
 	});
 
+	it("does not re-pulse the blur when a collapse is re-triggered mid-animation", () => {
+		vi.useFakeTimers();
+
+		const baseProps = {
+			wrapperRef: createRef<HTMLDivElement>(),
+			open: true as const,
+			onToggle: vi.fn(),
+			activeTab: "run",
+			onTabChange: vi.fn(),
+			setupScriptState: "idle" as const,
+			runScriptState: "running" as const,
+			runTabLabel: "Run",
+			workspaceId: null,
+			runActions: [],
+			activeRunActionId: null,
+			onSelectRunAction: vi.fn(),
+			onCreateRunAction: vi.fn(),
+			terminalInstances: [],
+			onAddTerminal: vi.fn(),
+			onCloseTerminal: vi.fn(),
+			onToggleTerminalHoverZoom: vi.fn(),
+			canSpawnTerminal: false,
+		};
+
+		const view = renderWithProviders(
+			<InspectorTabsSection {...baseProps} canHoverExpand>
+				<div>Terminal body</div>
+			</InspectorTabsSection>,
+		);
+
+		const tabsBody = screen.getByLabelText("Inspector tabs body");
+		const zoomContainer = screen.getByLabelText("Inspector section Tabs")
+			.parentElement as HTMLElement;
+		const blurLayer = () =>
+			zoomContainer.firstElementChild?.firstElementChild as HTMLElement;
+
+		// Hover-zoom in.
+		fireEvent.mouseEnter(zoomContainer);
+		fireEvent.mouseEnter(tabsBody);
+		act(() => {
+			vi.advanceTimersByTime(TABS_HOVER_ACTIVATION_MS);
+			vi.advanceTimersByTime(TABS_BLUR_HOLD_UNTIL_MS);
+		});
+
+		// First collapse: cursor leaves → delayed collapse fires its single blur
+		// pulse, which then clears. `isZoomPresented` is still true during the
+		// shrink (it lingers until TABS_HOVER_TRANSITION_MS + 20 after collapse).
+		fireEvent.mouseLeave(zoomContainer);
+		act(() => {
+			vi.advanceTimersByTime(TABS_HOVER_COLLAPSE_DELAY_MS);
+			vi.advanceTimersByTime(TABS_BLUR_HOLD_UNTIL_MS);
+		});
+		expect(blurLayer()).toHaveStyle({ filter: "blur(0)" });
+
+		// A second collapse trigger arrives mid-animation (the active tab becomes
+		// non-zoomable, as when closing a terminal). It must NOT fire a second
+		// blur pulse — the panel is already collapsing.
+		view.rerender(
+			<InspectorTabsSection {...baseProps} canHoverExpand={false}>
+				<div>Terminal body</div>
+			</InspectorTabsSection>,
+		);
+		expect(blurLayer()).toHaveStyle({ filter: "blur(0)" });
+	});
+
 	it("cancels the pending collapse when the cursor returns within the grace window", () => {
 		vi.useFakeTimers();
 
