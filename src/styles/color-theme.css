@@ -892,6 +892,16 @@
 	--terminal-chrome-bg: oklch(0.16 0.004 65 / 0.45);
 }
 
+/* Tooltips: the shared component uses bg-foreground + text-background, which is
+   a deliberately inverted light pill in the default themes. In Vesper
+   --background is transparent, so that pill renders white-on-white (invisible).
+   Floating UI stays opaque in Vesper, so give the tooltip an opaque dark pill
+   with near-white text. Scoped to Vesper only — other themes are untouched. */
+html.theme-vesper [data-slot="tooltip-content"] {
+	background-color: var(--bg-overlay);
+	color: var(--fg-default);
+}
+
 /* Collapse each sidebar to a SINGLE translucent layer. The shell wraps the left
    sidebar (aside → inner) and the inspector (aside → inner → content) in nested
    panes that all carry a surface background; left stacked they'd multiply the
