@@ -32,6 +32,8 @@ pub struct WorkspaceSessionSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action_kind: Option<ActionKind>,
     pub active: bool,
+    /// 'chat' (SDK-driven thread) or 'terminal' (PTY running an agent CLI).
+    pub session_kind: String,
 }
 
 pub fn list_workspace_sessions(workspace_id: &str) -> Result<Vec<WorkspaceSessionSummary>> {
@@ -60,7 +62,8 @@ pub fn list_workspace_sessions(workspace_id: &str) -> Result<Vec<WorkspaceSessio
               s.updated_at,
               s.last_user_message_at,
               s.is_hidden,
-              s.action_kind
+              s.action_kind,
+              s.session_kind
             FROM sessions s
             WHERE s.workspace_id = ?1 AND COALESCE(s.is_hidden, 0) = 0
             ORDER BY
@@ -89,6 +92,7 @@ pub fn list_workspace_sessions(workspace_id: &str) -> Result<Vec<WorkspaceSessio
             last_user_message_at: row.get(13)?,
             is_hidden: row.get::<_, i64>(14)? != 0,
             action_kind: row.get(15)?,
+            session_kind: row.get(16)?,
         })
     })?;
 
@@ -835,7 +839,7 @@ pub fn list_hidden_sessions(workspace_id: &str) -> Result<Vec<WorkspaceSessionSu
               s.id, s.workspace_id, s.title, s.agent_type, s.status, s.model,
               s.permission_mode, s.provider_session_id, s.effort_level,
               s.unread_count, s.fast_mode, s.created_at, s.updated_at,
-              s.last_user_message_at, s.is_hidden, s.action_kind
+              s.last_user_message_at, s.is_hidden, s.action_kind, s.session_kind
             FROM sessions s
             WHERE s.workspace_id = ?1 AND s.is_hidden = 1
             ORDER BY datetime(s.created_at) ASC
@@ -864,6 +868,7 @@ pub fn list_hidden_sessions(workspace_id: &str) -> Result<Vec<WorkspaceSessionSu
                 last_user_message_at: row.get(13)?,
                 is_hidden: row.get::<_, i64>(14)? != 0,
                 action_kind: row.get(15)?,
+                session_kind: row.get(16)?,
             })
         })
         .context("Failed to query hidden sessions")?;

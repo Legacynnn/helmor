@@ -21,7 +21,10 @@ import {
 import type { ResolvedComposerInsertRequest } from "@/lib/composer-insert";
 import { insertRequestMatchesComposer } from "@/lib/composer-insert";
 import { hasUnresolvedPlanReview } from "@/lib/plan-review";
-import { sessionThreadMessagesQueryOptions } from "@/lib/query-client";
+import {
+	sessionThreadMessagesQueryOptions,
+	workspaceSessionsQueryOptions,
+} from "@/lib/query-client";
 import { useSettings } from "@/lib/settings";
 import type { ContextCard } from "@/lib/sources/types";
 import {
@@ -307,6 +310,22 @@ export const WorkspaceConversationContainer = memo(
 			...sessionThreadMessagesQueryOptions(displayedSessionId ?? "__none__"),
 			enabled: Boolean(displayedSessionId),
 		});
+
+		// Terminal sessions have no chat composer — the agent CLI owns input.
+		const sessionsForKind = useQuery({
+			...workspaceSessionsQueryOptions(displayedWorkspaceId ?? "__none__", {
+				staleTime: 5_000,
+			}),
+			enabled: Boolean(displayedWorkspaceId),
+		});
+		const displayedIsTerminalSession = Boolean(
+			displayedSessionId &&
+				sessionsForKind.data?.some(
+					(session) =>
+						session.id === displayedSessionId &&
+						session.sessionKind === "terminal",
+				),
+		);
 		const hasPlanReview = useMemo(
 			() => hasUnresolvedPlanReview(threadQuery.data ?? []),
 			[threadQuery.data],
@@ -608,6 +627,7 @@ export const WorkspaceConversationContainer = memo(
 				<div
 					className={cn(
 						composerOnly ? "w-full" : "mt-auto px-4 pb-4 pt-0",
+						displayedIsTerminalSession && "hidden",
 						composerWrapperClassName,
 					)}
 				>

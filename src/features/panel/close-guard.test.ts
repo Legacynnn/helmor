@@ -20,6 +20,7 @@ const baseSession: WorkspaceSessionSummary = {
 	isHidden: false,
 	actionKind: null,
 	active: true,
+	sessionKind: "chat",
 };
 
 describe("shouldConfirmRunningSessionClose", () => {
@@ -30,5 +31,38 @@ describe("shouldConfirmRunningSessionClose", () => {
 				status: "streaming",
 			}),
 		).toBe(true);
+	});
+
+	it("confirms terminal sessions while working or needing attention", () => {
+		const terminal = {
+			...baseSession,
+			sessionKind: "terminal" as const,
+			agentType: "claude-code",
+		};
+		expect(
+			shouldConfirmRunningSessionClose({ ...terminal, status: "working" }),
+		).toBe(true);
+		expect(
+			shouldConfirmRunningSessionClose({ ...terminal, status: "attention" }),
+		).toBe(true);
+		expect(
+			shouldConfirmRunningSessionClose({ ...terminal, status: "idle" }),
+		).toBe(false);
+		expect(
+			shouldConfirmRunningSessionClose({ ...terminal, status: "exited" }),
+		).toBe(false);
+	});
+
+	it("ignores busySessionIds for terminal sessions", () => {
+		expect(
+			shouldConfirmRunningSessionClose(
+				{
+					...baseSession,
+					sessionKind: "terminal" as const,
+					status: "idle",
+				},
+				new Set([baseSession.id]),
+			),
+		).toBe(false);
 	});
 });

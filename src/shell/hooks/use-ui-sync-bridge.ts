@@ -247,6 +247,11 @@ function handleUiMutation(
 				queryKey: helmorQueryKeys.pairedDevices,
 			});
 			return;
+		case "terminalSessionChanged":
+			void queryClient.invalidateQueries({
+				queryKey: helmorQueryKeys.workspaceSessions(event.workspaceId),
+			});
+			return;
 	}
 }
 

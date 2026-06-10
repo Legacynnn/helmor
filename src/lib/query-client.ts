@@ -20,6 +20,7 @@ import {
 	getSessionCodexGoal,
 	getSessionContextUsage,
 	getSessionPlanState,
+	getTerminalAgentDetails,
 	getWorkspaceAccountProfile,
 	getWorkspaceForge,
 	listActiveStreams,
@@ -28,6 +29,7 @@ import {
 	listInboxKindLabels,
 	listRepositories,
 	listSlashCommands,
+	listTerminalAgents,
 	listWorkspaceCandidateDirectories,
 	listWorkspaceChanges,
 	listWorkspaceDiffStats,
@@ -73,6 +75,9 @@ export const helmorQueryKeys = {
 	opencodeCustomProviders: ["opencodeCustomProviders"] as const,
 	agentLoginStatus: ["agentLoginStatus"] as const,
 	agentVersions: ["agentVersions"] as const,
+	terminalAgents: ["terminalAgents"] as const,
+	terminalAgentDetails: (agentId: string) =>
+		["terminalAgentDetails", agentId] as const,
 	providerCapabilities: ["providerCapabilities"] as const,
 	workspaceDetail: (workspaceId: string) =>
 		["workspaceDetail", workspaceId] as const,
@@ -428,6 +433,26 @@ export function inboxKindLabelsQueryOptions(provider: ForgeProvider) {
 		queryFn: () => listInboxKindLabels(provider),
 		staleTime: Number.POSITIVE_INFINITY,
 		gcTime: Number.POSITIVE_INFINITY,
+	});
+}
+
+export function terminalAgentsQueryOptions() {
+	return queryOptions({
+		queryKey: helmorQueryKeys.terminalAgents,
+		queryFn: listTerminalAgents,
+		// Cheap fs probes; 30s keeps the picker snappy while still catching
+		// freshly-installed CLIs without an app restart.
+		staleTime: 30_000,
+		refetchOnWindowFocus: false,
+	});
+}
+
+export function terminalAgentDetailsQueryOptions(agentId: string) {
+	return queryOptions({
+		queryKey: helmorQueryKeys.terminalAgentDetails(agentId),
+		queryFn: () => getTerminalAgentDetails(agentId),
+		staleTime: 30_000,
+		refetchOnWindowFocus: false,
 	});
 }
 

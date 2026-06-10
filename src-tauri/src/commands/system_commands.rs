@@ -1194,7 +1194,7 @@ fn agent_cli_version(provider: &str) -> Option<String> {
 }
 
 // Extract the first `MAJOR.MINOR.PATCH(-suffix)?` token; CLI `--version` layouts vary.
-fn parse_semver(text: &str) -> Option<String> {
+pub(crate) fn parse_semver(text: &str) -> Option<String> {
     for token in text.split(|c: char| c.is_whitespace() || c == '(' || c == ')') {
         let trimmed = token.trim_start_matches('v');
         let mut dots = 0;
@@ -1445,6 +1445,7 @@ pub async fn spawn_agent_login_terminal(
         default_branch: None,
         port_base: None,
         port_count: None,
+        extra_env: Vec::new(),
     };
     let mgr = manager.inner().clone();
     let script_type = agent_login_script_type(&provider, &instance_id);

@@ -235,6 +235,7 @@ pub async fn spawn_forge_cli_auth_terminal(
         default_branch: None,
         port_base: None,
         port_count: None,
+        extra_env: Vec::new(),
     };
     let mgr = manager.inner().clone();
     let script_type = forge_cli_auth_script_type(provider, &host, &instance_id);

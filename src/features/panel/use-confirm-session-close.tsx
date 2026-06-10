@@ -1,5 +1,6 @@
 import { type QueryClient, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
+import { terminalAgentLabel } from "@/features/terminals/agent-meta";
 import {
 	findProviderCapabilities,
 	stopAgentStream,
@@ -88,10 +89,15 @@ export function useConfirmSessionClose({
 		}
 
 		const provider = request.provider ?? request.session.agentType ?? undefined;
+		const isTerminal = request.session.sessionKind === "terminal";
 
 		setLoading(true);
 		try {
-			await stopAgentStream(request.session.id, provider ?? undefined);
+			// Terminal sessions have no agent stream to stop — the PTY kill
+			// happens inside `closeWorkspaceSession`.
+			if (!isTerminal) {
+				await stopAgentStream(request.session.id, provider ?? undefined);
+			}
 		} catch (error) {
 			pushToast(
 				error instanceof Error ? error.message : String(error),
@@ -113,6 +119,9 @@ export function useConfirmSessionClose({
 	const agentLabel = useMemo(() => {
 		if (!pending) {
 			return "Claude";
+		}
+		if (pending.session.sessionKind === "terminal") {
+			return terminalAgentLabel(pending.session.agentType);
 		}
 		const provider = pending.provider ?? pending.session.agentType ?? "";
 		// Data-driven display name — single source of truth in

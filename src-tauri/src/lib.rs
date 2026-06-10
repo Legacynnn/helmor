@@ -28,6 +28,8 @@ pub mod sidecar;
 pub mod sidecar_host;
 pub mod slack;
 mod system_limits;
+pub mod terminal_agents;
+pub mod terminal_sessions;
 pub mod triage;
 pub mod ui_sync;
 pub mod updater;
@@ -189,6 +191,8 @@ pub fn run() {
         )))
         .manage(git_watcher::GitWatcherManager::new())
         .manage(workspace::scripts::ScriptProcessManager::new())
+        .manage(terminal_sessions::hook_server::TerminalHookServer::default())
+        .manage(terminal_sessions::status::HeuristicTracker::default())
         .manage(ui_sync::UiSyncManager::new())
         .manage(triage::ActiveStatusStore::new())
         .manage(global_hotkey::GlobalHotkeyState::default())
@@ -290,6 +294,23 @@ pub fn run() {
                 Ok(n) => tracing::info!(count = n, "Cleaned up orphan initializing workspaces"),
                 Err(e) => tracing::warn!("Failed to clean up initializing orphans: {e:#}"),
             }
+
+            // Terminal-session PTYs die with the app, so every non-exited
+            // terminal row from a prior launch is stale. Flip them to
+            // 'exited' before the window loads its session lists.
+            match models::terminal_sessions::mark_all_terminal_sessions_exited() {
+                Ok(stale) if stale.is_empty() => {}
+                Ok(stale) => tracing::info!(
+                    count = stale.len(),
+                    "Marked stale terminal sessions as exited"
+                ),
+                Err(e) => tracing::warn!("Failed to mark stale terminal sessions: {e:#}"),
+            }
+            // Hook artifacts from prior runs reference dead hook servers.
+            terminal_sessions::hook_artifacts::remove_all_artifacts();
+            // Background sweep flipping quiet heuristic terminal sessions
+            // back to idle.
+            terminal_sessions::status::spawn_heuristic_sweeper(app.handle().clone());
 
             // Runtime registry crash-recovery sweep. Probes every
             // still-open row from a prior launch via `kill(pid, 0)`,
@@ -666,6 +687,10 @@ pub fn run() {
             commands::terminal_commands::stop_terminal,
             commands::terminal_commands::write_terminal_stdin,
             commands::terminal_commands::resize_terminal,
+            commands::terminal_session_commands::list_terminal_agents,
+            commands::terminal_session_commands::get_terminal_agent_details,
+            commands::terminal_session_commands::create_terminal_session,
+            commands::terminal_session_commands::spawn_terminal_session,
             commands::triage_commands::get_triage_config,
             commands::triage_commands::update_triage_config,
             commands::triage_commands::get_triage_active_status,

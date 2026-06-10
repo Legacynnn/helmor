@@ -925,6 +925,7 @@ describe("App", () => {
 						updatedAt: "2026-04-03T00:00:00Z",
 						isHidden: false,
 						active: false,
+						sessionKind: "chat",
 					},
 				]}
 				selectedSessionId={null}
@@ -975,6 +976,7 @@ describe("App", () => {
 						updatedAt: "2026-04-03T00:00:00Z",
 						isHidden: false,
 						active: true,
+						sessionKind: "chat",
 					},
 				]}
 				selectedSessionId="session-1"

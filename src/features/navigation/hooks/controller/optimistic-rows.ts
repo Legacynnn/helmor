@@ -68,6 +68,7 @@ export function createOptimisticWorkspaceSession(
 		updatedAt: createdAt,
 		lastUserMessageAt: null,
 		isHidden: false,
+		sessionKind: "chat",
 		actionKind: null,
 		active: true,
 	};

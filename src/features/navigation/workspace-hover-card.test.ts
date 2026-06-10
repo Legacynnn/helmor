@@ -30,6 +30,7 @@ function makeSession(
 		isHidden: false,
 		actionKind: null,
 		active: false,
+		sessionKind: "chat",
 		...overrides,
 	};
 }

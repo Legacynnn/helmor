@@ -441,6 +441,8 @@ export type WorkspaceSessionSummary = {
 	 * post-stream verifiers and auto-close behavior. */
 	actionKind?: ActionKind | null;
 	active: boolean;
+	/** "chat" (SDK-driven thread) or "terminal" (PTY running an agent CLI). */
+	sessionKind: "chat" | "terminal";
 };
 
 export type RestoreWorkspaceResponse = {
@@ -2197,7 +2199,8 @@ export type UiMutationEvent =
 	| { type: "triageActiveStatusChanged" }
 	| { type: "triageWorkspaceCreated"; workspaceId: string }
 	| { type: "fastModeUnavailable"; sessionId: string; reason: string }
-	| { type: "pairedDevicesChanged" };
+	| { type: "pairedDevicesChanged" }
+	| { type: "terminalSessionChanged"; workspaceId: string; sessionId: string };
 
 export type TriageConfig = {
 	enabled: boolean;
@@ -4604,6 +4607,71 @@ export async function setWorkspaceActiveRunAction(
  * Nothing is persisted: closing the app discards every sub-tab and its
  * output. Cross-tab / cross-workspace survival is in-memory only.
  */
+// ── Terminal sessions (PTY-backed agent CLIs threaded as sessions) ──────
+
+export type TerminalAgentInfo = {
+	id: string;
+	displayName: string;
+	installed: boolean;
+	version: string | null;
+	binaryPath: string | null;
+	firstClass: boolean;
+	iconKey: string;
+	skillCount: number;
+	extensionCount: number;
+	pluginCount: number;
+	docsUrl: string;
+};
+
+export type TerminalAgentDetectedItem = {
+	name: string;
+	path: string;
+	kind: "skill" | "extension" | "plugin";
+};
+
+export type TerminalAgentDetails = TerminalAgentInfo & {
+	skills: TerminalAgentDetectedItem[];
+	extensions: TerminalAgentDetectedItem[];
+	plugins: TerminalAgentDetectedItem[];
+};
+
+export async function listTerminalAgents(): Promise<TerminalAgentInfo[]> {
+	return invoke<TerminalAgentInfo[]>("list_terminal_agents", {});
+}
+
+export async function getTerminalAgentDetails(
+	agentId: string,
+): Promise<TerminalAgentDetails> {
+	return invoke<TerminalAgentDetails>("get_terminal_agent_details", {
+		agentId,
+	});
+}
+
+export async function createTerminalSession(
+	workspaceId: string,
+	agentId: string,
+): Promise<CreateSessionResponse> {
+	return invoke<CreateSessionResponse>("create_terminal_session", {
+		workspaceId,
+		agentId,
+	});
+}
+
+/** Spawn (or reattach to) the agent CLI PTY for a terminal session.
+ * stdin/resize/stop reuse the inspector terminal commands with
+ * `instanceId = sessionId`. */
+export async function spawnTerminalSession(
+	sessionId: string,
+	onEvent: (event: ScriptEvent) => void,
+): Promise<void> {
+	const channel = new Channel<ScriptEvent>();
+	channel.onmessage = onEvent;
+	await invoke("spawn_terminal_session", {
+		sessionId,
+		channel,
+	});
+}
+
 export async function spawnTerminal(
 	repoId: string,
 	workspaceId: string,

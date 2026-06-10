@@ -84,6 +84,7 @@ pub async fn spawn_terminal(
         default_branch: repo.default_branch.clone(),
         port_base: port_range.map(|r| r.base),
         port_count: port_range.map(|r| r.count),
+        extra_env: Vec::new(),
     };
     let mgr = manager.inner().clone();
     let script_type = make_script_type(&instance_id);

@@ -74,6 +74,7 @@ import { LocalLlmPanel } from "./panels/local-llm";
 import { MobileCompanionPanel } from "./panels/mobile-companion";
 import { ProvidersPanel } from "./panels/providers";
 import { RepositorySettingsPanel } from "./panels/repository-settings";
+import { TerminalAgentsPanel } from "./panels/terminal-agents";
 import { TriagePanel } from "./panels/triage";
 
 const FALLBACK_EFFORT_LEVELS = ["low", "medium", "high"];
@@ -94,6 +95,7 @@ const SECTION_LABEL_OVERRIDES: Partial<Record<SettingsSection, string>> = {
 	model: "Models",
 	account: "Accounts",
 	inbox: "Contexts",
+	"terminal-agents": "Terminal agents",
 };
 
 /// Optional muted-caption next to the title in the dialog header.
@@ -183,6 +185,7 @@ export const SettingsDialog = memo(function SettingsDialog({
 		"appearance",
 		"model",
 		"providers",
+		"terminal-agents",
 		"shortcuts",
 		...(conductorEnabled ? (["import"] as const) : []),
 		"account",
@@ -594,6 +597,8 @@ export const SettingsDialog = memo(function SettingsDialog({
 							)}
 
 							{activeSection === "providers" && <ProvidersPanel />}
+
+							{activeSection === "terminal-agents" && <TerminalAgentsPanel />}
 
 							{activeSection === "experimental" && (
 								<SettingsGroup>

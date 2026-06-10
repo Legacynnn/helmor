@@ -5,6 +5,7 @@ pub mod session_inspection;
 pub mod sessions;
 pub mod settings;
 pub mod slack_workspaces;
+pub mod terminal_sessions;
 pub mod workspaces;
 
 // Keep the models namespace focused on persistence-facing code. Workflow and

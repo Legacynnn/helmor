@@ -1,4 +1,5 @@
 import Ai302Color from "@lobehub/icons/es/Ai302/components/Color";
+import AmpMono from "@lobehub/icons/es/Amp/components/Mono";
 import BasetenMono from "@lobehub/icons/es/Baseten/components/Mono";
 import CerebrasColor from "@lobehub/icons/es/Cerebras/components/Color";
 import ClaudeColor from "@lobehub/icons/es/Claude/components/Color";
@@ -7,6 +8,9 @@ import CursorMono from "@lobehub/icons/es/Cursor/components/Mono";
 import DeepInfraColor from "@lobehub/icons/es/DeepInfra/components/Color";
 import DeepSeekColor from "@lobehub/icons/es/DeepSeek/components/Color";
 import FireworksColor from "@lobehub/icons/es/Fireworks/components/Color";
+import GeminiCliMono from "@lobehub/icons/es/GeminiCLI/components/Mono";
+import GithubCopilotMono from "@lobehub/icons/es/GithubCopilot/components/Mono";
+import GooseMono from "@lobehub/icons/es/Goose/components/Mono";
 import GrokMono from "@lobehub/icons/es/Grok/components/Mono";
 import GroqMono from "@lobehub/icons/es/Groq/components/Mono";
 import HuggingFaceColor from "@lobehub/icons/es/HuggingFace/components/Color";
@@ -65,6 +69,46 @@ export function CursorIcon(props: SVGProps<SVGSVGElement>) {
 
 export function OpenCodeIcon(props: SVGProps<SVGSVGElement>) {
 	return <OpenCodeMono {...props} />;
+}
+
+export function AmpIcon(props: SVGProps<SVGSVGElement>) {
+	return <AmpMono {...props} />;
+}
+
+export function GeminiCliIcon(props: SVGProps<SVGSVGElement>) {
+	return <GeminiCliMono {...props} />;
+}
+
+export function GithubCopilotIcon(props: SVGProps<SVGSVGElement>) {
+	return <GithubCopilotMono {...props} />;
+}
+
+export function GooseIcon(props: SVGProps<SVGSVGElement>) {
+	return <GooseMono {...props} />;
+}
+
+/** pi has no lobehub icon yet — π glyph matching the brand wordmark. */
+export function PiIcon(props: SVGProps<SVGSVGElement>) {
+	return (
+		<svg
+			fill="currentColor"
+			viewBox="0 0 24 24"
+			xmlns="http://www.w3.org/2000/svg"
+			{...props}
+		>
+			<title>pi</title>
+			<text
+				x="12"
+				y="17.5"
+				textAnchor="middle"
+				fontSize="19"
+				fontFamily="ui-serif, Georgia, serif"
+				fill="currentColor"
+			>
+				π
+			</text>
+		</svg>
+	);
 }
 
 export function ClaudeColorIcon(props: SVGProps<SVGSVGElement>) {

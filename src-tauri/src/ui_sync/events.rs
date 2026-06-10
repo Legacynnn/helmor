@@ -97,6 +97,13 @@ pub enum UiMutationEvent {
     /// The mobile-companion paired-device list changed (paired or revoked).
     /// Frontends invalidate the `pairedDevices` query.
     PairedDevicesChanged,
+    /// A terminal session's live status changed (hook ping, output
+    /// heuristic, or PTY exit). Frontends invalidate the
+    /// `workspaceSessions(workspaceId)` query so tab badges update.
+    TerminalSessionChanged {
+        workspace_id: String,
+        session_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -188,6 +195,10 @@ mod tests {
             UiMutationEvent::FastModeUnavailable {
                 session_id: "s".into(),
                 reason: "extra usage not enabled".into(),
+            },
+            UiMutationEvent::TerminalSessionChanged {
+                workspace_id: "w".into(),
+                session_id: "s".into(),
             },
         ];
         for event in cases {

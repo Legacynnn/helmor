@@ -835,6 +835,20 @@ fn run_migrations(connection: &Connection) -> Result<()> {
             "INTEGER NOT NULL DEFAULT 0",
         )?;
     }
+
+    // Terminal sessions: 'chat' rows are the existing SDK-driven threads,
+    // 'terminal' rows wrap a PTY running an agent CLI. Terminal rows never
+    // get session_messages, so the message pipeline never sees them.
+    // `terminal_meta` is opaque JSON (exit code, launch info).
+    if has_table(connection, "sessions") {
+        add_column_if_missing(
+            connection,
+            "sessions",
+            "session_kind",
+            "TEXT NOT NULL DEFAULT 'chat'",
+        )?;
+        add_column_if_missing(connection, "sessions", "terminal_meta", "TEXT")?;
+    }
     if has_table(connection, "triage_candidate") {
         // Why an item surfaced for the user (review_requested / assigned /
         // mentioned / author / owned_issue). Nullable — older rows + sources
@@ -1112,6 +1126,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     context_usage_meta TEXT,
     codex_goal_meta TEXT,
     draft_state TEXT,
+    session_kind TEXT NOT NULL DEFAULT 'chat',
+    terminal_meta TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

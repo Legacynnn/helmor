@@ -63,6 +63,7 @@ pub async fn spawn_lark_cli_auth_terminal(
         default_branch: None,
         port_base: None,
         port_count: None,
+        extra_env: Vec::new(),
     };
     let mgr = manager.inner().clone();
     let script_type = action.script_type(&instance_id);

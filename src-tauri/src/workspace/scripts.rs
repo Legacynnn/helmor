@@ -14,7 +14,10 @@ use anyhow::{bail, Context, Result};
 use serde::Serialize;
 use tauri::ipc::Channel;
 
-#[derive(Debug, Clone, Serialize)]
+// `Deserialize` exists for tee channels (terminal sessions wrap the
+// frontend channel to observe Stdout/Exited for status heuristics) —
+// the wire shape is unchanged.
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ScriptEvent {
     Started {
@@ -233,6 +236,14 @@ impl ScriptProcessManager {
     /// — avoiding an extra thread spawn per Stop click for the 95% of
     /// run actions that don't need a graceful cleanup. Does **not**
     /// reap — `run_script`'s `child.wait()` still owns that.
+    /// Whether a live process is currently registered under `key`.
+    pub fn is_running(&self, key: &ProcessKey) -> bool {
+        self.processes
+            .lock()
+            .expect("process map poisoned")
+            .contains_key(key)
+    }
+
     pub fn kill(&self, key: &ProcessKey) -> bool {
         let handle = {
             let map = self.processes.lock().expect("process map poisoned");
@@ -579,6 +590,9 @@ pub struct ScriptContext {
     /// Size of the port block starting at `port_base`. Surfaces to
     /// scripts as `HELMOR_PORT_COUNT`. Always paired with `port_base`.
     pub port_count: Option<u16>,
+    /// Additional env vars for this spawn (terminal sessions inject
+    /// `HELMOR_TERMINAL_SESSION_ID` / hook server coordinates here).
+    pub extra_env: Vec<(String, String)>,
 }
 
 /// Allocate a PTY pair via `openpty`. Returns (master_fd, slave_fd).
@@ -809,6 +823,9 @@ pub(crate) fn run_script_with_shell(
     if let (Some(base), Some(count)) = (context.port_base, context.port_count) {
         cmd.env("HELMOR_PORT", base.to_string());
         cmd.env("HELMOR_PORT_COUNT", count.to_string());
+    }
+    for (key, value) in &context.extra_env {
+        cmd.env(key, value);
     }
 
     // Set up the child's session and controlling terminal before exec.
@@ -1259,6 +1276,7 @@ mod tests {
             default_branch: None,
             port_base: None,
             port_count: None,
+            extra_env: Vec::new(),
         };
         let key: ProcessKey = ("repo".into(), "run".into(), Some("ws".into()));
 
@@ -1383,6 +1401,7 @@ mod tests {
             default_branch: None,
             port_base: None,
             port_count: None,
+            extra_env: Vec::new(),
         };
         let key: ProcessKey = ("repo".into(), "run".into(), Some("ws".into()));
 
@@ -1449,6 +1468,7 @@ mod tests {
             default_branch: None,
             port_base: None,
             port_count: None,
+            extra_env: Vec::new(),
         };
         let key: ProcessKey = ("repo".into(), "run".into(), Some("ws".into()));
 
@@ -1540,6 +1560,7 @@ mod tests {
             default_branch: None,
             port_base: None,
             port_count: None,
+            extra_env: Vec::new(),
         };
         let key: ProcessKey = ("repo".into(), "run".into(), Some("ws".into()));
 
@@ -1631,6 +1652,7 @@ mod tests {
             default_branch: None,
             port_base: None,
             port_count: None,
+            extra_env: Vec::new(),
         };
         run_script_with_shell(
             &mgr,
@@ -1702,6 +1724,7 @@ mod tests {
             default_branch: Some("main".into()),
             port_base: Some(55_100),
             port_count: Some(10),
+            extra_env: Vec::new(),
         };
 
         let (tx, rx) = mpsc::channel::<String>();
@@ -1779,6 +1802,7 @@ mod tests {
             default_branch: Some("main".into()),
             port_base: None,
             port_count: None,
+            extra_env: Vec::new(),
         };
 
         let (tx, rx) = mpsc::channel::<String>();
@@ -1850,6 +1874,7 @@ mod tests {
             default_branch: None,
             port_base: None,
             port_count: None,
+            extra_env: Vec::new(),
         };
         let result = run_script(
             &mgr,
@@ -1942,6 +1967,7 @@ mod tests {
             default_branch: None,
             port_base: None,
             port_count: None,
+            extra_env: Vec::new(),
         }
     }
 
