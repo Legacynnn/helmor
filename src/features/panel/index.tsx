@@ -1,5 +1,7 @@
-import { memo, type ReactNode, useEffect } from "react";
+import { memo, type ReactNode, useEffect, useRef } from "react";
 import { SourceDetailView } from "@/features/source-detail";
+import { terminalAgentLabel } from "@/features/terminals/agent-meta";
+import { TerminalSessionPane } from "@/features/terminals/terminal-session-pane";
 import type {
 	AgentProvider,
 	ChangeRequestInfo,
@@ -52,6 +54,7 @@ type WorkspacePanelProps = {
 	headerActions?: ReactNode;
 	headerLeading?: ReactNode;
 	newSessionShortcut?: string | null;
+	newTerminalShortcut?: string | null;
 	missingScriptTypes?: WorkspaceScriptType[];
 	onInitializeScript?: (scriptType: WorkspaceScriptType) => void;
 };
@@ -84,6 +87,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	headerActions,
 	headerLeading,
 	newSessionShortcut,
+	newTerminalShortcut,
 	missingScriptTypes = [],
 	onInitializeScript,
 }: WorkspacePanelProps) {
@@ -93,6 +97,25 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 		sessionPanes.find((pane) => pane.presentationState === "presented") ??
 		sessionPanes[0] ??
 		null;
+
+	// Terminal sessions: a pane spawns its PTY on first selection and then
+	// stays mounted (CSS-hidden) so scrollback survives tab switches. The
+	// `openedTerminalIds` ref remembers which sessions have been opened —
+	// without it every terminal tab would spawn its agent CLI eagerly.
+	const selectedIsTerminal = selectedSession?.sessionKind === "terminal";
+	const openedTerminalIds = useRef<Set<string>>(new Set());
+	if (selectedIsTerminal && selectedSessionId) {
+		openedTerminalIds.current.add(selectedSessionId);
+	}
+	const visibleSessionIds = new Set(sessions.map((session) => session.id));
+	for (const id of [...openedTerminalIds.current]) {
+		if (!visibleSessionIds.has(id)) openedTerminalIds.current.delete(id);
+	}
+	const mountedTerminalSessions = sessions.filter(
+		(session) =>
+			session.sessionKind === "terminal" &&
+			openedTerminalIds.current.has(session.id),
+	);
 
 	useEffect(() => {
 		if (typeof window === "undefined") {
@@ -147,14 +170,31 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 					onWorkspaceChanged={onWorkspaceChanged}
 					onRequestCloseSession={onRequestCloseSession}
 					newSessionShortcut={newSessionShortcut}
+					newTerminalShortcut={newTerminalShortcut}
 				/>
 
 				<div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+					{workspace
+						? mountedTerminalSessions.map((session) => (
+								<TerminalSessionPane
+									key={session.id}
+									sessionId={session.id}
+									repoId={workspace.repoId}
+									workspaceId={workspace.id}
+									agentLabel={terminalAgentLabel(session.agentType)}
+									isActive={
+										selectedIsTerminal &&
+										session.id === selectedSessionId &&
+										!contextPreviewActive
+									}
+								/>
+							))
+						: null}
 					{contextPreviewActive && contextPreviewCard ? (
 						<div className="min-h-0 flex-1 overflow-hidden px-0 pt-4 pb-3">
 							<SourceDetailView card={contextPreviewCard} />
 						</div>
-					) : activePane?.hasLoaded ? (
+					) : selectedIsTerminal ? null : activePane?.hasLoaded ? (
 						<ActiveThreadViewport
 							hasSession={!!selectedSession}
 							pane={activePane}

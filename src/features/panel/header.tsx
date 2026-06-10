@@ -12,7 +12,6 @@ import {
 	Layers,
 	MessageCircle,
 	Pencil,
-	Plus,
 	RotateCcw,
 	Trash2,
 	X,
@@ -51,7 +50,8 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { InlineShortcutDisplay } from "@/features/shortcuts/shortcut-display";
+import { terminalAgentIcon } from "@/features/terminals/agent-meta";
+import { NewSessionPopover } from "@/features/terminals/new-session-popover";
 import {
 	type AgentProvider,
 	type ChangeRequestInfo,
@@ -107,6 +107,7 @@ type WorkspacePanelHeaderProps = {
 	 *  chip). Wired from the shell's selection controller. */
 	onSelectWorkspace?: (workspaceId: string) => void;
 	newSessionShortcut?: string | null;
+	newTerminalShortcut?: string | null;
 };
 
 const SESSION_TITLE_TOOLTIP_MAX_CHARS = 240;
@@ -139,6 +140,7 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 	onRequestCloseSession,
 	onSelectWorkspace,
 	newSessionShortcut,
+	newTerminalShortcut,
 }: WorkspacePanelHeaderProps) {
 	const branchTone = getWorkspaceBranchTone({
 		workspaceState: workspace?.state,
@@ -579,13 +581,17 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 									) : null}
 									{sessions.map((session) => {
 										const selected = session.id === selectedSessionId;
-										const isActivelySending =
-											busySessionIds?.has(session.id) === true ||
-											isSessionRunningStatus(session.status) ||
-											(selected && sending);
+										const isTerminal = session.sessionKind === "terminal";
+										const isActivelySending = isTerminal
+											? session.status === "working"
+											: busySessionIds?.has(session.id) === true ||
+												isSessionRunningStatus(session.status) ||
+												(selected && sending);
 										const hasUnread = session.unreadCount > 0;
-										const isInteractionRequired =
-											interactionRequiredSessionIds?.has(session.id) ?? false;
+										const isInteractionRequired = isTerminal
+											? session.status === "attention"
+											: (interactionRequiredSessionIds?.has(session.id) ??
+												false);
 										const isActive =
 											isActivelySending && !isInteractionRequired;
 										const hasStatusDot =
@@ -611,10 +617,16 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 														<span className="tab-content-fade flex min-w-0 flex-1 items-center gap-1.5">
 															<SessionProviderIcon
 																agentType={
-																	sessionDisplayProviders?.[session.id] ??
-																	session.agentType
+																	isTerminal
+																		? session.agentType
+																		: (sessionDisplayProviders?.[session.id] ??
+																			session.agentType)
 																}
 																active={isActive}
+																terminal={isTerminal}
+																exited={
+																	isTerminal && session.status === "exited"
+																}
 															/>
 															{isEditing ? (
 																<Input
@@ -725,32 +737,14 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 					</div>
 				</div>
 
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Button
-							aria-label="New session"
-							onClick={sessionActions.createSession}
-							variant="ghost"
-							size="icon-sm"
-							className="ml-0.5 shrink-0 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-						>
-							<Plus className="size-3.5" strokeWidth={1.8} />
-						</Button>
-					</TooltipTrigger>
-					<TooltipContent
-						side="bottom"
-						sideOffset={4}
-						className="flex h-[24px] items-center gap-2 rounded-md px-2 text-small leading-none"
-					>
-						<span>New session</span>
-						{newSessionShortcut ? (
-							<InlineShortcutDisplay
-								hotkey={newSessionShortcut}
-								className="text-background/60"
-							/>
-						) : null}
-					</TooltipContent>
-				</Tooltip>
+				<NewSessionPopover
+					workspaceId={workspace?.id ?? null}
+					conversationShortcut={newSessionShortcut}
+					terminalShortcut={newTerminalShortcut}
+					onCreateConversation={() => void sessionActions.createSession()}
+					onSelectSession={onSelectSession}
+					onSessionsChanged={onSessionsChanged}
+				/>
 
 				<DropdownMenu
 					open={hiddenHistory.showHistory}
@@ -852,12 +846,27 @@ function getBranchToneClassName(tone: WorkspaceBranchTone) {
 function SessionProviderIcon({
 	agentType,
 	active,
+	terminal = false,
+	exited = false,
 }: {
 	agentType?: string | null;
 	active: boolean;
+	terminal?: boolean;
+	exited?: boolean;
 }) {
 	if (active) {
 		return <HelmorThinkingIndicator size={14} />;
+	}
+	if (terminal) {
+		const Icon = terminalAgentIcon(agentType);
+		return (
+			<Icon
+				className={cn(
+					"size-3 shrink-0 text-muted-foreground",
+					exited && "opacity-50",
+				)}
+			/>
+		);
 	}
 	if (agentType === "codex") {
 		return <OpenAIIcon className="size-3 shrink-0 text-muted-foreground" />;

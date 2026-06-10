@@ -18,7 +18,8 @@ const apiMocks = vi.hoisted(() => ({
 	renameSession: vi.fn(),
 }));
 
-vi.mock("@/components/icons", () => ({
+vi.mock("@/components/icons", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/components/icons")>()),
 	ClaudeIcon: (props: { className?: string }) => (
 		<span data-testid="claude-icon" {...props}>
 			claude-icon
@@ -100,6 +101,7 @@ const SESSIONS: WorkspaceSessionSummary[] = [
 		isHidden: false,
 		actionKind: null,
 		active: true,
+		sessionKind: "chat",
 	},
 ];
 
@@ -190,6 +192,10 @@ describe("WorkspacePanel", () => {
 		);
 
 		await user.click(screen.getByRole("button", { name: "New session" }));
+		// The popover is now open — click "New conversation" inside it.
+		await user.click(
+			await screen.findByRole("button", { name: "New conversation" }),
+		);
 
 		await waitFor(() => {
 			expect(onSelectSession).toHaveBeenCalledWith("session-new");

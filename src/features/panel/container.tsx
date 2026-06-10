@@ -222,6 +222,7 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 								isHidden: false,
 								actionKind: null,
 								active: true,
+								sessionKind: "chat" as const,
 							},
 						];
 					},
@@ -511,8 +512,15 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 		[displayedWorkspaceId, queryClient, sessions, workspace],
 	);
 
+	const sessionsRef = useRef(sessions);
+	sessionsRef.current = sessions;
 	const handlePrefetchSession = useCallback(
 		(sessionId: string) => {
+			// Terminal sessions have no thread messages to prefetch.
+			const target = sessionsRef.current.find((s) => s.id === sessionId);
+			if (target?.sessionKind === "terminal") {
+				return;
+			}
 			void queryClient.prefetchQuery(
 				sessionThreadMessagesQueryOptions(sessionId),
 			);
@@ -668,6 +676,10 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			headerActions={headerActions}
 			headerLeading={headerLeading}
 			newSessionShortcut={getShortcut(settings.shortcuts, "session.new")}
+			newTerminalShortcut={getShortcut(
+				settings.shortcuts,
+				"session.newTerminal",
+			)}
 			missingScriptTypes={missingScriptTypes}
 			onInitializeScript={handleInitializeScript}
 			changeRequest={workspaceChangeRequest}
