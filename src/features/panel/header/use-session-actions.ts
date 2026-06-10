@@ -28,7 +28,7 @@ export type SessionActionsController = {
 	editingSessionId: string | null;
 	editingTitle: string;
 	setEditingTitle(value: string): void;
-	createSession(): Promise<void>;
+	createSession(model?: string): Promise<void>;
 	hideSession(sessionId: string, event: React.MouseEvent): Promise<void>;
 	deleteHiddenSession(sessionId: string): Promise<void>;
 	startRename(session: WorkspaceSessionSummary, event: React.MouseEvent): void;
@@ -64,27 +64,33 @@ export function useSessionActions({
 	const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
 	const [editingTitle, setEditingTitle] = useState("");
 
-	const createSessionAction = useCallback(async () => {
-		if (!workspace) return;
-		try {
-			const result = await createSession(workspace.id);
-			seedNewSessionInCache({
-				queryClient,
-				workspaceId: workspace.id,
-				sessionId: result.sessionId,
-				workspace,
-				existingSessions: sessions,
-				createdAt: new Date().toISOString(),
-			});
-			void queryClient.invalidateQueries({
-				queryKey: helmorQueryKeys.repoScripts(workspace.repoId, workspace.id),
-			});
-			onSessionsChanged?.();
-			onSelectSession?.(result.sessionId);
-		} catch (error) {
-			console.error("Failed to create session:", error);
-		}
-	}, [onSelectSession, onSessionsChanged, queryClient, sessions, workspace]);
+	const createSessionAction = useCallback(
+		async (model?: string) => {
+			if (!workspace) return;
+			try {
+				const result = await createSession(
+					workspace.id,
+					model ? { model } : undefined,
+				);
+				seedNewSessionInCache({
+					queryClient,
+					workspaceId: workspace.id,
+					sessionId: result.sessionId,
+					workspace,
+					existingSessions: sessions,
+					createdAt: new Date().toISOString(),
+				});
+				void queryClient.invalidateQueries({
+					queryKey: helmorQueryKeys.repoScripts(workspace.repoId, workspace.id),
+				});
+				onSessionsChanged?.();
+				onSelectSession?.(result.sessionId);
+			} catch (error) {
+				console.error("Failed to create session:", error);
+			}
+		},
+		[onSelectSession, onSessionsChanged, queryClient, sessions, workspace],
+	);
 
 	const hideSession = useCallback(
 		async (sessionId: string, event: React.MouseEvent) => {

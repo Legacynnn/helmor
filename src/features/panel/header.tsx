@@ -741,7 +741,9 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 					workspaceId={workspace?.id ?? null}
 					conversationShortcut={newSessionShortcut}
 					terminalShortcut={newTerminalShortcut}
-					onCreateConversation={() => void sessionActions.createSession()}
+					onCreateConversation={(model) =>
+						void sessionActions.createSession(model)
+					}
 					onSelectSession={onSelectSession}
 					onSessionsChanged={onSessionsChanged}
 				/>
