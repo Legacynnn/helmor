@@ -9,8 +9,8 @@
 // Fullscreen handling: in a fullscreen space there is no desktop behind the
 // window, so the vibrancy material falls back to a green/black cast. When the
 // window enters fullscreen we therefore clear the native blur and add a
-// `vesper-fullscreen` class so CSS swaps the chrome to an opaque "better dark"
-// background; on exit we restore the blur.
+// `vesper-fullscreen` class so CSS switches to an in-window frosted material
+// using backdrop-filter; on exit we restore the native blur.
 //
 // macOS + Tauri only. Everywhere else Vesper degrades to a plain opaque dark
 // theme and this hook is a no-op.
@@ -100,7 +100,7 @@ export function useVesperWindow(opts: VesperWindowOptions): void {
 			}
 			if (disposed) return;
 			root.classList.toggle(FULLSCREEN_CLASS, fullscreen);
-			// Opaque dark in fullscreen (no green cast), translucent blur otherwise.
+			// Native desktop blur outside fullscreen, CSS in-window blur inside it.
 			await setVibrancy(!fullscreen);
 		};
 
