@@ -172,6 +172,12 @@ export function useGlobalShortcutHandlers({
 				enabled: workspaceViewMode === "conversation",
 			},
 			{
+				id: "session.newTerminal" as const,
+				callback: () =>
+					publishShellEvent({ type: "open-new-session", tab: "terminal" }),
+				enabled: workspaceViewMode === "conversation",
+			},
+			{
 				id: "session.reopenClosed" as const,
 				callback: () => void handleReopenClosedSession(),
 			},
