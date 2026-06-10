@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { MessageSquare, Plus, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ModelIcon } from "@/components/model-icon";
 import { Button } from "@/components/ui/button";
 import {
 	Popover,
@@ -13,8 +14,15 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { InlineShortcutDisplay } from "@/features/shortcuts/shortcut-display";
-import { createTerminalSession, type TerminalAgentInfo } from "@/lib/api";
-import { terminalAgentsQueryOptions } from "@/lib/query-client";
+import {
+	type AgentModelSection,
+	createTerminalSession,
+	type TerminalAgentInfo,
+} from "@/lib/api";
+import {
+	agentModelSectionsQueryOptions,
+	terminalAgentsQueryOptions,
+} from "@/lib/query-client";
 import { cn } from "@/lib/utils";
 import { useWorkspaceToast } from "@/lib/workspace-toast-context";
 import { publishShellEvent, useShellEvent } from "@/shell/event-bus";
@@ -28,8 +36,9 @@ type NewSessionPopoverProps = {
 	conversationShortcut?: string | null;
 	/** Hotkey label for the Terminal tab (e.g. "Mod+Shift+T"). */
 	terminalShortcut?: string | null;
-	/** Plain "new conversation" action — owned by the panel header. */
-	onCreateConversation: () => void;
+	/** Plain "new conversation" action — owned by the panel header. Optional
+	 * `model` seeds the new session's harness/model. */
+	onCreateConversation: (model?: string) => void;
 	onSelectSession?: (sessionId: string) => void;
 	onSessionsChanged?: () => void;
 };
@@ -99,15 +108,25 @@ export function NewSessionPopover({
 		.filter((agentInfo) => agentInfo.installed)
 		.sort((a, b) => agentRank(a) - agentRank(b));
 
+	const modelSectionsQuery = useQuery({
+		...agentModelSectionsQueryOptions(),
+		enabled: open,
+	});
+	const harnesses: AgentModelSection[] = (modelSectionsQuery.data ?? []).filter(
+		(section) => section.status === "ready" && section.options.length > 0,
+	);
+
+	const activeListLength =
+		tab === "conversation" ? harnesses.length : installed.length;
 	useEffect(() => {
 		setHighlight((current) =>
-			installed.length === 0 ? 0 : Math.min(current, installed.length - 1),
+			activeListLength === 0 ? 0 : Math.min(current, activeListLength - 1),
 		);
-	}, [installed.length]);
+	}, [activeListLength]);
 
-	const startConversation = () => {
+	const startConversation = (model?: string) => {
 		setOpen(false);
-		onCreateConversation();
+		onCreateConversation(model);
 	};
 
 	const startTerminal = async (agent: TerminalAgentInfo) => {
@@ -138,9 +157,31 @@ export function NewSessionPopover({
 			return;
 		}
 		if (tab === "conversation") {
+			if (event.key === "ArrowDown") {
+				event.preventDefault();
+				setHighlight((current) =>
+					Math.max(0, Math.min(harnesses.length - 1, current + 1)),
+				);
+				return;
+			}
+			if (event.key === "ArrowUp") {
+				event.preventDefault();
+				setHighlight((current) => Math.max(0, current - 1));
+				return;
+			}
 			if (event.key === "Enter") {
 				event.preventDefault();
-				startConversation();
+				const section = harnesses[highlight];
+				if (section) startConversation(section.options[0]?.id);
+				else startConversation();
+				return;
+			}
+			if (/^[1-9]$/.test(event.key)) {
+				const section = harnesses[Number(event.key) - 1];
+				if (section) {
+					event.preventDefault();
+					startConversation(section.options[0]?.id);
+				}
 			}
 			return;
 		}
@@ -223,14 +264,47 @@ export function NewSessionPopover({
 
 				{tab === "conversation" ? (
 					<div className="p-1">
-						<button
-							type="button"
-							onClick={startConversation}
-							className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-small hover:bg-accent/60"
-						>
-							<MessageSquare className="size-3.5 shrink-0" />
-							New conversation
-						</button>
+						{modelSectionsQuery.isPending ? (
+							<div className="px-2 py-1.5 text-small text-muted-foreground">
+								Detecting harnesses…
+							</div>
+						) : harnesses.length === 0 ? (
+							<button
+								type="button"
+								onClick={() => startConversation()}
+								className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-small hover:bg-accent/60"
+							>
+								<MessageSquare className="size-3.5 shrink-0" />
+								New conversation
+							</button>
+						) : (
+							harnesses.map((section, index) => {
+								const quickKey = index < 9 ? String(index + 1) : null;
+								return (
+									<button
+										key={section.id}
+										type="button"
+										onClick={() => startConversation(section.options[0]?.id)}
+										onMouseEnter={() => setHighlight(index)}
+										data-highlighted={index === highlight ? "" : undefined}
+										className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-small hover:bg-accent/60 data-[highlighted]:bg-accent/60"
+									>
+										<ModelIcon
+											model={section.options[0]}
+											className="size-3.5 shrink-0"
+										/>
+										<span className="min-w-0 flex-1 truncate text-left">
+											{section.label}
+										</span>
+										{quickKey ? (
+											<kbd className="shrink-0 rounded-sm border border-border/70 bg-background px-1 text-[10px] text-muted-foreground">
+												{quickKey}
+											</kbd>
+										) : null}
+									</button>
+								);
+							})
+						)}
 					</div>
 				) : (
 					<div className="p-1">

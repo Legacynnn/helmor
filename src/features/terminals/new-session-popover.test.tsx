@@ -1,21 +1,62 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TerminalAgentInfo } from "@/lib/api";
+import type { AgentModelSection, TerminalAgentInfo } from "@/lib/api";
 import { renderWithProviders } from "@/test/render-with-providers";
 
 const apiMocks = vi.hoisted(() => ({
 	listTerminalAgents: vi.fn(),
 	createTerminalSession: vi.fn(),
+	loadAgentModelSections: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/api")>()),
 	listTerminalAgents: apiMocks.listTerminalAgents,
 	createTerminalSession: apiMocks.createTerminalSession,
+	loadAgentModelSections: apiMocks.loadAgentModelSections,
 }));
 
 import { NewSessionPopover } from "./new-session-popover";
+
+const HARNESS_SECTIONS: AgentModelSection[] = [
+	{
+		id: "claude",
+		label: "Claude Code",
+		status: "ready",
+		options: [
+			{
+				id: "default",
+				provider: "claude",
+				label: "Opus 4.8 1M",
+				cliModel: "default",
+				effortLevels: [],
+				supportsContextUsage: true,
+			},
+		],
+	},
+	{
+		id: "codex",
+		label: "Codex",
+		status: "ready",
+		options: [
+			{
+				id: "gpt-5.5",
+				provider: "codex",
+				label: "GPT-5.5",
+				cliModel: "gpt-5.5",
+				effortLevels: [],
+				supportsContextUsage: true,
+			},
+		],
+	},
+	{
+		id: "opencode",
+		label: "OpenCode",
+		status: "unavailable",
+		options: [],
+	},
+];
 
 function agent(overrides: Partial<TerminalAgentInfo>): TerminalAgentInfo {
 	return {
@@ -72,17 +113,38 @@ beforeEach(() => {
 		agent({ id: "amp", displayName: "Amp", installed: false, version: null }),
 	]);
 	apiMocks.createTerminalSession.mockResolvedValue({ sessionId: "ts-1" });
+	apiMocks.loadAgentModelSections.mockResolvedValue(HARNESS_SECTIONS);
 });
 
 describe("NewSessionPopover", () => {
-	it("creates a conversation from the Conversation tab", async () => {
+	it("creates a conversation seeded with the harness's default model", async () => {
 		const onCreateConversation = vi.fn();
 		const user = userEvent.setup();
 		renderPopover({ onCreateConversation });
 		await user.click(screen.getByLabelText("New session"));
-		await user.click(await screen.findByText("New conversation"));
-		expect(onCreateConversation).toHaveBeenCalledTimes(1);
+		await user.click(await screen.findByText("Claude Code"));
+		expect(onCreateConversation).toHaveBeenCalledWith("default");
 		expect(apiMocks.createTerminalSession).not.toHaveBeenCalled();
+	});
+
+	it("lists only ready harnesses and hides unavailable ones", async () => {
+		const user = userEvent.setup();
+		renderPopover();
+		await user.click(screen.getByLabelText("New session"));
+		await waitFor(() => {
+			expect(screen.getByText("Claude Code")).toBeInTheDocument();
+		});
+		expect(screen.getByText("Codex")).toBeInTheDocument();
+		expect(screen.queryByText("OpenCode")).not.toBeInTheDocument();
+	});
+
+	it("creates a conversation with the picked harness's first model id", async () => {
+		const onCreateConversation = vi.fn();
+		const user = userEvent.setup();
+		renderPopover({ onCreateConversation });
+		await user.click(screen.getByLabelText("New session"));
+		await user.click(await screen.findByText("Codex"));
+		expect(onCreateConversation).toHaveBeenCalledWith("gpt-5.5");
 	});
 
 	it("lists only installed terminal agents on the Terminal tab", async () => {
