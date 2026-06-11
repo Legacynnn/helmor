@@ -149,6 +149,7 @@ async fn dispatch(
         "list_workspace_changes" => to_value(crate::commands::editor_commands::list_workspace_changes(arg_string(&args, "workspaceRootPath")?, arg_opt_string(&args, "workspaceId")).await?),
         "list_workspace_files" => to_value(crate::commands::editor_commands::list_workspace_files(arg_string(&args, "workspaceRootPath")?).await?),
         "list_workspace_groups" => to_value(crate::commands::workspace_commands::list_workspace_groups().await?),
+        "list_workspace_tree" => to_value(crate::commands::search_commands::list_workspace_tree(arg_string(&args, "workspaceRootPath")?).await?),
         "list_workspace_linked_directories" => to_value(crate::commands::workspace_commands::list_workspace_linked_directories(arg_string(&args, "workspaceId")?).await?),
         "list_workspace_sessions" => to_value(crate::commands::session_commands::list_workspace_sessions(arg_string(&args, "workspaceId")?).await?),
         "load_auto_close_action_kinds" => to_value(crate::commands::settings_commands::load_auto_close_action_kinds().await?),
@@ -227,6 +228,7 @@ async fn dispatch(
             crate::agents::respond_to_user_input(app.state::<crate::sidecar::ManagedSidecar>(), arg_json(&args, "request")?).await?;
             Ok(Value::Null)
         }
+        "replace_in_workspace" => to_value(crate::commands::search_commands::replace_in_workspace(app.clone(), arg_json(&args, "request")?).await?),
         "restore_workspace" => to_value(crate::commands::workspace_commands::restore_workspace(app.clone(), arg_string(&args, "workspaceId")?, arg_opt_string(&args, "targetBranchOverride")).await?),
         "retry_repo_forge_binding" => to_value(crate::commands::repository_commands::retry_repo_forge_binding(app.clone(), arg_string(&args, "repoId")?).await?),
         "save_auto_close_action_kinds" => {
@@ -242,6 +244,7 @@ async fn dispatch(
             crate::commands::system_commands::save_text_file_as(arg_string(&args, "path")?, arg_string(&args, "contents")?).await?;
             Ok(Value::Null)
         }
+        "search_workspace" => to_value(crate::commands::search_commands::search_workspace(arg_json(&args, "request")?).await?),
         "set_session_context_usage" => {
             crate::commands::session_commands::set_session_context_usage(app.clone(), arg_string(&args, "sessionId")?, arg_string(&args, "meta")?).await?;
             Ok(Value::Null)

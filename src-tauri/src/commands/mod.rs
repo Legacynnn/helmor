@@ -9,6 +9,7 @@ pub(crate) mod local_llm_commands;
 pub(crate) mod opencode_config_commands;
 pub(crate) mod repository_commands;
 pub(crate) mod script_commands;
+pub(crate) mod search_commands;
 pub(crate) mod session_commands;
 pub(crate) mod settings_commands;
 pub(crate) mod slack_commands;

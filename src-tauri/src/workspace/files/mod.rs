@@ -1,7 +1,10 @@
 mod changes;
 mod diff_stats;
 mod editor;
+mod replace;
+mod search;
 mod support;
+mod tree;
 mod types;
 
 pub use changes::{
@@ -13,6 +16,9 @@ pub use editor::{
     list_editor_files, list_workspace_files, read_editor_file, read_file_at_ref, stat_editor_file,
     write_editor_file,
 };
+pub use replace::{replace_in_workspace, WorkspaceReplaceRequest, WorkspaceReplaceResponse};
+pub use search::{search_workspace, WorkspaceSearchRequest, WorkspaceSearchResponse};
+pub use tree::{list_workspace_tree, WorkspaceTreeResponse};
 pub use types::{
     EditorFileListItem, EditorFileReadResponse, EditorFileStatResponse, EditorFileWriteResponse,
 };
