@@ -370,6 +370,15 @@ impl ManagedSidecar {
         }
     }
 
+    /// PID of the running sidecar process, if one is alive. Used by the
+    /// resource monitor to anchor the Helmor process tree.
+    pub fn current_pid(&self) -> Option<u32> {
+        self.process
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|p| p.child.id()))
+    }
+
     // Called once from Tauri setup; later calls are no-ops.
     pub fn install_host_dispatcher(&self) -> mpsc::Receiver<HostRequestEnvelope> {
         let (tx, rx) = mpsc::channel();

@@ -21,6 +21,7 @@ pub mod models;
 pub mod pipeline;
 pub(crate) mod platform;
 pub mod rate_limits;
+pub mod resources;
 pub mod schema;
 pub mod service;
 mod shell_env;

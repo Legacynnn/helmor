@@ -74,6 +74,7 @@ tauri = { version = "2", features = [
     "devtools",
     "macos-private-api",
 ] }
+sysinfo = "0.33"
 tempfile = "3"
 tauri-plugin-deep-link = "2"
 tauri-plugin-dialog = "2"
