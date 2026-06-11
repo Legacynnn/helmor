@@ -6,6 +6,7 @@ import {
 	FileDiff,
 	GitBranch,
 	GitPullRequest,
+	Laptop,
 	type LucideIcon,
 	MessageCircle,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import {
 	LazyStreamdown,
 	preloadStreamdown,
 } from "@/components/streamdown-loader";
+import { Badge } from "@/components/ui/badge";
 import {
 	HoverCardContent,
 	HoverCard as HoverCardRoot,
@@ -278,6 +280,14 @@ export function formatElapsed(ms: number): string {
 	const hr = Math.floor(totalMin / 60);
 	const remMin = totalMin % 60;
 	return remMin > 0 ? `${hr}h ${remMin}m` : `${hr}h`;
+}
+
+/** A "primary" workspace operates on the repository's primary worktree — its
+ * root checkout — rather than a Helmor-created per-session worktree. In the
+ * data model that's exactly `mode === "local"`: Worktree mode is a dedicated
+ * `git worktree` Helmor spun up, and Chat mode has no repo at all. */
+export function isPrimaryWorktree(row: Pick<WorkspaceRow, "mode">): boolean {
+	return row.mode === "local";
 }
 
 /** "Running for X" timer next to the Helmor logo. Start time = last user
@@ -657,6 +667,18 @@ export function WorkspaceHoverCard({
 								<span className="truncate text-mini text-muted-foreground">
 									{subtitle}
 								</span>
+							) : null}
+							{/* Local-mode workspaces operate on the repo's primary
+							 *  worktree (its root checkout) rather than a
+							 *  Helmor-created per-session worktree — flag that. */}
+							{isPrimaryWorktree(row) ? (
+								<Badge
+									variant="secondary"
+									className="h-[18px] gap-1 px-1.5 text-mini font-medium"
+								>
+									<Laptop strokeWidth={2} />
+									Primary
+								</Badge>
 							) : null}
 						</div>
 						{/* Chat workspaces have no git context and no workspace

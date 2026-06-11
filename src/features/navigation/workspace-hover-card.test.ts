@@ -10,6 +10,7 @@ import {
 	chooseLiveSessionId,
 	extractLiveActivity,
 	formatElapsed,
+	isPrimaryWorktree,
 	LIVE_BLOCK_CHAR_BUDGET,
 	truncateLiveText,
 } from "./workspace-hover-card";
@@ -73,6 +74,27 @@ describe("truncateLiveText", () => {
 		expect(out.startsWith("…")).toBe(true);
 		expect(out.length).toBe(LIVE_BLOCK_CHAR_BUDGET + 1);
 		expect(out.endsWith("z".repeat(20))).toBe(true);
+	});
+});
+
+// ---------- isPrimaryWorktree ----------
+
+describe("isPrimaryWorktree", () => {
+	it("flags local-mode workspaces (the repo's primary worktree)", () => {
+		expect(isPrimaryWorktree({ mode: "local" })).toBe(true);
+	});
+
+	it("does not flag Helmor-created worktrees", () => {
+		expect(isPrimaryWorktree({ mode: "worktree" })).toBe(false);
+	});
+
+	it("does not flag chat workspaces", () => {
+		expect(isPrimaryWorktree({ mode: "chat" })).toBe(false);
+	});
+
+	it("does not flag rows with an unknown/absent mode", () => {
+		expect(isPrimaryWorktree({})).toBe(false);
+		expect(isPrimaryWorktree({ mode: undefined })).toBe(false);
 	});
 });
 
