@@ -900,10 +900,10 @@
 	   to blur. The glass feel comes entirely from this layer, so it carries real
 	   luminance + warm-chroma variation (a peach light source top-left, a cooler
 	   pool bottom-right) — a flat dark gradient just reads as an opaque theme. */
-	--vesper-fullscreen-material-low: oklch(0.135 0.008 60);
-	--vesper-fullscreen-material-mid: oklch(0.215 0.018 72);
-	--vesper-fullscreen-material-high: oklch(0.31 0.04 70);
-	--vesper-fullscreen-material-glow: oklch(0.245 0.026 74);
+	--vesper-fullscreen-material-low: oklch(0.15 0.006 60);
+	--vesper-fullscreen-material-mid: oklch(0.2 0.012 72);
+	--vesper-fullscreen-material-high: oklch(0.255 0.022 70);
+	--vesper-fullscreen-material-glow: oklch(0.215 0.015 74);
 	/* Lower-alpha panes so more of the lit material bleeds through as frosted
 	   glass; the center viewport stays denser (below) to protect reading text. */
 	--vesper-fullscreen-pane-bg: oklch(0.205 0.008 66 / 0.4);
@@ -1061,6 +1061,18 @@ html.vesper-fullscreen.theme-vesper.dark
 html.vesper-fullscreen.theme-vesper.dark [aria-label="Workspace viewport"],
 html.vesper-fullscreen.theme-vesper.dark [aria-label="Top-level screen"] {
 	background-color: var(--vesper-fullscreen-viewport-bg);
+}
+
+/* Top-level screens (dashboard, etc.) are mostly open canvas, so the warm
+   material reads much louder here than on the content-filled chat viewport.
+   Quiet it down: a denser, near-neutral background lets less tinted material
+   bleed through, and a lower saturate stops the backdrop-filter from
+   amplifying the warm chroma. Scoped to top-level screens only — the chat
+   viewport keeps its glassier, more saturated look. */
+html.vesper-fullscreen.theme-vesper.dark [aria-label="Top-level screen"] {
+	background-color: oklch(0.165 0.004 65 / 0.86);
+	-webkit-backdrop-filter: blur(40px) saturate(1.05) brightness(1.03);
+	backdrop-filter: blur(40px) saturate(1.05) brightness(1.03);
 }
 
 /* The window background is the base surface itself: transparent (blur shows
