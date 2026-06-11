@@ -34,10 +34,7 @@ pub fn classify(name: &str, pid: u32, app_pid: u32, sidecar_pid: Option<u32>) ->
     let lower = name.to_ascii_lowercase();
     if lower.contains("claude") || lower.contains("codex") {
         ProcessKind::Agent
-    } else if ["node", "bun", "deno", "vite"]
-        .iter()
-        .any(|n| lower == *n || lower.starts_with(&format!("{n} ")))
-    {
+    } else if ["node", "bun", "deno", "vite"].iter().any(|n| lower == *n) {
         ProcessKind::DevServer
     } else if ["zsh", "bash", "fish", "sh"].contains(&lower.as_str()) {
         ProcessKind::Shell
