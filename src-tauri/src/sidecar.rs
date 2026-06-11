@@ -370,8 +370,8 @@ impl ManagedSidecar {
         }
     }
 
-    /// PID of the running sidecar process, if one is alive. Used by the
-    /// resource monitor to anchor the Helmor process tree.
+    /// Last known PID of the sidecar process, if one was spawned and not shut
+    /// down. Used by the resource monitor to anchor the Helmor process tree.
     pub fn current_pid(&self) -> Option<u32> {
         self.process
             .lock()
