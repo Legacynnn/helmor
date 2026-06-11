@@ -17,9 +17,11 @@ import {
 	getClaudeRateLimits,
 	getCodexRateLimits,
 	getLiveContextUsage,
+	getResourceSnapshot,
 	getSessionCodexGoal,
 	getSessionContextUsage,
 	getSessionPlanState,
+	getStorageBreakdown,
 	getTerminalAgentDetails,
 	getWorkspaceAccountProfile,
 	getWorkspaceForge,
@@ -179,6 +181,8 @@ export const helmorQueryKeys = {
 	triageConfig: ["triage", "config"] as const,
 	triageActiveStatus: ["triage", "activeStatus"] as const,
 	pairedDevices: ["pairedDevices"] as const,
+	resourceSnapshot: ["resourceSnapshot"] as const,
+	storageBreakdown: ["storageBreakdown"] as const,
 };
 
 /** Persistence is opt-in per `queryOptions` via `meta: { persist: true }`.
@@ -1059,5 +1063,26 @@ export function workspaceTreeQueryOptions(workspaceRootPath: string) {
 		staleTime: 30_000,
 		gcTime: DEFAULT_GC_TIME,
 		retry: 0,
+	});
+}
+
+/** Helmor process tree snapshot for the resource monitor widget.
+ *  `intervalMs` = 2000 at rest, 1000 while the popover is open. */
+export function resourceSnapshotQueryOptions(intervalMs: number) {
+	return queryOptions({
+		queryKey: helmorQueryKeys.resourceSnapshot,
+		queryFn: getResourceSnapshot,
+		refetchInterval: intervalMs,
+		staleTime: 0,
+		gcTime: 5_000,
+	});
+}
+
+/** On-disk storage breakdown. Invalidated by the `storageChanged` event. */
+export function storageBreakdownQueryOptions() {
+	return queryOptions({
+		queryKey: helmorQueryKeys.storageBreakdown,
+		queryFn: getStorageBreakdown,
+		staleTime: 30_000,
 	});
 }

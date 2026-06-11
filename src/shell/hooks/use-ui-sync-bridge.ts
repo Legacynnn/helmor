@@ -258,6 +258,11 @@ function handleUiMutation(
 				queryKey: helmorQueryKeys.workspaceSessions(event.workspaceId),
 			});
 			return;
+		case "storageChanged":
+			void queryClient.invalidateQueries({
+				queryKey: helmorQueryKeys.storageBreakdown,
+			});
+			return;
 	}
 }
 

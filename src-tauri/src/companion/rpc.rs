@@ -418,10 +418,21 @@ async fn dispatch(
             Ok(Value::Null)
         }
 
+        // Resource monitor + storage: reads live sysinfo / walks the disk. The
+        // companion phone view has no use for per-process CPU/RAM or host-disk
+        // cleanup, and `lsof` / `sysinfo` are desktop-process concepts. Return
+        // null so a future companion UI can gate on empty data rather than 400.
+        "get_resource_snapshot"
+        |         "get_storage_breakdown"
+        |         "kill_resource_process"
+        |         "delete_workspace_storage"
+        |         "clear_old_logs"
+        |         "vacuum_database"
+
         // ============ desktop-only / destructive: no-op for a phone ============
         // Companion self-management: a paired browser does not administer the
         // companion server (enable/pair/sign-in happen on the desktop host).
-        "companion_allocate_stable_url"
+        |         "companion_allocate_stable_url"
         |         "companion_destroy_stable_url"
         |         "companion_disable"
         |         "companion_enable"

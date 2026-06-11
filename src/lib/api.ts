@@ -2168,6 +2168,90 @@ export async function slackListEmoji(
 	}
 }
 
+// ---- Resource monitor ----
+
+export type ProcessKind =
+	| "app"
+	| "sidecar"
+	| "agent"
+	| "devServer"
+	| "shell"
+	| "other";
+
+export type ProcessInfo = {
+	pid: number;
+	parentPid: number | null;
+	name: string;
+	cpuPercent: number;
+	memoryBytes: number;
+	startTime: number;
+	workspaceId: string | null;
+	kind: ProcessKind;
+	killable: boolean;
+};
+
+export type PortInfo = {
+	port: number;
+	pid: number | null;
+	processName: string | null;
+	workspaceId: string | null;
+};
+
+export type ResourceSnapshot = {
+	totalCpuPercent: number;
+	totalMemoryBytes: number;
+	processes: ProcessInfo[];
+	ports: PortInfo[];
+	portsUnavailable: boolean;
+};
+
+export type WorkspaceStorage = {
+	id: string;
+	name: string;
+	branch: string | null;
+	state: string;
+	sizeBytes: number | null;
+	dirPresent: boolean;
+	reclaimable: boolean;
+};
+
+export type StorageBreakdown = {
+	totalBytes: number;
+	dbBytes: number;
+	logsBytes: number;
+	chatsBytes: number;
+	workspaces: WorkspaceStorage[];
+};
+
+export async function getResourceSnapshot(): Promise<ResourceSnapshot> {
+	return invoke<ResourceSnapshot>("get_resource_snapshot");
+}
+
+export async function getStorageBreakdown(): Promise<StorageBreakdown> {
+	return invoke<StorageBreakdown>("get_storage_breakdown");
+}
+
+export async function killResourceProcess(
+	pid: number,
+	startTime: number,
+): Promise<void> {
+	return invoke("kill_resource_process", { pid, startTime });
+}
+
+export async function deleteWorkspaceStorage(
+	workspaceIds: string[],
+): Promise<number> {
+	return invoke<number>("delete_workspace_storage", { workspaceIds });
+}
+
+export async function clearOldLogs(days: number): Promise<number> {
+	return invoke<number>("clear_old_logs", { days });
+}
+
+export async function vacuumDatabase(): Promise<number> {
+	return invoke<number>("vacuum_database");
+}
+
 export type UiMutationEvent =
 	| { type: "workspaceListChanged" }
 	| { type: "workspaceChanged"; workspaceId: string }
@@ -2200,7 +2284,8 @@ export type UiMutationEvent =
 	| { type: "triageWorkspaceCreated"; workspaceId: string }
 	| { type: "fastModeUnavailable"; sessionId: string; reason: string }
 	| { type: "pairedDevicesChanged" }
-	| { type: "terminalSessionChanged"; workspaceId: string; sessionId: string };
+	| { type: "terminalSessionChanged"; workspaceId: string; sessionId: string }
+	| { type: "storageChanged" };
 
 export type TriageConfig = {
 	enabled: boolean;
