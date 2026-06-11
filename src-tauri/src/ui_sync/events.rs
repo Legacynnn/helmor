@@ -104,6 +104,10 @@ pub enum UiMutationEvent {
         workspace_id: String,
         session_id: String,
     },
+    /// Helmor's disk footprint changed (cleanup ran, workspace dirs
+    /// deleted, logs pruned, DB vacuumed). Frontends invalidate the
+    /// `storageBreakdown` query.
+    StorageChanged,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -244,6 +248,7 @@ mod tests {
                 UiMutationEvent::ActiveStreamsChanged,
                 "activeStreamsChanged",
             ),
+            (UiMutationEvent::StorageChanged, "storageChanged"),
         ];
         for (event, expected) in cases {
             let json = serde_json::to_value(&event).unwrap();

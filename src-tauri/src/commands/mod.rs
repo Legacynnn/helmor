@@ -8,6 +8,7 @@ pub(crate) mod forge_commands;
 pub(crate) mod local_llm_commands;
 pub(crate) mod opencode_config_commands;
 pub(crate) mod repository_commands;
+pub(crate) mod resources_commands;
 pub(crate) mod script_commands;
 pub(crate) mod search_commands;
 pub(crate) mod session_commands;

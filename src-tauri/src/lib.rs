@@ -194,6 +194,7 @@ pub fn run() {
         .manage(workspace::scripts::ScriptProcessManager::new())
         .manage(terminal_sessions::hook_server::TerminalHookServer::default())
         .manage(terminal_sessions::status::HeuristicTracker::default())
+        .manage(resources::sampler::ResourceSampler::default())
         .manage(ui_sync::UiSyncManager::new())
         .manage(triage::ActiveStatusStore::new())
         .manage(global_hotkey::GlobalHotkeyState::default())
@@ -637,6 +638,12 @@ pub fn run() {
             commands::system_commands::stop_agent_login_terminal,
             commands::system_commands::write_agent_login_terminal_stdin,
             commands::system_commands::resize_agent_login_terminal,
+            commands::resources_commands::get_resource_snapshot,
+            commands::resources_commands::get_storage_breakdown,
+            commands::resources_commands::kill_resource_process,
+            commands::resources_commands::delete_workspace_storage,
+            commands::resources_commands::clear_old_logs,
+            commands::resources_commands::vacuum_database,
             commands::forge_commands::get_workspace_forge,
             commands::forge_commands::list_forge_accounts,
             commands::forge_commands::list_inbox_items,
