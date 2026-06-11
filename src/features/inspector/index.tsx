@@ -26,6 +26,7 @@ import { TOGGLE_TERMINAL_ZOOM_EVENT } from "./layout/use-hover-zoom";
 import { InspectorPanel } from "./panel";
 import { FilesTab } from "./panel/files";
 import { ChangesSection } from "./panel/git";
+import { SearchTab } from "./panel/search";
 import { usePanelShortcuts } from "./panel/use-panel-shortcuts";
 import type { ScriptStatus } from "./script-store";
 import { ActionsTabBody } from "./sections/actions";
@@ -564,9 +565,11 @@ export function WorkspaceInspectorSidebar({
 					/>
 				}
 				searchPage={
-					<div className="px-3 py-3 text-mini leading-5 text-muted-foreground">
-						Search coming soon.
-					</div>
+					<SearchTab
+						workspaceRootPath={workspaceRootPath ?? null}
+						workspaceId={workspaceId ?? null}
+						onOpenFileReference={onOpenFileReference}
+					/>
 				}
 				actionsPage={
 					<ActionsTabBody
