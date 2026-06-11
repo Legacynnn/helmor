@@ -24,6 +24,7 @@ import { useSetupAutoRun } from "./hooks/use-setup-auto-run";
 import { HorizontalResizeHandle, InspectorTabsSection } from "./layout";
 import { TOGGLE_TERMINAL_ZOOM_EVENT } from "./layout/use-hover-zoom";
 import { InspectorPanel } from "./panel";
+import { FilesTab } from "./panel/files";
 import { ChangesSection } from "./panel/git";
 import { usePanelShortcuts } from "./panel/use-panel-shortcuts";
 import type { ScriptStatus } from "./script-store";
@@ -523,9 +524,13 @@ export function WorkspaceInspectorSidebar({
 				activeTab={panelTab}
 				onTabChange={setPanelTab}
 				filesPage={
-					<div className="px-3 py-3 text-mini leading-5 text-muted-foreground">
-						File tree coming soon.
-					</div>
+					<FilesTab
+						workspaceRootPath={workspaceRootPath ?? null}
+						changes={changes}
+						editorMode={editorMode}
+						activeEditor={activeEditor}
+						onOpenEditorFile={onOpenEditorFile}
+					/>
 				}
 				gitPage={
 					<ChangesSection

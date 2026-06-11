@@ -2767,6 +2767,112 @@ export async function listWorkspaceFiles(
 	}
 }
 
+/** One entry of the gitignore-aware workspace tree (inspector Files tab). */
+export type WorkspaceTreeEntry = {
+	/** Relative to the workspace root, forward slashes. */
+	path: string;
+	name: string;
+	isDir: boolean;
+};
+
+export type WorkspaceTreeResponse = {
+	entries: WorkspaceTreeEntry[];
+	truncated: boolean;
+};
+
+/**
+ * Gitignore-aware flat listing of every file/directory under the workspace
+ * root, for the inspector's Files tab. The frontend nests it into a tree.
+ */
+export async function listWorkspaceTree(
+	workspaceRootPath: string,
+): Promise<WorkspaceTreeResponse> {
+	try {
+		return await invoke<WorkspaceTreeResponse>("list_workspace_tree", {
+			workspaceRootPath,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to list the workspace tree."),
+		);
+	}
+}
+
+export type WorkspaceSearchRequest = {
+	workspaceRootPath: string;
+	query: string;
+	caseSensitive: boolean;
+	wholeWord: boolean;
+	regex: boolean;
+	includeGlobs: string[];
+	excludeGlobs: string[];
+	maxResults?: number;
+};
+
+export type WorkspaceSearchMatch = {
+	lineNumber: number;
+	/** Line text pre-split around the match so highlighting needs no offsets. */
+	prefix: string;
+	matched: string;
+	suffix: string;
+};
+
+export type WorkspaceSearchFileResult = {
+	path: string;
+	absolutePath: string;
+	matches: WorkspaceSearchMatch[];
+};
+
+export type WorkspaceSearchResponse = {
+	files: WorkspaceSearchFileResult[];
+	fileNameMatches: string[];
+	totalMatches: number;
+	truncated: boolean;
+};
+
+/** Ripgrep-backed content search over the workspace (inspector Search tab). */
+export async function searchWorkspace(
+	request: WorkspaceSearchRequest,
+): Promise<WorkspaceSearchResponse> {
+	try {
+		return await invoke<WorkspaceSearchResponse>("search_workspace", {
+			request,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Search failed."));
+	}
+}
+
+export type WorkspaceReplaceRequest = {
+	workspaceRootPath: string;
+	workspaceId?: string | null;
+	query: string;
+	caseSensitive: boolean;
+	wholeWord: boolean;
+	regex: boolean;
+	replacement: string;
+	/** Explicit relative paths from the search preview; matches re-run fresh. */
+	paths: string[];
+};
+
+export type WorkspaceReplaceResponse = {
+	filesChanged: number;
+	replacements: number;
+};
+
+/** Bulk replace-in-files. Writes atomically; skips binaries. */
+export async function replaceInWorkspace(
+	request: WorkspaceReplaceRequest,
+): Promise<WorkspaceReplaceResponse> {
+	try {
+		return await invoke<WorkspaceReplaceResponse>("replace_in_workspace", {
+			request,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Replace failed."));
+	}
+}
+
 export async function listWorkspaceChanges(
 	workspaceRootPath: string,
 	workspaceId?: string | null,

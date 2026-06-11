@@ -35,6 +35,7 @@ import {
 	listWorkspaceDiffStats,
 	listWorkspaceFiles,
 	listWorkspaceLinkedDirectories,
+	listWorkspaceTree,
 	loadAgentModelSections,
 	loadArchivedWorkspaces,
 	loadAutoCloseActionKinds,
@@ -108,6 +109,10 @@ export const helmorQueryKeys = {
 		["workspaceChanges", workspaceRootPath, workspaceId ?? ""] as const,
 	workspaceFiles: (workspaceRootPath: string) =>
 		["workspaceFiles", workspaceRootPath] as const,
+	workspaceTree: (workspaceRootPath: string) =>
+		["workspaceTree", workspaceRootPath] as const,
+	workspaceSearch: (workspaceRootPath: string, paramsKey: string) =>
+		["workspaceSearch", workspaceRootPath, paramsKey] as const,
 	workspaceChangeRequest: (workspaceId: string) =>
 		["workspaceChangeRequest", workspaceId] as const,
 	workspaceForge: (workspaceId: string) =>
@@ -1037,6 +1042,21 @@ export function workspaceFilesQueryOptions(workspaceRootPath: string) {
 		queryKey: helmorQueryKeys.workspaceFiles(workspaceRootPath),
 		queryFn: () => listWorkspaceFiles(workspaceRootPath),
 		staleTime: 60_000,
+		gcTime: DEFAULT_GC_TIME,
+		retry: 0,
+	});
+}
+
+/**
+ * Gitignore-aware workspace tree for the inspector's Files tab. Refreshes via
+ * the UI sync bridge on `workspaceFilesChanged`; the staleTime only guards
+ * against re-mount churn when switching panel tabs.
+ */
+export function workspaceTreeQueryOptions(workspaceRootPath: string) {
+	return queryOptions({
+		queryKey: helmorQueryKeys.workspaceTree(workspaceRootPath),
+		queryFn: () => listWorkspaceTree(workspaceRootPath),
+		staleTime: 30_000,
 		gcTime: DEFAULT_GC_TIME,
 		retry: 0,
 	});
