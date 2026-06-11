@@ -17,18 +17,19 @@ import { loadRepoScripts, type RepoScripts } from "@/lib/api";
 import type { InspectorFileItem } from "@/lib/editor-session";
 import { workspaceChangesQueryOptions } from "@/lib/query-client";
 import {
-	getInitialActionsOpen,
 	getInitialActiveTab,
-	getInitialChangesHeight,
 	getInitialTabsHeight,
 	getInitialTabsOpen,
-	INSPECTOR_ACTIONS_OPEN_STORAGE_KEY,
 	INSPECTOR_ACTIVE_TAB_STORAGE_KEY,
-	INSPECTOR_CHANGES_HEIGHT_STORAGE_KEY,
 	INSPECTOR_SECTION_HEADER_HEIGHT,
 	INSPECTOR_TABS_HEIGHT_STORAGE_KEY,
 	INSPECTOR_TABS_OPEN_STORAGE_KEY,
 } from "../layout";
+import {
+	getInitialPanelTab,
+	INSPECTOR_PANEL_TAB_STORAGE_KEY,
+	type PanelTabId,
+} from "../panel/state";
 import { getScriptState, startScript, stopScript } from "../script-store";
 
 // Stable empty-array reference for the `changesQuery.data ?? ...` fallback.
@@ -36,44 +37,30 @@ const EMPTY_CHANGES: InspectorFileItem[] = [];
 
 // Inspector layout model
 // ----------------------
-// Three vertically-stacked sections (Changes, Actions, Tabs). Their bodies
-// always sum to `bodyBudget = container - 3 * sectionHeader`. There is no
-// CSS auto-fill — every body height is an explicit pixel value derived from:
-//   - actionsOpen / tabsOpen
+// Two vertically-stacked sections: the tabbed Panel (Files / Git / Search /
+// Actions) and the Tabs section (Setup / Run / Terminal). Their bodies always
+// sum to `bodyBudget = container - 2 * sectionHeader`. There is no CSS
+// auto-fill — every body height is an explicit pixel value derived from:
+//   - tabsOpen
 //   - containerHeight (observed)
-//   - storedChangesBody / storedTabsBody (user-resized values)
+//   - storedTabsBody (user-resized value)
 //
-// The "auto-fill" panel is whichever panel absorbs the slack:
-//   - actions, when actions is open
-//   - changes, when actions is collapsed
-// We never store an explicit size for actions: it's always the slack absorber
-// (or zero when collapsed). That keeps the toggle round-trip lossless and
-// stops the section identities from competing for the same role.
+// The Panel is always the slack absorber: we never store an explicit size for
+// it, which keeps the tabs toggle round-trip lossless.
 
-const RESIZE_TARGET_ACTIONS = "actions";
-const RESIZE_TARGET_TABS = "tabs";
-type ResizeTarget = typeof RESIZE_TARGET_ACTIONS | typeof RESIZE_TARGET_TABS;
-
-const MIN_CHANGES_BODY = 128;
-const MIN_ACTIONS_BODY = 160;
+const MIN_PANEL_BODY = 128;
 const MIN_TABS_BODY = 160;
-const DEFAULT_CHANGES_BODY = 240;
 const DEFAULT_TABS_BODY = 160;
 
 type ResizeState = {
 	pointerY: number;
-	target: ResizeTarget;
-	initialChangesBody: number;
 	initialTabsBody: number;
 	bodyBudget: number;
-	tabsBody: number;
-	actionsOpen: boolean;
 	tabsOpen: boolean;
 };
 
 type SectionRefs = {
-	changes: RefObject<HTMLElement | null>;
-	actions: RefObject<HTMLElement | null>;
+	panel: RefObject<HTMLElement | null>;
 	tabsWrapper: RefObject<HTMLDivElement | null>;
 };
 
@@ -82,17 +69,11 @@ type SectionRefs = {
 function writeBodyHeights(
 	refs: SectionRefs,
 	sizes: DerivedSizes,
-	options: { actionsOpen: boolean; tabsOpen: boolean },
+	options: { tabsOpen: boolean },
 ) {
-	const changes = refs.changes.current;
-	if (changes) {
-		changes.style.height = `${INSPECTOR_SECTION_HEADER_HEIGHT + sizes.changesBody}px`;
-	}
-	const actions = refs.actions.current;
-	if (actions) {
-		actions.style.height = options.actionsOpen
-			? `${INSPECTOR_SECTION_HEADER_HEIGHT + sizes.actionsBody}px`
-			: `${INSPECTOR_SECTION_HEADER_HEIGHT}px`;
+	const panel = refs.panel.current;
+	if (panel) {
+		panel.style.height = `${INSPECTOR_SECTION_HEADER_HEIGHT + sizes.panelBody}px`;
 	}
 	const tabsWrapper = refs.tabsWrapper.current;
 	if (tabsWrapper) {
@@ -118,8 +99,7 @@ type UseWorkspaceInspectorSidebarArgs = {
 };
 
 type DerivedSizes = {
-	changesBody: number;
-	actionsBody: number;
+	panelBody: number;
 	tabsBody: number;
 };
 
@@ -133,39 +113,26 @@ function clamp(value: number, min: number, max: number): number {
 /**
  * Pure layout derivation. Heights always sum to `bodyBudget`, except in the
  * pathological case where the container is smaller than the minimums — there
- * we surface the negative as `actionsBody` going below its minimum, which the
- * UI absorbs (the section just compresses).
+ * the panel just compresses below its minimum and the UI absorbs it.
  */
 function deriveSizes({
 	bodyBudget,
-	actionsOpen,
 	tabsOpen,
-	storedChangesBody,
 	storedTabsBody,
 }: {
 	bodyBudget: number;
-	actionsOpen: boolean;
 	tabsOpen: boolean;
-	storedChangesBody: number;
 	storedTabsBody: number;
 }): DerivedSizes {
 	const tabsBody = tabsOpen
-		? clamp(storedTabsBody, MIN_TABS_BODY, Math.max(MIN_TABS_BODY, bodyBudget))
+		? clamp(
+				storedTabsBody,
+				MIN_TABS_BODY,
+				Math.max(MIN_TABS_BODY, bodyBudget - MIN_PANEL_BODY),
+			)
 		: 0;
-
-	if (actionsOpen) {
-		const remaining = Math.max(0, bodyBudget - tabsBody);
-		const changesBody = clamp(
-			storedChangesBody,
-			MIN_CHANGES_BODY,
-			Math.max(MIN_CHANGES_BODY, remaining - MIN_ACTIONS_BODY),
-		);
-		const actionsBody = Math.max(MIN_ACTIONS_BODY, remaining - changesBody);
-		return { changesBody, actionsBody, tabsBody };
-	}
-
-	const changesBody = Math.max(MIN_CHANGES_BODY, bodyBudget - tabsBody);
-	return { changesBody, actionsBody: 0, tabsBody };
+	const panelBody = Math.max(MIN_PANEL_BODY, bodyBudget - tabsBody);
+	return { panelBody, tabsBody };
 }
 
 export function useWorkspaceInspectorSidebar({
@@ -175,9 +142,9 @@ export function useWorkspaceInspectorSidebar({
 	workspaceState,
 	workspaceActiveRunActionId,
 }: UseWorkspaceInspectorSidebarArgs) {
-	const [actionsOpen, setActionsOpen] = useState(getInitialActionsOpen);
 	const [tabsOpen, setTabsOpen] = useState(getInitialTabsOpen);
 	const [activeTab, setActiveTab] = useState(getInitialActiveTab);
+	const [panelTab, setPanelTab] = useState<PanelTabId>(getInitialPanelTab);
 
 	// On workspace switch, default the Setup/Run tab to whichever phase the
 	// workspace is currently in: `setup_pending` → "setup" so the user sees
@@ -200,21 +167,16 @@ export function useWorkspaceInspectorSidebar({
 	}, [workspaceId, workspaceState]);
 
 	const [containerHeight, setContainerHeight] = useState(0);
-	const [storedChangesBody, setStoredChangesBody] = useState(() =>
-		getInitialChangesHeight(DEFAULT_CHANGES_BODY),
-	);
 	const [storedTabsBody, setStoredTabsBody] = useState(() =>
 		getInitialTabsHeight(DEFAULT_TABS_BODY),
 	);
 	const [resizeState, setResizeState] = useState<ResizeState | null>(null);
 
 	const containerRef = useRef<HTMLDivElement>(null);
-	const changesRef = useRef<HTMLElement>(null);
-	const actionsRef = useRef<HTMLElement>(null);
+	const panelRef = useRef<HTMLElement>(null);
 	const tabsWrapperRef = useRef<HTMLDivElement>(null);
 	const sectionRefsRef = useRef<SectionRefs>({
-		changes: changesRef,
-		actions: actionsRef,
+		panel: panelRef,
 		tabsWrapper: tabsWrapperRef,
 	});
 
@@ -248,19 +210,17 @@ export function useWorkspaceInspectorSidebar({
 
 	const bodyBudget = Math.max(
 		0,
-		containerHeight - 3 * INSPECTOR_SECTION_HEADER_HEIGHT,
+		containerHeight - 2 * INSPECTOR_SECTION_HEADER_HEIGHT,
 	);
 
-	const { changesBody, actionsBody, tabsBody } = useMemo(
+	const { panelBody, tabsBody } = useMemo(
 		() =>
 			deriveSizes({
 				bodyBudget,
-				actionsOpen,
 				tabsOpen,
-				storedChangesBody,
 				storedTabsBody,
 			}),
-		[bodyBudget, actionsOpen, tabsOpen, storedChangesBody, storedTabsBody],
+		[bodyBudget, tabsOpen, storedTabsBody],
 	);
 
 	// Gate so the non-drag effect doesn't clobber the live ref-written
@@ -270,24 +230,10 @@ export function useWorkspaceInspectorSidebar({
 		if (isResizingRef.current) return;
 		writeBodyHeights(
 			sectionRefsRef.current,
-			{ changesBody, actionsBody, tabsBody },
-			{ actionsOpen, tabsOpen },
+			{ panelBody, tabsBody },
+			{ tabsOpen },
 		);
-	}, [changesBody, actionsBody, tabsBody, actionsOpen, tabsOpen]);
-
-	useEffect(() => {
-		try {
-			window.localStorage.setItem(
-				INSPECTOR_ACTIONS_OPEN_STORAGE_KEY,
-				String(actionsOpen),
-			);
-		} catch (error) {
-			console.error(
-				`[helmor] actions open save failed for "${INSPECTOR_ACTIONS_OPEN_STORAGE_KEY}"`,
-				error,
-			);
-		}
-	}, [actionsOpen]);
+	}, [panelBody, tabsBody, tabsOpen]);
 
 	useEffect(() => {
 		try {
@@ -316,17 +262,14 @@ export function useWorkspaceInspectorSidebar({
 
 	useEffect(() => {
 		try {
-			window.localStorage.setItem(
-				INSPECTOR_CHANGES_HEIGHT_STORAGE_KEY,
-				String(storedChangesBody),
-			);
+			window.localStorage.setItem(INSPECTOR_PANEL_TAB_STORAGE_KEY, panelTab);
 		} catch (error) {
 			console.error(
-				`[helmor] changes height save failed for "${INSPECTOR_CHANGES_HEIGHT_STORAGE_KEY}"`,
+				`[helmor] panel tab save failed for "${INSPECTOR_PANEL_TAB_STORAGE_KEY}"`,
 				error,
 			);
 		}
-	}, [storedChangesBody]);
+	}, [panelTab]);
 
 	useEffect(() => {
 		try {
@@ -378,9 +321,8 @@ export function useWorkspaceInspectorSidebar({
 		return () => window.removeEventListener("helmor:run-script", handler);
 	}, [repoId, workspaceId, resolvedActiveId]);
 
-	const isResizing = resizeState !== null;
-	const isActionsResizing = resizeState?.target === RESIZE_TARGET_ACTIONS;
-	const isTabsResizing = resizeState?.target === RESIZE_TARGET_TABS;
+	const isTabsResizing = resizeState !== null;
+	const isResizing = isTabsResizing;
 
 	// Skip while the worktree isn't fully materialised. During
 	// `Initializing`, `git worktree add` is mid-checkout: `git diff`
@@ -449,10 +391,6 @@ export function useWorkspaceInspectorSidebar({
 		setTabsOpen((open) => !open);
 	}, []);
 
-	const handleToggleActions = useCallback(() => {
-		setActionsOpen((open) => !open);
-	}, []);
-
 	useEffect(() => {
 		if (!resizeState) {
 			return;
@@ -469,7 +407,6 @@ export function useWorkspaceInspectorSidebar({
 
 		let pendingMove: globalThis.MouseEvent | null = null;
 		let animationFrameId: number | null = null;
-		let lastStoredChanges: number = captured.initialChangesBody;
 		let lastStoredTabs: number = captured.initialTabsBody;
 
 		const flush = () => {
@@ -479,42 +416,22 @@ export function useWorkspaceInspectorSidebar({
 			if (!event) return;
 			const deltaY = event.clientY - captured.pointerY;
 
-			if (captured.target === RESIZE_TARGET_ACTIONS) {
-				// Drag down → changes grows, actions auto-shrinks.
-				const max = Math.max(
-					MIN_CHANGES_BODY,
-					captured.bodyBudget - captured.tabsBody - MIN_ACTIONS_BODY,
-				);
-				lastStoredChanges = clamp(
-					captured.initialChangesBody + deltaY,
-					MIN_CHANGES_BODY,
-					max,
-				);
-			} else {
-				// Drag down → tabs shrinks, upper region (actions or changes) grows.
-				const upperMin =
-					MIN_CHANGES_BODY + (captured.actionsOpen ? MIN_ACTIONS_BODY : 0);
-				const max = Math.max(MIN_TABS_BODY, captured.bodyBudget - upperMin);
-				lastStoredTabs = clamp(
-					captured.initialTabsBody - deltaY,
-					MIN_TABS_BODY,
-					max,
-				);
-			}
+			// Drag down → tabs shrinks, the panel grows.
+			const max = Math.max(MIN_TABS_BODY, captured.bodyBudget - MIN_PANEL_BODY);
+			lastStoredTabs = clamp(
+				captured.initialTabsBody - deltaY,
+				MIN_TABS_BODY,
+				max,
+			);
 
 			// Drag-time inline writes — bypass React render + CSS-var
 			// invalidation.
 			const sizes = deriveSizes({
 				bodyBudget: captured.bodyBudget,
-				actionsOpen: captured.actionsOpen,
 				tabsOpen: captured.tabsOpen,
-				storedChangesBody: lastStoredChanges,
 				storedTabsBody: lastStoredTabs,
 			});
-			writeBodyHeights(refs, sizes, {
-				actionsOpen: captured.actionsOpen,
-				tabsOpen: captured.tabsOpen,
-			});
+			writeBodyHeights(refs, sizes, { tabsOpen: captured.tabsOpen });
 		};
 
 		const handleMouseMove = (event: globalThis.MouseEvent) => {
@@ -533,14 +450,8 @@ export function useWorkspaceInspectorSidebar({
 			// Commit the final value back to React state for localStorage
 			// persistence and any external consumers. Same-value setState is a no-op.
 			isResizingRef.current = false;
-			if (captured.target === RESIZE_TARGET_ACTIONS) {
-				if (lastStoredChanges !== captured.initialChangesBody) {
-					setStoredChangesBody(lastStoredChanges);
-				}
-			} else {
-				if (lastStoredTabs !== captured.initialTabsBody) {
-					setStoredTabsBody(lastStoredTabs);
-				}
+			if (lastStoredTabs !== captured.initialTabsBody) {
+				setStoredTabsBody(lastStoredTabs);
 			}
 			setResizeState(null);
 		};
@@ -551,7 +462,7 @@ export function useWorkspaceInspectorSidebar({
 		document.body.style.userSelect = "none";
 
 		// Hit-test absorber so WebKit's `:hover` recompute doesn't cascade
-		// through the Changes subtree on every mousemove.
+		// through the panel subtree on every mousemove.
 		const overlay = document.createElement("div");
 		overlay.style.position = "fixed";
 		overlay.style.inset = "0";
@@ -579,49 +490,36 @@ export function useWorkspaceInspectorSidebar({
 		};
 	}, [resizeState]);
 
-	const handleResizeStart = useCallback(
-		(target: ResizeTarget) => (event: ReactMouseEvent<HTMLDivElement>) => {
+	const handleTabsResizeStart = useCallback(
+		(event: ReactMouseEvent<HTMLDivElement>) => {
 			if (event.button !== 0) return;
 			event.preventDefault();
 			setResizeState({
 				pointerY: event.clientY,
-				target,
-				initialChangesBody: storedChangesBody,
 				initialTabsBody: storedTabsBody,
 				bodyBudget,
-				tabsBody,
-				actionsOpen,
 				tabsOpen,
 			});
 		},
-		[
-			storedChangesBody,
-			storedTabsBody,
-			bodyBudget,
-			tabsBody,
-			actionsOpen,
-			tabsOpen,
-		],
+		[storedTabsBody, bodyBudget, tabsOpen],
 	);
 
 	return {
-		actionsOpen,
-		actionsRef,
 		activeTab,
 		changes,
 		changesLoaded,
-		changesRef,
 		containerRef,
 		flashingPaths,
-		handleResizeStart,
-		handleToggleActions,
+		handleTabsResizeStart,
 		handleToggleTabs,
-		isActionsResizing,
 		isResizing,
 		isTabsResizing,
+		panelRef,
+		panelTab,
 		repoScripts,
 		scriptsLoaded,
 		setActiveTab,
+		setPanelTab,
 		tabsOpen,
 		tabsWrapperRef,
 	};

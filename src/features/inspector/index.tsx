@@ -23,9 +23,11 @@ import { useScriptStatus } from "./hooks/use-script-status";
 import { useSetupAutoRun } from "./hooks/use-setup-auto-run";
 import { HorizontalResizeHandle, InspectorTabsSection } from "./layout";
 import { TOGGLE_TERMINAL_ZOOM_EVENT } from "./layout/use-hover-zoom";
+import { InspectorPanel } from "./panel";
 import { ChangesSection } from "./panel/git";
+import { usePanelShortcuts } from "./panel/use-panel-shortcuts";
 import type { ScriptStatus } from "./script-store";
-import { ActionsSection } from "./sections/actions";
+import { ActionsTabBody } from "./sections/actions";
 import { OpenDevServerButton, RunTab } from "./sections/run";
 import { SetupTab } from "./sections/setup";
 import { TerminalInstancePanel } from "./sections/terminal";
@@ -151,23 +153,21 @@ export function WorkspaceInspectorSidebar({
 }: WorkspaceInspectorSidebarProps) {
 	const queryClient = useQueryClient();
 	const {
-		actionsOpen,
-		actionsRef,
 		activeTab,
 		changes,
 		changesLoaded,
-		changesRef,
 		containerRef,
 		flashingPaths,
-		handleResizeStart,
-		handleToggleActions,
+		handleTabsResizeStart,
 		handleToggleTabs,
-		isActionsResizing,
 		isResizing,
 		isTabsResizing,
+		panelRef,
+		panelTab,
 		repoScripts,
 		scriptsLoaded,
 		setActiveTab,
+		setPanelTab,
 		tabsOpen,
 		tabsWrapperRef,
 	} = useWorkspaceInspectorSidebar({
@@ -481,6 +481,9 @@ export function WorkspaceInspectorSidebar({
 		handlers: terminalShortcutHandlers,
 	});
 
+	// Mod+Shift+1..4 — switch the panel section's page from anywhere.
+	usePanelShortcuts(setPanelTab);
+
 	// Reset to "setup" when the active tab is a terminal id that no longer
 	// matches any current instance — happens when switching workspaces while
 	// a terminal tab was active in the previous one.
@@ -515,51 +518,60 @@ export function WorkspaceInspectorSidebar({
 				isResizing && "select-none",
 			)}
 		>
-			<ChangesSection
-				sectionRef={changesRef}
-				workspaceId={workspaceId ?? null}
-				workspaceRootPath={workspaceRootPath ?? null}
-				workspaceBranch={workspaceBranch ?? null}
-				workspaceRemoteUrl={workspaceRemoteUrl ?? null}
-				workspaceTargetBranch={workspaceTargetBranch ?? null}
-				changes={changes}
-				changesLoaded={changesLoaded}
-				editorMode={editorMode}
-				activeEditor={activeEditor}
-				preferredEditor={preferredEditor}
-				onOpenEditorFile={onOpenEditorFile}
-				flashingPaths={flashingPaths}
-				onCommitAction={onCommitAction}
-				commitButtonMode={commitButtonMode}
-				commitButtonState={commitButtonState}
-				changeRequest={changeRequest ?? null}
-				forgeIsRefreshing={forgeIsRefreshing}
-			/>
-			{actionsOpen ? (
-				<HorizontalResizeHandle
-					onMouseDown={handleResizeStart("actions")}
-					isActive={isActionsResizing}
-				/>
-			) : null}
-			<ActionsSection
-				workspaceId={workspaceId ?? null}
-				workspaceState={workspaceState ?? null}
-				repoId={repoId ?? null}
-				workspaceRemote={workspaceRemote ?? null}
-				sectionRef={actionsRef}
-				open={actionsOpen}
-				onToggle={handleToggleActions}
-				onCommitAction={onCommitAction}
-				onReviewAction={onReviewAction}
-				currentSessionId={currentSessionId ?? null}
-				onQueuePendingPromptForSession={onQueuePendingPromptForSession}
-				commitButtonMode={commitButtonMode}
-				commitButtonState={commitButtonState}
-				changeRequest={changeRequest ?? null}
+			<InspectorPanel
+				sectionRef={panelRef}
+				activeTab={panelTab}
+				onTabChange={setPanelTab}
+				filesPage={
+					<div className="px-3 py-3 text-mini leading-5 text-muted-foreground">
+						File tree coming soon.
+					</div>
+				}
+				gitPage={
+					<ChangesSection
+						workspaceId={workspaceId ?? null}
+						workspaceRootPath={workspaceRootPath ?? null}
+						workspaceBranch={workspaceBranch ?? null}
+						workspaceRemoteUrl={workspaceRemoteUrl ?? null}
+						workspaceTargetBranch={workspaceTargetBranch ?? null}
+						changes={changes}
+						changesLoaded={changesLoaded}
+						editorMode={editorMode}
+						activeEditor={activeEditor}
+						preferredEditor={preferredEditor}
+						onOpenEditorFile={onOpenEditorFile}
+						flashingPaths={flashingPaths}
+						onCommitAction={onCommitAction}
+						commitButtonMode={commitButtonMode}
+						commitButtonState={commitButtonState}
+						changeRequest={changeRequest ?? null}
+						forgeIsRefreshing={forgeIsRefreshing}
+					/>
+				}
+				searchPage={
+					<div className="px-3 py-3 text-mini leading-5 text-muted-foreground">
+						Search coming soon.
+					</div>
+				}
+				actionsPage={
+					<ActionsTabBody
+						workspaceId={workspaceId ?? null}
+						workspaceState={workspaceState ?? null}
+						repoId={repoId ?? null}
+						workspaceRemote={workspaceRemote ?? null}
+						onCommitAction={onCommitAction}
+						onReviewAction={onReviewAction}
+						currentSessionId={currentSessionId ?? null}
+						onQueuePendingPromptForSession={onQueuePendingPromptForSession}
+						commitButtonMode={commitButtonMode}
+						commitButtonState={commitButtonState}
+						changeRequest={changeRequest ?? null}
+					/>
+				}
 			/>
 			{tabsOpen ? (
 				<HorizontalResizeHandle
-					onMouseDown={handleResizeStart("tabs")}
+					onMouseDown={handleTabsResizeStart}
 					isActive={isTabsResizing}
 				/>
 			) : null}

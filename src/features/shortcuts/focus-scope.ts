@@ -13,6 +13,7 @@ const KNOWN_SCOPES: ReadonlySet<ShortcutScope> = new Set([
 	"composer",
 	"terminal",
 	"editor",
+	"inspector",
 	"start-composer",
 	"workspace-composer",
 ]);

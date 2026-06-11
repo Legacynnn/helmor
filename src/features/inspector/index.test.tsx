@@ -12,6 +12,7 @@ import type { ForgeActionStatus, WorkspaceGitActionStatus } from "@/lib/api";
 import { ComposerInsertProvider } from "@/lib/composer-insert-context";
 import { renderWithProviders } from "@/test/render-with-providers";
 import { WorkspaceInspectorSidebar } from "./index";
+import { INSPECTOR_PANEL_TAB_STORAGE_KEY } from "./panel/state";
 
 const apiMocks = vi.hoisted(() => ({
 	listWorkspaceChanges: vi.fn(),
@@ -104,6 +105,9 @@ function expectTextBefore(
 
 describe("WorkspaceInspectorSidebar Actions section", () => {
 	beforeEach(() => {
+		// These specs exercise the Actions page, now one tab of the panel
+		// section — pre-select it so the page is mounted on first render.
+		window.localStorage.setItem(INSPECTOR_PANEL_TAB_STORAGE_KEY, "actions");
 		apiMocks.listWorkspaceChanges.mockReset();
 		apiMocks.getWorkspaceForgeCheckInsertText.mockReset();
 		apiMocks.loadWorkspaceGitActionStatus.mockReset();
@@ -126,6 +130,7 @@ describe("WorkspaceInspectorSidebar Actions section", () => {
 
 	afterEach(() => {
 		cleanup();
+		window.localStorage.removeItem(INSPECTOR_PANEL_TAB_STORAGE_KEY);
 	});
 
 	it("hides deployments and checks when remote arrays are empty", async () => {
@@ -732,6 +737,8 @@ describe("WorkspaceInspectorSidebar Actions section", () => {
 	});
 
 	it("shows an empty changes state after empty changes have loaded", async () => {
+		// This spec looks at the Git page, not Actions.
+		window.localStorage.setItem(INSPECTOR_PANEL_TAB_STORAGE_KEY, "git");
 		renderInspector();
 
 		expect(

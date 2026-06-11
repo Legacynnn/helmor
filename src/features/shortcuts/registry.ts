@@ -411,6 +411,38 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		scopes: ["app"],
 		editable: true,
 	},
+	{
+		id: "panel.showFiles",
+		title: "Show inspector Files tab",
+		group: "Workspace",
+		defaultHotkey: "Mod+Shift+1",
+		scopes: ["app"],
+		editable: true,
+	},
+	{
+		id: "panel.showGit",
+		title: "Show inspector Git tab",
+		group: "Workspace",
+		defaultHotkey: "Mod+Shift+2",
+		scopes: ["app"],
+		editable: true,
+	},
+	{
+		id: "panel.showSearch",
+		title: "Show inspector Search tab",
+		group: "Workspace",
+		defaultHotkey: "Mod+Shift+3",
+		scopes: ["app"],
+		editable: true,
+	},
+	{
+		id: "panel.showActions",
+		title: "Show inspector Actions tab",
+		group: "Workspace",
+		defaultHotkey: "Mod+Shift+4",
+		scopes: ["app"],
+		editable: true,
+	},
 ];
 
 export const SHORTCUT_DEFINITION_BY_ID = new Map(

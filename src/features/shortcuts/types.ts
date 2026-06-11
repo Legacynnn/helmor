@@ -47,7 +47,11 @@ export type ShortcutId =
 	| "terminal.next"
 	| "terminal.previous"
 	| "inspector.toggleScripts"
-	| "inspector.focusTerminal";
+	| "inspector.focusTerminal"
+	| "panel.showFiles"
+	| "panel.showGit"
+	| "panel.showSearch"
+	| "panel.showActions";
 
 export type ShortcutGroup =
 	| "Navigation"
@@ -78,6 +82,7 @@ export type ShortcutScope =
 	| "composer"
 	| "terminal"
 	| "editor"
+	| "inspector"
 	| "start-composer"
 	| "workspace-composer";
 

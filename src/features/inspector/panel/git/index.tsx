@@ -55,10 +55,6 @@ type ChangesSectionProps = {
 	changeRequest: ChangeRequestInfo | null;
 	/** Cold-fetch indicator owned by App; drives the git-header shimmer. */
 	forgeIsRefreshing?: boolean;
-	/** Ref handed to the inspector's resize hook so it can write `style.height`
-	 * directly during drag, bypassing React and CSS custom-property
-	 * invalidation. */
-	sectionRef?: React.RefObject<HTMLElement | null>;
 };
 
 function ChangesSectionImpl({
@@ -79,7 +75,6 @@ function ChangesSectionImpl({
 	commitButtonState,
 	changeRequest,
 	forgeIsRefreshing = false,
-	sectionRef,
 }: ChangesSectionProps) {
 	const queryClient = useQueryClient();
 	const {
@@ -169,13 +164,9 @@ function ChangesSectionImpl({
 	const isForgeRefreshing = workspaceId !== null && forgeIsRefreshing;
 
 	return (
-		<section
-			ref={sectionRef}
-			aria-label="Inspector section Git"
-			className="flex min-h-0 shrink-0 flex-col overflow-hidden border-b border-border/60 bg-sidebar"
-			// Height written via `sectionRef` by `useWorkspaceInspectorSidebar`
-			// — kept out of JSX so incidental re-renders can't clobber it.
-			style={{ contain: "layout style paint" }}
+		<div
+			aria-label="Git panel"
+			className="flex min-h-0 flex-1 flex-col overflow-hidden bg-sidebar"
 		>
 			<GitSectionHeader
 				commitButtonMode={commitButtonMode}
@@ -283,7 +274,7 @@ function ChangesSectionImpl({
 					</div>
 				)}
 			</ScrollArea>
-		</section>
+		</div>
 	);
 }
 
