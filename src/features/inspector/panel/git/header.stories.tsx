@@ -4,7 +4,7 @@ import type {
 	WorkspaceCommitButtonMode,
 } from "@/features/commit/button";
 import type { ChangeRequestInfo } from "@/lib/api";
-import { GitSectionHeader } from "./git-section-header";
+import { GitSectionHeader } from "./header";
 
 // ── Mock data ─────────────────────────────────────────────────────────
 

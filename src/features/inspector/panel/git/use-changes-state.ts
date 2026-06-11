@@ -18,8 +18,9 @@ export type ChangesStateController = {
 };
 
 export function useChangesState(): ChangesStateController {
-	const [changesTreeView, setChangesTreeView] = useState(true);
-	const [branchDiffTreeView, setBranchDiffTreeView] = useState(true);
+	// View toggles default to the flat list; tree view is opt-in.
+	const [changesTreeView, setChangesTreeView] = useState(false);
+	const [branchDiffTreeView, setBranchDiffTreeView] = useState(false);
 	const [changesOpen, setChangesOpen] = useState(true);
 	const [stagedOpen, setStagedOpen] = useState(true);
 	const [branchDiffOpen, setBranchDiffOpen] = useState(true);

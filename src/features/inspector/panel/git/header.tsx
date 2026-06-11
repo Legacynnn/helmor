@@ -1,6 +1,5 @@
-import { ChevronsRight, ExternalLink } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { GithubBrandIcon, GitlabBrandIcon } from "@/components/brand-icon";
+import { ChevronsRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
@@ -29,24 +28,12 @@ import {
 	getGitSectionHeaderHighlightClass,
 	INSPECTOR_SECTION_HEADER_CLASS,
 	INSPECTOR_SECTION_TITLE_CLASS,
-} from "../layout";
-import { ForgeCliTrigger } from "./forge-cli-onboarding";
+} from "../../layout";
+import { ForgeCliTrigger } from "../../sections/forge-cli-onboarding";
+import { ChangeRequestPill } from "./change-request-pill";
+import { CONTINUE_LABEL, useContinueButtonWidth } from "./use-continue-width";
 
 const SHIMMER_MIN_DISPLAY_MS = 1500;
-const CONTINUE_LABEL = "Continue";
-const CONTINUE_BUTTON_PADDING_X_PX = 8;
-const CONTINUE_BUTTON_GAP_PX = 4;
-const CONTINUE_ICON_SIZE_PX = 13;
-const CONTINUE_LABEL_FALLBACK_WIDTH_PX = 45;
-const getContinueFullWidth = (labelWidth: number) =>
-	CONTINUE_BUTTON_PADDING_X_PX * 2 +
-	CONTINUE_ICON_SIZE_PX +
-	CONTINUE_BUTTON_GAP_PX +
-	labelWidth;
-const CONTINUE_ICON_WIDTH_PX =
-	CONTINUE_BUTTON_PADDING_X_PX * 2 + CONTINUE_ICON_SIZE_PX;
-const CONTINUE_COMPACT_THRESHOLD_PX =
-	CONTINUE_ICON_WIDTH_PX + CONTINUE_BUTTON_GAP_PX + 12;
 
 function getShortcutIdForCommitMode(
 	mode: WorkspaceCommitButtonMode,
@@ -168,89 +155,15 @@ export function GitSectionHeader({
 	const isMergeRequest = forgeDetection?.provider === "gitlab";
 	const showChangeRequest = changeRequest !== null && !showForgeOnboarding;
 	const showContinue = commitButtonMode === "merged" && showChangeRequest;
-	const headerRef = useRef<HTMLDivElement | null>(null);
-	const changeRequestRef = useRef<HTMLDivElement | null>(null);
-	const commitButtonRef = useRef<HTMLDivElement | null>(null);
-	const continueLabelRef = useRef<HTMLSpanElement | null>(null);
-	const [continueLabelWidth, setContinueLabelWidth] = useState(
-		CONTINUE_LABEL_FALLBACK_WIDTH_PX,
-	);
-	const continueFullWidth = getContinueFullWidth(continueLabelWidth);
-	const [continueWidth, setContinueWidth] = useState(continueFullWidth);
-	const iconMarginLeft =
-		CONTINUE_BUTTON_PADDING_X_PX +
-		((continueFullWidth - continueWidth) /
-			(continueFullWidth - CONTINUE_ICON_WIDTH_PX)) *
-			((CONTINUE_ICON_WIDTH_PX - CONTINUE_ICON_SIZE_PX) / 2 -
-				CONTINUE_BUTTON_PADDING_X_PX);
-	const labelMaxWidth = Math.max(
-		0,
-		continueWidth -
-			iconMarginLeft -
-			CONTINUE_ICON_SIZE_PX -
-			CONTINUE_BUTTON_GAP_PX -
-			CONTINUE_BUTTON_PADDING_X_PX,
-	);
-
-	useLayoutEffect(() => {
-		if (!showContinue || !showButton || typeof ResizeObserver === "undefined") {
-			setContinueWidth(continueFullWidth);
-			return;
-		}
-
-		const measure = () => {
-			const header = headerRef.current;
-			const changeRequestButton = changeRequestRef.current;
-			const commitButton = commitButtonRef.current;
-			if (!header || !changeRequestButton || !commitButton) return;
-
-			const labelWidth = continueLabelRef.current?.scrollWidth;
-			if (
-				typeof labelWidth === "number" &&
-				Math.abs(labelWidth - continueLabelWidth) > 0.5
-			) {
-				setContinueLabelWidth(labelWidth);
-			}
-
-			const styles = window.getComputedStyle(header);
-			const contentWidth =
-				header.clientWidth -
-				Number.parseFloat(styles.paddingLeft || "0") -
-				Number.parseFloat(styles.paddingRight || "0");
-			const headerGap = Number.parseFloat(styles.columnGap || "0");
-			const actionGap = Number.parseFloat(
-				window.getComputedStyle(commitButton.parentElement ?? header)
-					.columnGap || "0",
-			);
-			const availableForContinue =
-				contentWidth -
-				changeRequestButton.offsetWidth -
-				commitButton.offsetWidth -
-				headerGap -
-				actionGap;
-			const compact = availableForContinue < CONTINUE_COMPACT_THRESHOLD_PX;
-
-			setContinueWidth(
-				compact
-					? CONTINUE_ICON_WIDTH_PX
-					: Math.min(
-							continueFullWidth,
-							Math.max(CONTINUE_COMPACT_THRESHOLD_PX, availableForContinue),
-						),
-			);
-		};
-
-		const observer = new ResizeObserver(measure);
-		for (const element of [
-			headerRef.current,
-			changeRequestRef.current,
-			commitButtonRef.current,
-		]) {
-			if (element) observer.observe(element);
-		}
-		measure();
-		return () => observer.disconnect();
-	}, [showContinue, showButton, continueFullWidth, continueLabelWidth]);
+	const {
+		headerRef,
+		changeRequestRef,
+		commitButtonRef,
+		continueLabelRef,
+		continueWidth,
+		iconMarginLeft,
+		labelMaxWidth,
+	} = useContinueButtonWidth({ showContinue, showButton });
 
 	return (
 		<div
@@ -284,67 +197,13 @@ export function GitSectionHeader({
 						Git
 					</span>
 				) : (
-					(() => {
-						const button = (
-							<Button
-								type="button"
-								variant="outline"
-								size="xs"
-								className={cn(
-									"self-center rounded-md bg-transparent font-normal tracking-[0.01em] transition-[background-color,border-color,color,box-shadow,opacity] duration-300 ease-out hover:bg-transparent hover:opacity-80",
-									(commitButtonMode === "fix" ||
-										commitButtonMode === "merge-blocked" ||
-										commitButtonMode === "closed") &&
-										"border-[var(--workspace-pr-closed-accent)] text-[var(--workspace-pr-closed-accent)] hover:text-[var(--workspace-pr-closed-accent)]",
-									commitButtonMode === "resolve-conflicts" &&
-										"border-[var(--workspace-pr-conflicts-accent)] text-[var(--workspace-pr-conflicts-accent)] hover:text-[var(--workspace-pr-conflicts-accent)]",
-									commitButtonMode === "checks-running" &&
-										"border-[var(--workspace-pr-checks-running-accent)] text-[var(--workspace-pr-checks-running-accent)] hover:text-[var(--workspace-pr-checks-running-accent)]",
-									commitButtonMode === "merge" &&
-										"border-[var(--workspace-pr-open-accent)] text-[var(--workspace-pr-open-accent)] hover:text-[var(--workspace-pr-open-accent)]",
-									commitButtonMode === "merged" &&
-										"border-[var(--workspace-pr-merged-accent)] text-[var(--workspace-pr-merged-accent)] hover:text-[var(--workspace-pr-merged-accent)]",
-								)}
-								onClick={onChangeRequestClick}
-							>
-								<span className="inline-flex h-4 min-w-0 items-center gap-1.5 leading-4">
-									<span className="inline-flex size-4 shrink-0 items-center justify-center overflow-visible">
-										{isMergeRequest ? (
-											<GitlabBrandIcon size={12} />
-										) : (
-											<GithubBrandIcon size={12} />
-										)}
-									</span>
-									<span className="inline-flex h-4 min-w-0 items-center truncate leading-4 tabular-nums text-ui font-light">
-										{isMergeRequest ? "!" : "#"}
-										{changeRequest.number}
-									</span>
-									<ExternalLink
-										size={12}
-										strokeWidth={2}
-										className="shrink-0 self-center"
-									/>
-								</span>
-							</Button>
-						);
-						const openLabel = isMergeRequest
-							? "Open merge request"
-							: "Open pull request";
-						return (
-							<Tooltip>
-								<TooltipTrigger asChild>{button}</TooltipTrigger>
-								<TooltipContent
-									side="bottom"
-									className="flex max-w-[320px] items-center gap-2 rounded-md px-2 py-1 text-small leading-tight"
-								>
-									<span className="truncate">{openLabel}</span>
-									{openChangeRequestShortcut ? (
-										<InlineShortcutDisplay hotkey={openChangeRequestShortcut} />
-									) : null}
-								</TooltipContent>
-							</Tooltip>
-						);
-					})()
+					<ChangeRequestPill
+						changeRequest={changeRequest}
+						commitButtonMode={commitButtonMode}
+						isMergeRequest={isMergeRequest}
+						openChangeRequestShortcut={openChangeRequestShortcut}
+						onClick={onChangeRequestClick}
+					/>
 				)}
 			</div>
 			{showButton &&

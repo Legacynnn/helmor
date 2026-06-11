@@ -2,12 +2,12 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChangeRequestInfo, ForgeDetection } from "@/lib/api";
 import { renderWithProviders } from "@/test/render-with-providers";
-import { GitSectionHeader } from "./git-section-header";
+import { GitSectionHeader } from "./header";
 
 // The dialog spawns a real PTY through Tauri IPC; replace it with a probe so
 // these tests stay structural and don't pull in the auth flow (already
 // covered by `forge-connect-dialog.test.tsx`).
-vi.mock("./forge-cli-onboarding", () => ({
+vi.mock("../../sections/forge-cli-onboarding", () => ({
 	ForgeCliTrigger: ({ detection }: { detection: ForgeDetection }) => (
 		<button type="button" data-testid="forge-connect-trigger">
 			{detection.labels.connectAction}
