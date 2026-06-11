@@ -920,6 +920,16 @@ html.theme-vesper [data-slot="tooltip-content"] {
 	color: var(--fg-default);
 }
 
+/* The inline shortcut chips inside those tooltips (InlineShortcutDisplay) hardcode
+   `text-background/NN` — the inverted-pill text color that works in the default
+   themes. Vesper's --background is transparent, so the chips render fully
+   transparent (invisible) while the tooltip label, which inherits the override
+   color above, stays legible. Re-tint the chips to the dimmed foreground so the
+   keybind shows. Scoped to Vesper tooltips only — other themes are untouched. */
+html.theme-vesper [data-slot="tooltip-content"] [class*="text-background"] {
+	color: color-mix(in oklab, var(--fg-default) 60%, transparent);
+}
+
 /* Collapse each sidebar to a SINGLE translucent layer. The shell wraps the left
    sidebar (aside → inner) and the inspector (aside → inner → content) in nested
    panes that all carry a surface background; left stacked they'd multiply the
