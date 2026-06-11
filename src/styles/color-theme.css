@@ -931,6 +931,58 @@ html.theme-vesper.dark [data-shell-pane-inner="inspector"] {
 	background-color: transparent;
 }
 
+/* Left sidebar — light frosted glass (windowed Vesper only).
+   The rule above zeroes the outer aside, and the inner pane carries no desktop
+   background, so the left sidebar paints NO tint of its own — it's pure native
+   blur. Over a *dark* desktop that's fine, but over a *white* desktop the blur
+   washes to pale grey and the near-white chrome text becomes unreadable. The
+   native HudWindow material is global (one material per window) and only ever
+   darkens, so it can't be pushed white; instead we paint the inner pane as a
+   warm near-white frosted layer and re-root this subtree's palette to dark ink
+   on light glass. Result: a crisp, clearly-light sidebar that stays legible
+   over any desktop and reads as distinct from the dark content area.
+
+   Scope notes:
+   • Inner pane only — all sidebar content lives inside it, and the outer aside
+     stays transparent so we keep a single translucent layer over the blur.
+   • Windowed only (`:not(.vesper-fullscreen)`) — fullscreen has no desktop to
+     bleed through, so it keeps the dark in-window material; the dark-on-light
+     tokens below must NOT leak there or dark text would land on a dark pane.
+   • Every shadcn/sidebar/workspace token forwards from the internal base
+     tokens, so overriding those base tokens flips foregrounds, borders, washes
+     and the computed selected-row tint in one place. Portaled UI (menus, hover
+     cards, tooltips) renders outside this subtree and is intentionally left on
+     the normal dark palette. */
+html.theme-vesper.dark:not(.vesper-fullscreen)
+[data-shell-pane-inner="sidebar"] {
+	/* Warm near-white frost. High-ish alpha so it stays clearly light over the
+	   darkening HUD material; the ~18% that bleeds through keeps the frost. The
+	   token drives in-sidebar `bg-sidebar`/`ring-sidebar` (badge cut-outs) too,
+	   so they match the pane instead of punching dark dots. */
+	--bg-surface: oklch(0.94 0.012 80 / 0.82);
+	background-color: var(--bg-surface);
+	/* Hairline on the inner (right) edge so the light pane reads as detached
+	   from the dark content area — no layout-shifting border. */
+	box-shadow: inset -1px 0 0 0 oklch(0.25 0.01 72 / 0.12);
+
+	/* Dark ink + dark washes for the light glass. */
+	--fg-default: oklch(0.28 0.012 72);
+	--fg-muted: oklch(0.46 0.012 72);
+	--border-default: oklch(0.25 0.01 72 / 0.16);
+	--border-subtle: oklch(0.25 0.01 72 / 0.09);
+	--border-strong: oklch(0.25 0.01 72 / 0.26);
+	/* Muted/accent surfaces → subtle dark washes (the active nav row uses
+	   `bg-accent`; keep it visible but quiet). */
+	--accent-muted: oklch(0.3 0.02 72 / 0.1);
+	--accent-muted-fg: oklch(0.28 0.012 72);
+	--bg-elevated: oklch(0.3 0.02 72 / 0.08);
+	--input-bg: oklch(0.3 0.02 72 / 0.06);
+	/* Row hover/active washes — Vesper sets these to *white* washes for the dark
+	   glass; flip to dark washes so they register on light. */
+	--sidebar-item-hover-bg: oklch(0.3 0.02 72 / 0.08);
+	--sidebar-item-active-bg: oklch(0.3 0.02 72 / 0.14);
+}
+
 /* Center workspace: SLIGHTLY translucent (requested) — a subtle blur bleed, not
    full glass, so chat/editor text stays readable. The section stays transparent
    so the viewport is the single ~0.9-alpha layer (otherwise the two stack and
