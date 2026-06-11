@@ -1,7 +1,12 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentModelSection, TerminalAgentInfo } from "@/lib/api";
+import type {
+	AgentModelSection,
+	TerminalAgentInfo,
+	WorkspaceSessionSummary,
+} from "@/lib/api";
+import { createHelmorQueryClient, helmorQueryKeys } from "@/lib/query-client";
 import { renderWithProviders } from "@/test/render-with-providers";
 
 const apiMocks = vi.hoisted(() => ({
@@ -177,6 +182,60 @@ describe("NewSessionPopover", () => {
 		});
 		await waitFor(() => {
 			expect(onSelectSession).toHaveBeenCalledWith("ts-1");
+		});
+	});
+
+	it("seeds the new terminal session into the cache as the active session", async () => {
+		const queryClient = createHelmorQueryClient();
+		const existingChat: WorkspaceSessionSummary = {
+			id: "chat-1",
+			workspaceId: "w1",
+			title: "Existing",
+			agentType: null,
+			status: "idle",
+			model: null,
+			permissionMode: "default",
+			providerSessionId: null,
+			effortLevel: null,
+			unreadCount: 0,
+			fastMode: false,
+			createdAt: "2026-01-01T00:00:00Z",
+			updatedAt: "2026-01-01T00:00:00Z",
+			lastUserMessageAt: null,
+			isHidden: false,
+			sessionKind: "chat",
+			actionKind: null,
+			active: true,
+		};
+		queryClient.setQueryData(helmorQueryKeys.workspaceSessions("w1"), [
+			existingChat,
+		]);
+
+		const user = userEvent.setup();
+		renderWithProviders(
+			<NewSessionPopover workspaceId="w1" onCreateConversation={vi.fn()} />,
+			{ queryClient },
+		);
+		await user.click(screen.getByLabelText("New session"));
+		await user.click(screen.getByRole("button", { name: /Terminal/ }));
+		await waitFor(() => {
+			expect(screen.getByText("Claude Code")).toBeInTheDocument();
+		});
+		await user.keyboard("1");
+
+		await waitFor(() => {
+			const sessions = queryClient.getQueryData<WorkspaceSessionSummary[]>(
+				helmorQueryKeys.workspaceSessions("w1"),
+			);
+			const seeded = sessions?.find((session) => session.id === "ts-1");
+			expect(seeded?.active).toBe(true);
+			expect(seeded?.sessionKind).toBe("terminal");
+			expect(seeded?.agentType).toBe("claude-code");
+			// The previously-active chat tab must be demoted so the new terminal
+			// tab is the only active one.
+			expect(sessions?.find((session) => session.id === "chat-1")?.active).toBe(
+				false,
+			);
 		});
 	});
 });

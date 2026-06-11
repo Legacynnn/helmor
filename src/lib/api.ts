@@ -4657,6 +4657,23 @@ export async function createTerminalSession(
 	});
 }
 
+/** Persisted scrollback for a terminal session, replayed into xterm when a
+ * session is re-opened after the in-memory buffer is gone (e.g. app restart). */
+export type TerminalScrollback = {
+	data: string;
+	truncated: boolean;
+};
+
+/** Read a terminal session's persisted scrollback. Returns `null` when nothing
+ * was persisted (a session that never produced output). */
+export async function readTerminalScrollback(
+	sessionId: string,
+): Promise<TerminalScrollback | null> {
+	return invoke<TerminalScrollback | null>("read_terminal_scrollback", {
+		sessionId,
+	});
+}
+
 /** Spawn (or reattach to) the agent CLI PTY for a terminal session.
  * stdin/resize/stop reuse the inspector terminal commands with
  * `instanceId = sessionId`. */

@@ -9,6 +9,8 @@ import {
 	attach,
 	detach,
 	ensureSpawned,
+	getBuffer,
+	loadPersisted,
 	resize,
 	TRUNCATION_NOTICE,
 	writeStdin,
@@ -51,6 +53,10 @@ type TerminalSessionPaneProps = {
 	workspaceId: string;
 	/** Display name of the agent CLI, for the exited overlay. */
 	agentLabel: string;
+	/** The session's persisted DB status. An `exited` session (e.g. restored
+	 * after an app restart) replays its history and waits for the user to
+	 * relaunch — it is never auto-spawned. */
+	initialStatus: string;
 	isActive: boolean;
 };
 
@@ -62,6 +68,7 @@ export function TerminalSessionPane({
 	repoId,
 	workspaceId,
 	agentLabel,
+	initialStatus,
 	isActive,
 }: TerminalSessionPaneProps) {
 	const termRef = useRef<TerminalHandle | null>(null);
@@ -74,43 +81,74 @@ export function TerminalSessionPane({
 		return cancel;
 	}, []);
 
-	// Spawn (idempotent) + attach + one-shot replay on mount.
+	// On mount: replay scrollback + attach the live listener. New sessions
+	// spawn the agent CLI; restored (`exited`) sessions replay their persisted
+	// history and wait for an explicit Relaunch instead of auto-spawning.
 	useEffect(() => {
-		const entry = ensureSpawned(sessionId, repoId, workspaceId);
-		setExited(entry.runStatus === "exited");
-		setExitCode(entry.exitCode);
-		const existing = attach(sessionId, {
-			onChunk: (data) => termRef.current?.write(data),
-			onStatusChange: (status, code) => {
-				setExited(status === "exited");
-				setExitCode(code);
-			},
-		});
-
+		let cancelled = false;
 		let rafId: number | null = null;
-		const tryReplay = () => {
+
+		const replay = (chunks: string[], truncated: boolean) => {
 			rafId = null;
 			const t = termRef.current;
 			if (!t) {
-				rafId = requestAnimationFrame(tryReplay);
+				rafId = requestAnimationFrame(() => replay(chunks, truncated));
 				return;
 			}
-			if (existing && existing.chunks.length > 0) {
-				const snapshot = existing.chunks.slice();
+			if (chunks.length > 0) {
 				t.clear();
-				if (existing.truncated) t.write(TRUNCATION_NOTICE);
-				for (const chunk of snapshot) t.write(chunk);
+				if (truncated) t.write(TRUNCATION_NOTICE);
+				for (const chunk of chunks) t.write(chunk);
 			}
 			if (isActive) t.focus();
 		};
-		tryReplay();
+
+		const listener = {
+			onChunk: (data: string) => termRef.current?.write(data),
+			onStatusChange: (status: "running" | "exited", code: number | null) => {
+				if (cancelled) return;
+				setExited(status === "exited");
+				setExitCode(code);
+			},
+			// The PTY boots at a default size; the initial fit-resize can race the
+			// spawn and be dropped. Re-push the real grid size once the process is
+			// up so the CLI fills the pane width instead of rendering narrow.
+			onStarted: () => {
+				requestAnimationFrame(() => termRef.current?.syncSize());
+			},
+		};
+
+		const live = getBuffer(sessionId);
+		if (live) {
+			// Already attached this run (tab switch or live session).
+			setExited(live.runStatus === "exited");
+			setExitCode(live.exitCode);
+			attach(sessionId, listener);
+			replay(live.chunks.slice(), live.truncated);
+		} else if (initialStatus === "exited") {
+			// Restored old session: replay history, do NOT spawn.
+			setExited(true);
+			const pending = loadPersisted(sessionId, repoId, workspaceId, "exited");
+			attach(sessionId, listener);
+			void pending.then((entry) => {
+				if (!cancelled) replay(entry.chunks.slice(), entry.truncated);
+			});
+		} else {
+			// New session: spawn the agent CLI.
+			const entry = ensureSpawned(sessionId, repoId, workspaceId);
+			setExited(entry.runStatus === "exited");
+			setExitCode(entry.exitCode);
+			attach(sessionId, listener);
+			replay(entry.chunks.slice(), entry.truncated);
+		}
 
 		return () => {
+			cancelled = true;
 			if (rafId !== null) cancelAnimationFrame(rafId);
 			detach(sessionId);
 		};
 		// isActive deliberately not in deps — handled by the [isActive] effect below.
-	}, [sessionId, repoId, workspaceId]);
+	}, [sessionId, repoId, workspaceId, initialStatus]);
 
 	// Refit + focus on activate (xterm size may have drifted while hidden).
 	useEffect(() => {
@@ -141,6 +179,9 @@ export function TerminalSessionPane({
 	const handleRelaunch = useCallback(() => {
 		setExited(false);
 		setExitCode(null);
+		// Wipe the replayed frame so the resumed CLI redraws onto a clean screen
+		// (ensureSpawned drops the in-memory scrollback in tandem).
+		termRef.current?.reset();
 		ensureSpawned(sessionId, repoId, workspaceId);
 		requestAnimationFrame(() => termRef.current?.focus());
 	}, [sessionId, repoId, workspaceId]);

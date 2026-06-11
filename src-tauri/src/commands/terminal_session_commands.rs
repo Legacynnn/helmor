@@ -47,6 +47,16 @@ pub async fn create_terminal_session(
     Ok(response)
 }
 
+/// Read a terminal session's persisted scrollback so a restored session
+/// replays its real output instead of a blank pane. `None` when nothing was
+/// persisted (e.g. a session that never produced output).
+#[tauri::command]
+pub async fn read_terminal_scrollback(
+    session_id: String,
+) -> CmdResult<Option<crate::terminal_sessions::scrollback::Scrollback>> {
+    run_blocking(move || crate::terminal_sessions::scrollback::read(&session_id)).await
+}
+
 /// Spawn (or no-op if already running) the agent CLI for a terminal
 /// session. Output streams to `channel` as `ScriptEvent`s; stdin/resize
 /// reuse the inspector terminal commands with `instanceId = sessionId`.

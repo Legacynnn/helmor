@@ -182,6 +182,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 									repoId={workspace.repoId}
 									workspaceId={workspace.id}
 									agentLabel={terminalAgentLabel(session.agentType)}
+									initialStatus={session.status}
 									isActive={
 										selectedIsTerminal &&
 										session.id === selectedSessionId &&

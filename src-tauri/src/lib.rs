@@ -691,6 +691,7 @@ pub fn run() {
             commands::terminal_session_commands::get_terminal_agent_details,
             commands::terminal_session_commands::create_terminal_session,
             commands::terminal_session_commands::spawn_terminal_session,
+            commands::terminal_session_commands::read_terminal_scrollback,
             commands::triage_commands::get_triage_config,
             commands::triage_commands::update_triage_config,
             commands::triage_commands::get_triage_active_status,

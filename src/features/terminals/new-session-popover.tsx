@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MessageSquare, Plus, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ModelIcon } from "@/components/model-icon";
@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useWorkspaceToast } from "@/lib/workspace-toast-context";
 import { publishShellEvent, useShellEvent } from "@/shell/event-bus";
+import { seedNewSessionInCache } from "../panel/session-cache";
 import { terminalAgentIconByKey } from "./agent-meta";
 
 type LauncherTab = "conversation" | "terminal";
@@ -93,6 +94,7 @@ export function NewSessionPopover({
 	const [tab, setTab] = useState<LauncherTab>("conversation");
 	const [highlight, setHighlight] = useState(0);
 	const pushToast = useWorkspaceToast();
+	const queryClient = useQueryClient();
 
 	useShellEvent("open-new-session", (event) => {
 		setTab(event.tab ?? "conversation");
@@ -134,6 +136,19 @@ export function NewSessionPopover({
 		setOpen(false);
 		try {
 			const { sessionId } = await createTerminalSession(workspaceId, agent.id);
+			// Optimistically seed the cache (same as the conversation flow) so the
+			// new terminal session is present + marked active immediately. Without
+			// this, the panel's reconciliation effect resolves the displayed
+			// session from the stale active pointer and yanks selection back to the
+			// previously-active tab before the async refetch lands — leaving the
+			// new tab created but not focused.
+			seedNewSessionInCache({
+				queryClient,
+				workspaceId,
+				sessionId,
+				sessionKind: "terminal",
+				agentType: agent.id,
+			});
 			onSessionsChanged?.();
 			onSelectSession?.(sessionId);
 		} catch (error) {

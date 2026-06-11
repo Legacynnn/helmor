@@ -47,6 +47,40 @@ pub enum ScriptEvent {
 /// Key = (repo_id, script_type, workspace_id)
 type ProcessKey = (String, String, Option<String>);
 
+/// Decode as much complete UTF-8 as possible from `bytes`, returning the
+/// decoded text plus any trailing bytes that form an *incomplete-but-valid*
+/// multibyte sequence. Those carry into the next PTY read so a codepoint split
+/// across a read boundary isn't mangled into `�` — which corrupts box-drawing
+/// and emoji and visibly breaks TUI spacing (e.g. Claude Code's UI).
+///
+/// Genuinely invalid bytes are decoded lossily and never carried, so a corrupt
+/// stream can't stall the reader.
+fn decode_utf8_stream(bytes: &[u8]) -> (String, Vec<u8>) {
+    match std::str::from_utf8(bytes) {
+        Ok(s) => (s.to_owned(), Vec::new()),
+        Err(err) => {
+            let valid = err.valid_up_to();
+            // SAFETY: `bytes[..valid]` is valid UTF-8 by `valid_up_to`'s contract.
+            let mut head = unsafe { std::str::from_utf8_unchecked(&bytes[..valid]) }.to_owned();
+            match err.error_len() {
+                // `None` = unexpected end: the tail is an incomplete-but-valid
+                // prefix. Carry it (bounded to one UTF-8 sequence's max length).
+                None if bytes.len() - valid <= 4 => (head, bytes[valid..].to_vec()),
+                // Invalid bytes (or an implausibly long tail): decode the
+                // remainder lossily so the reader never stalls; carry nothing.
+                _ => {
+                    head.push_str(&String::from_utf8_lossy(&bytes[valid..]));
+                    (head, Vec::new())
+                }
+            }
+        }
+    }
+}
+
+/// How long a kill-before-register tombstone stays valid. Comfortably longer
+/// than a PTY spawn, short enough that a stale tombstone (spawn that never
+/// registered) can't kill an unrelated later relaunch of the same key.
+const PENDING_KILL_TTL: Duration = Duration::from_secs(10);
 const PROCESS_TERM_TIMEOUT: Duration = Duration::from_millis(200);
 const PROCESS_KILL_TIMEOUT: Duration = Duration::from_millis(500);
 const PTY_POLL_INTERVAL: Duration = Duration::from_millis(25);
@@ -105,6 +139,12 @@ struct ProcessHandle {
 #[derive(Clone, Default)]
 pub struct ScriptProcessManager {
     processes: Arc<Mutex<HashMap<ProcessKey, ProcessHandle>>>,
+    /// Keys whose `kill` arrived before the process finished registering
+    /// (a close-during-spawn race — e.g. a terminal agent closed in the
+    /// brief window between `spawn` firing and the PTY being registered).
+    /// `register` honors a recent tombstone by killing the just-spawned
+    /// process immediately, so the agent can never outlive its close.
+    pending_kills: Arc<Mutex<HashMap<ProcessKey, Instant>>>,
 }
 
 impl ScriptProcessManager {
@@ -142,11 +182,25 @@ impl ScriptProcessManager {
             stopping: Arc::new(AtomicBool::new(false)),
             stop_pgid: Arc::new(Mutex::new(None)),
         };
-        let mut map = self.processes.lock().expect("process map poisoned");
-        if let Some(old) = map.insert(key, handle) {
-            old.killed.store(true, Ordering::Release);
-            kill_in_flight_stop_command(&old.stop_pgid);
-            escalating_kill(old.pid, old.pgid);
+        {
+            let mut map = self.processes.lock().expect("process map poisoned");
+            if let Some(old) = map.insert(key.clone(), handle) {
+                old.killed.store(true, Ordering::Release);
+                kill_in_flight_stop_command(&old.stop_pgid);
+                escalating_kill(old.pid, old.pgid);
+            }
+        }
+        // Close-during-spawn: a kill raced ahead of this registration. Finish
+        // the freshly-spawned process now so it can't outlive the close. Stale
+        // tombstones are pruned so they can't kill an unrelated later spawn.
+        let tombstoned = {
+            let mut pending = self.pending_kills.lock().expect("pending kills poisoned");
+            pending.retain(|_, at| at.elapsed() < PENDING_KILL_TTL);
+            pending.remove(&key).is_some()
+        };
+        if tombstoned {
+            killed.store(true, Ordering::Release);
+            escalating_kill(pid, pgid);
         }
         killed
     }
@@ -262,7 +316,15 @@ impl ScriptProcessManager {
                 }
                 true
             }
-            None => false,
+            None => {
+                // The process may still be spawning (close-during-spawn).
+                // Tombstone the kill so `register` finishes it on arrival.
+                self.pending_kills
+                    .lock()
+                    .expect("pending kills poisoned")
+                    .insert(key.clone(), Instant::now());
+                false
+            }
         }
     }
 
@@ -401,6 +463,7 @@ fn run_stop_command(
         .env("TERM", "xterm-256color")
         .env("FORCE_COLOR", "1")
         .env("CLICOLOR_FORCE", "1")
+        .env("COLORTERM", "truecolor")
         .env("HELMOR_ROOT_PATH", &ctx.root_path)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -802,6 +865,7 @@ pub(crate) fn run_script_with_shell(
         .env("TERM", "xterm-256color")
         .env("FORCE_COLOR", "1")
         .env("CLICOLOR_FORCE", "1")
+        .env("COLORTERM", "truecolor")
         // Prevent history pollution from the interactive shell.
         .env("HISTFILE", "/dev/null")
         .env("SAVEHIST", "0")
@@ -913,6 +977,9 @@ pub(crate) fn run_script_with_shell(
         .spawn(move || {
             let mut master = unsafe { std::fs::File::from_raw_fd(master_fd) };
             let mut buf = [0u8; 4096];
+            // Trailing bytes of a multibyte UTF-8 sequence split across reads,
+            // carried into the next wake so the codepoint isn't corrupted.
+            let mut carry: Vec<u8> = Vec::new();
             // 100ms tick is just a stop-flag fallback — kill() also closes
             // the PTY which triggers EIO/POLLHUP and wakes us instantly.
             const POLL_TIMEOUT_MS: libc::c_int = 100;
@@ -945,18 +1012,20 @@ pub(crate) fn run_script_with_shell(
                 let revents = pfd.revents;
                 let hung_up = revents & (libc::POLLHUP | libc::POLLERR | libc::POLLNVAL) != 0;
 
-                // Drain everything available in this wake cycle.
+                // Drain everything available in this wake cycle into one buffer
+                // (prefixed with any incomplete UTF-8 tail carried from the last
+                // wake), then emit it as a single chunk. Coalescing reads cuts
+                // per-read IPC + xterm.write overhead — the main source of lag
+                // during full-screen TUI redraws.
                 let mut should_exit = hung_up;
+                let mut pending: Vec<u8> = std::mem::take(&mut carry);
                 loop {
                     match master.read(&mut buf) {
                         Ok(0) => {
                             should_exit = true;
                             break;
                         }
-                        Ok(n) => {
-                            let data = String::from_utf8_lossy(&buf[..n]).into_owned();
-                            let _ = ch.send(ScriptEvent::Stdout { data });
-                        }
+                        Ok(n) => pending.extend_from_slice(&buf[..n]),
                         Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                             // Drained for now — back to poll().
                             break;
@@ -969,6 +1038,19 @@ pub(crate) fn run_script_with_shell(
                             should_exit = true;
                             break;
                         }
+                    }
+                }
+                if !pending.is_empty() {
+                    if should_exit {
+                        // No more bytes will arrive — flush the tail lossily.
+                        let data = String::from_utf8_lossy(&pending).into_owned();
+                        let _ = ch.send(ScriptEvent::Stdout { data });
+                    } else {
+                        let (data, tail) = decode_utf8_stream(&pending);
+                        if !data.is_empty() {
+                            let _ = ch.send(ScriptEvent::Stdout { data });
+                        }
+                        carry = tail;
                     }
                 }
                 if should_exit {
@@ -1048,6 +1130,41 @@ mod tests {
     use std::process::Command as StdCommand;
     use std::sync::mpsc;
     use tempfile::NamedTempFile;
+
+    // ── decode_utf8_stream ──────────────────────────────────────────────────
+
+    #[test]
+    fn decode_utf8_stream_passes_clean_input() {
+        let (s, carry) = decode_utf8_stream("hello ─ 🚀".as_bytes());
+        assert_eq!(s, "hello ─ 🚀");
+        assert!(carry.is_empty());
+    }
+
+    #[test]
+    fn decode_utf8_stream_carries_split_multibyte() {
+        // U+2500 BOX DRAWINGS LIGHT HORIZONTAL = E2 94 80 (3 bytes).
+        let full = "a─b".as_bytes().to_vec(); // 61 E2 94 80 62
+                                              // Split mid-codepoint: "a" + first byte of `─`.
+        let (s1, carry1) = decode_utf8_stream(&full[..2]);
+        assert_eq!(s1, "a");
+        assert_eq!(carry1, vec![0xE2]);
+
+        // Next read prepends the carry — the codepoint completes intact.
+        let mut next = carry1;
+        next.extend_from_slice(&full[2..]);
+        let (s2, carry2) = decode_utf8_stream(&next);
+        assert_eq!(s2, "─b");
+        assert!(carry2.is_empty());
+    }
+
+    #[test]
+    fn decode_utf8_stream_lossy_on_invalid_without_carry() {
+        // 0xFF can't start a UTF-8 sequence — decode lossily, carry nothing,
+        // so a corrupt byte can't stall the reader.
+        let (s, carry) = decode_utf8_stream(&[b'x', 0xFF, b'y']);
+        assert!(carry.is_empty());
+        assert!(s.starts_with('x') && s.ends_with('y'));
+    }
 
     // ── shell_escape ───────────────────────────────────────────────────────
 
@@ -1216,6 +1333,36 @@ mod tests {
     fn kill_others_in_repo_with_no_matches_is_noop() {
         let mgr = ScriptProcessManager::new();
         assert_eq!(mgr.kill_others_in_repo("nope", "run", None), 0);
+    }
+
+    // ── close-during-spawn race (tombstone) ────────────────────────────────
+
+    #[test]
+    fn kill_before_register_finishes_the_racing_spawn() {
+        let mgr = ScriptProcessManager::new();
+        let key: ProcessKey = ("R".into(), "terminal:race".into(), Some("ws".into()));
+        // Close arrives before the PTY registers: nothing live to kill yet.
+        assert!(!mgr.kill(&key));
+        // The spawn then completes — register must honor the pending kill and
+        // finish the process instead of leaking an orphan.
+        let (mut child, _, _, killed) = spawn_and_register(&mgr, key.clone());
+        let _ = child.wait();
+        assert!(
+            killed.load(Ordering::Acquire),
+            "racing spawn was not killed by the pending tombstone"
+        );
+    }
+
+    #[test]
+    fn register_without_pending_kill_is_not_killed() {
+        // A normal spawn (no prior kill) must never be killed by a stray
+        // tombstone.
+        let mgr = ScriptProcessManager::new();
+        let key: ProcessKey = ("R".into(), "terminal:normal".into(), Some("ws".into()));
+        let (mut child, _, _, killed) = spawn_and_register(&mgr, key.clone());
+        assert!(!killed.load(Ordering::Acquire));
+        mgr.kill(&key);
+        let _ = child.wait();
     }
 
     // ── kill_all (graceful-quit path) ──────────────────────────────────────

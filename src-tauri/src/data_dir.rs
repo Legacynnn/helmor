@@ -72,6 +72,17 @@ pub fn logs_dir() -> Result<PathBuf> {
     Ok(dir)
 }
 
+/// Returns the terminal-session scrollback directory inside the data dir.
+/// Holds one `<session_id>.log` per terminal session so PTY output survives
+/// app restarts (the in-memory buffer dies with the app).
+pub fn terminal_logs_dir() -> Result<PathBuf> {
+    let dir = data_dir()?.join("terminal_logs");
+    if !dir.exists() {
+        fs::create_dir_all(&dir).context("Failed to create terminal logs directory")?;
+    }
+    Ok(dir)
+}
+
 /// Returns the runtime state directory inside the data dir.
 pub fn run_dir() -> Result<PathBuf> {
     let dir = data_dir()?.join("run");
@@ -214,6 +225,7 @@ pub fn ensure_directory_structure() -> Result<()> {
     workspaces_dir()?;
     chats_dir()?;
     logs_dir()?;
+    terminal_logs_dir()?;
     run_dir()?;
     generated_images_dir()?;
     Ok(())

@@ -35,6 +35,13 @@ type TerminalOutputProps = {
 export type TerminalHandle = {
 	write: (data: string) => void;
 	clear: () => void;
+	/**
+	 * Full terminal reset (`reset()`): wipes the screen + scrollback and
+	 * restores default modes (alt-screen, cursor, wrap). Used on relaunch so a
+	 * resumed CLI redraws onto a clean slate instead of stacking its TUI on top
+	 * of the previously replayed frame.
+	 */
+	reset: () => void;
 	dispose: () => void;
 	/**
 	 * Force a FitAddon re-fit. Used when the terminal becomes visible after
@@ -43,6 +50,13 @@ export type TerminalHandle = {
 	 * frames and benefits from one explicit fit + redraw on re-show.
 	 */
 	refit: () => void;
+	/**
+	 * Re-emit the current grid size via `onResize` even if it hasn't changed.
+	 * Used right after a PTY (re)spawns to push the real size to a freshly
+	 * booted process — the initial FitAddon resize can race the spawn and be
+	 * dropped, leaving the CLI rendering at the PTY's default width.
+	 */
+	syncSize: () => void;
 	/**
 	 * Move keyboard focus into the xterm viewport so the user can start
 	 * typing immediately. Used when a terminal tab is activated or when a
@@ -484,8 +498,13 @@ function TerminalOutputImpl({
 					suspendedWrites.length = 0;
 					terminal.clear();
 				},
+				reset: () => {
+					suspendedWrites.length = 0;
+					terminal.reset();
+				},
 				dispose: () => terminal.dispose(),
 				refit: () => runFit(),
+				syncSize: () => onResizeRef.current?.(terminal.cols, terminal.rows),
 				focus: () => terminal.focus(),
 			};
 		}

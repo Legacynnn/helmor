@@ -4,5 +4,6 @@
 
 pub mod hook_artifacts;
 pub mod hook_server;
+pub mod scrollback;
 pub mod spawn;
 pub mod status;

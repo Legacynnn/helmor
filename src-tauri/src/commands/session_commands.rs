@@ -82,7 +82,14 @@ pub async fn unhide_session(session_id: String) -> CmdResult<()> {
 
 #[tauri::command]
 pub async fn delete_session(session_id: String) -> CmdResult<()> {
-    run_blocking(move || sessions::delete_session(&session_id)).await
+    run_blocking(move || {
+        sessions::delete_session(&session_id)?;
+        // Permanent delete: drop any persisted terminal scrollback (no-op for
+        // chat sessions). Hide deliberately keeps the log for History restore.
+        crate::terminal_sessions::scrollback::clear(&session_id);
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]

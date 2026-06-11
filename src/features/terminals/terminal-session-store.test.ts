@@ -6,6 +6,7 @@ const apiMocks = vi.hoisted(() => ({
 	stopTerminal: vi.fn(),
 	writeTerminalStdin: vi.fn(),
 	resizeTerminal: vi.fn(),
+	readTerminalScrollback: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -13,6 +14,7 @@ vi.mock("@/lib/api", () => ({
 	stopTerminal: apiMocks.stopTerminal,
 	writeTerminalStdin: apiMocks.writeTerminalStdin,
 	resizeTerminal: apiMocks.resizeTerminal,
+	readTerminalScrollback: apiMocks.readTerminalScrollback,
 }));
 
 import {
@@ -20,6 +22,7 @@ import {
 	closeSession,
 	ensureSpawned,
 	getBuffer,
+	loadPersisted,
 	resize,
 	writeStdin,
 } from "./terminal-session-store";
@@ -38,6 +41,7 @@ beforeEach(() => {
 	apiMocks.stopTerminal.mockResolvedValue(true);
 	apiMocks.writeTerminalStdin.mockResolvedValue(true);
 	apiMocks.resizeTerminal.mockResolvedValue(true);
+	apiMocks.readTerminalScrollback.mockResolvedValue(null);
 });
 
 function uniqueId() {
@@ -103,6 +107,61 @@ describe("terminal-session-store", () => {
 		emit?.({ type: "exited", code: 0 });
 		closeSession(id);
 		expect(apiMocks.stopTerminal).not.toHaveBeenCalled();
+	});
+
+	it("loadPersisted replays history and exited status without spawning", async () => {
+		const id = uniqueId();
+		apiMocks.readTerminalScrollback.mockResolvedValueOnce({
+			data: "prior output\n",
+			truncated: false,
+		});
+		const entry = await loadPersisted(id, "r1", "w1", "exited");
+		expect(apiMocks.spawnTerminalSession).not.toHaveBeenCalled();
+		expect(entry.runStatus).toBe("exited");
+		expect(entry.chunks).toEqual(["prior output\n"]);
+		expect(getBuffer(id)?.chunks).toEqual(["prior output\n"]);
+	});
+
+	it("loadPersisted tolerates a session with no persisted scrollback", async () => {
+		const id = uniqueId();
+		apiMocks.readTerminalScrollback.mockResolvedValueOnce(null);
+		const entry = await loadPersisted(id, "r1", "w1", "exited");
+		expect(entry.runStatus).toBe("exited");
+		expect(entry.chunks).toEqual([]);
+		expect(apiMocks.spawnTerminalSession).not.toHaveBeenCalled();
+	});
+
+	it("relaunch after loadPersisted spawns once and resets stale scrollback", async () => {
+		const id = uniqueId();
+		apiMocks.readTerminalScrollback.mockResolvedValueOnce({
+			data: "history\n",
+			truncated: false,
+		});
+		await loadPersisted(id, "r1", "w1", "exited");
+		ensureSpawned(id, "r1", "w1");
+		expect(apiMocks.spawnTerminalSession).toHaveBeenCalledTimes(1);
+		const buffer = getBuffer(id);
+		expect(buffer?.runStatus).toBe("running");
+		// Prior (TUI) frame is dropped so the resumed CLI redraws clean — no
+		// double UI. Fresh output then repopulates the buffer.
+		expect(buffer?.chunks).toEqual([]);
+		emit?.({ type: "stdout", data: "resumed\n" });
+		expect(getBuffer(id)?.chunks).toEqual(["resumed\n"]);
+	});
+
+	it("notifies the listener when the PTY process starts", () => {
+		const id = uniqueId();
+		ensureSpawned(id, "r1", "w1");
+		let started = 0;
+		attach(id, {
+			onChunk: () => {},
+			onStatusChange: () => {},
+			onStarted: () => {
+				started += 1;
+			},
+		});
+		emit?.({ type: "started", pid: 123, command: "claude" });
+		expect(started).toBe(1);
 	});
 
 	it("routes stdin and resize through the session's repo/workspace", () => {

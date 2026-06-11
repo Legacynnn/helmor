@@ -1,4 +1,5 @@
 import {
+	readTerminalScrollback,
 	resizeTerminal,
 	type ScriptEvent,
 	spawnTerminalSession,
@@ -33,6 +34,9 @@ type Listener = {
 		status: TerminalSessionRunStatus,
 		exitCode: number | null,
 	) => void;
+	/** Fired when the PTY process reports it has started. The pane uses this to
+	 * push the current terminal size to the freshly booted process. */
+	onStarted?: () => void;
 };
 
 /** ~2 MB ≈ 20k lines, well beyond xterm's scrollback. */
@@ -80,8 +84,13 @@ export function ensureSpawned(
 		runStatus: "running",
 		exitCode: null,
 	};
-	// Relaunch of an exited session: keep prior scrollback for context, the
-	// agent CLI clears the screen on boot anyway.
+	// Relaunch of an exited session: drop the prior scrollback. For a TUI agent
+	// (Claude Code, Codex) that replayed frame is a full-screen snapshot that
+	// doesn't scroll away — keeping it stacks a second copy of the UI under the
+	// resumed CLI's redraw. The caller resets the xterm screen in tandem.
+	entry.chunks = [];
+	entry.bufferedBytes = 0;
+	entry.truncated = false;
 	entry.runStatus = "running";
 	entry.exitCode = null;
 	buffers.set(sessionId, entry);
@@ -91,6 +100,7 @@ export function ensureSpawned(
 		if (!current) return;
 		switch (event.type) {
 			case "started":
+				listeners.get(sessionId)?.onStarted?.();
 				break;
 			case "stdout":
 			case "stderr": {
@@ -130,6 +140,52 @@ export function ensureSpawned(
 		listeners.get(sessionId)?.onStatusChange("exited", current.exitCode);
 	});
 
+	return entry;
+}
+
+/** Load persisted scrollback for a session WITHOUT spawning the agent CLI.
+ * Used when re-opening a session whose in-memory buffer is gone (the app
+ * restarted): we replay the saved output and surface the real exited state,
+ * leaving the relaunch decision to the user. Idempotent — a buffer that
+ * already exists this run is returned untouched. */
+export async function loadPersisted(
+	sessionId: string,
+	repoId: string,
+	workspaceId: string,
+	status: TerminalSessionRunStatus,
+): Promise<TerminalSessionBuffer> {
+	const existing = buffers.get(sessionId);
+	if (existing) return existing;
+
+	const entry: TerminalSessionBuffer = {
+		sessionId,
+		repoId,
+		workspaceId,
+		chunks: [],
+		bufferedBytes: 0,
+		truncated: false,
+		runStatus: status,
+		exitCode: null,
+	};
+	buffers.set(sessionId, entry);
+
+	try {
+		const scrollback = await readTerminalScrollback(sessionId);
+		// Don't clobber a buffer that a racing Relaunch already spawned into.
+		if (
+			buffers.get(sessionId) === entry &&
+			entry.runStatus !== "running" &&
+			entry.chunks.length === 0 &&
+			scrollback?.data
+		) {
+			entry.chunks = [scrollback.data];
+			entry.bufferedBytes = scrollback.data.length;
+			entry.truncated = scrollback.truncated;
+		}
+	} catch (err) {
+		// Non-fatal: show an empty pane rather than failing the session open.
+		console.error("Failed to load terminal scrollback:", err);
+	}
 	return entry;
 }
 

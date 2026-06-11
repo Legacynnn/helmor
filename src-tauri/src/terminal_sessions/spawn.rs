@@ -84,11 +84,24 @@ fn tee_channel<R: Runtime>(
             return Ok(());
         };
         match &event {
-            ScriptEvent::Stdout { .. } | ScriptEvent::Stderr { .. } if heuristic => {
-                let tracker = app.state::<HeuristicTracker>();
-                tracker.touch(&app, &session_id);
+            ScriptEvent::Stdout { data } | ScriptEvent::Stderr { data } => {
+                // Persist the live string stream so a restored session replays
+                // its real output instead of a blank pane.
+                super::scrollback::append(&session_id, data);
+                if heuristic {
+                    app.state::<HeuristicTracker>().touch(&app, &session_id);
+                }
             }
             ScriptEvent::Exited { code } => {
+                // Mirror the frontend's exit notice into the log so re-opened
+                // history shows how the session ended.
+                super::scrollback::append(
+                    &session_id,
+                    &format!(
+                        "\r\n\x1b[2m[Process exited with code {}]\x1b[0m\r\n",
+                        code.map(|c| c.to_string()).unwrap_or_else(|| "?".into())
+                    ),
+                );
                 if heuristic {
                     app.state::<HeuristicTracker>().forget(&session_id);
                 }
@@ -142,6 +155,13 @@ pub async fn spawn_for_session<R: Runtime>(
     // re-render raced us — keep the existing process.
     if manager.is_running(&key) {
         return Ok(());
+    }
+
+    // Relaunch (the row is `exited`): start the scrollback log fresh so the
+    // resumed CLI's redraw isn't stacked under the previous run's persisted
+    // frame after a future restart. The frontend resets its replay in tandem.
+    if session.status == STATUS_EXITED {
+        super::scrollback::clear(&session_id);
     }
 
     // Hook plumbing (first-class agents only).
