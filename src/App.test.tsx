@@ -106,13 +106,16 @@ describe("App", () => {
 		// Width driven by CSS var — assert on the documentElement var, not inline style.
 		expect(getPaneInlineWidth("sidebar")).toBe("336px");
 		expect(getPaneInlineWidth("inspector")).toBe("336px");
+		expect(screen.getByLabelText("Inspector panel")).toBeInTheDocument();
+		// Panel tab strip: Files / Git / Search / Actions icons; Git is the
+		// default page, so only its body is mounted.
+		expect(screen.getByRole("tab", { name: "Files" })).toBeInTheDocument();
+		expect(screen.getByRole("tab", { name: "Git" })).toBeInTheDocument();
+		expect(screen.getByRole("tab", { name: "Search" })).toBeInTheDocument();
+		expect(screen.getByRole("tab", { name: "Actions" })).toBeInTheDocument();
 		expect(screen.getByLabelText("Inspector section Git")).toBeInTheDocument();
-		expect(
-			screen.getByLabelText("Inspector section Actions"),
-		).toBeInTheDocument();
 		expect(screen.getByLabelText("Inspector section Tabs")).toBeInTheDocument();
 		expect(screen.getByLabelText("Changes panel body")).toBeInTheDocument();
-		expect(screen.getByLabelText("Actions panel body")).toBeInTheDocument();
 		// Inspector tabs section starts collapsed; body only mounts when opened.
 		expect(
 			screen.queryByLabelText("Inspector tabs body"),
@@ -153,20 +156,13 @@ describe("App", () => {
 		await screen.findByRole("main", { name: "Application shell" });
 		const tabsToggle = screen.getByLabelText("Toggle inspector tabs section");
 		const tabsChevron = tabsToggle.querySelector("svg");
-		const actionsChevron = screen
-			.getByLabelText("Toggle inspector actions section")
-			.querySelector("svg");
 
 		expect(tabsChevron).toHaveStyle({
 			transition: "none",
 		});
-		expect(actionsChevron).toHaveStyle({
-			transition: "none",
-		});
 
-		// Default: tabs section collapsed; changes + actions bodies present.
+		// Default: tabs section collapsed; the panel's Git page stays mounted.
 		expect(screen.getByLabelText("Changes panel body")).toBeInTheDocument();
-		expect(screen.getByLabelText("Actions panel body")).toBeInTheDocument();
 		expect(
 			screen.queryByLabelText("Inspector tabs body"),
 		).not.toBeInTheDocument();
@@ -175,14 +171,12 @@ describe("App", () => {
 		await user.click(tabsToggle);
 
 		expect(screen.getByLabelText("Changes panel body")).toBeInTheDocument();
-		expect(screen.getByLabelText("Actions panel body")).toBeInTheDocument();
 		expect(screen.getByLabelText("Inspector tabs body")).toBeInTheDocument();
 
 		// Clicking again collapses it back.
 		await user.click(tabsToggle);
 
 		expect(screen.getByLabelText("Changes panel body")).toBeInTheDocument();
-		expect(screen.getByLabelText("Actions panel body")).toBeInTheDocument();
 		expect(
 			screen.queryByLabelText("Inspector tabs body"),
 		).not.toBeInTheDocument();
@@ -213,16 +207,13 @@ describe("App", () => {
 			// entire subtree's computed style on any `setProperty()`, which
 			// caps inspector drags at ~28 FPS once the panel has many nodes.
 			// Verify the layout effect wrote the correct heights synchronously
-			// (runs before first paint). Container is 900px tall with 3 section
-			// headers (33×3=99), leaving 801px body budget. Defaults: changes
-			// body 240, actions body absorbs slack (801−240=561), tabs body 0.
+			// (runs before first paint). Container is 900px tall with 2 section
+			// headers (33×2=66), leaving 834px body budget. Tabs start
+			// collapsed, so the panel absorbs all the slack.
 			await waitFor(() => {
-				expect(screen.getByLabelText("Inspector section Git")).toHaveStyle({
-					height: "273px", // 33 header + 240 body
+				expect(screen.getByLabelText("Inspector panel")).toHaveStyle({
+					height: "867px", // 33 header + 834 body (slack absorber)
 				});
-			});
-			expect(screen.getByLabelText("Inspector section Actions")).toHaveStyle({
-				height: "594px", // 33 header + 561 body (slack absorber)
 			});
 			// Tabs wrapper is collapsed (tabsOpen=false default) so its height
 			// is pinned to the section-header constant.
