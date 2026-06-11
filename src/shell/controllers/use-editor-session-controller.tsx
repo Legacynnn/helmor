@@ -19,7 +19,12 @@ import {
 
 export type EditorSessionActions = {
 	openFile(path: string, options?: DiffOpenOptions): void;
-	openFileReference(path: string, line?: number, column?: number): void;
+	openFileReference(
+		path: string,
+		line?: number,
+		column?: number,
+		options?: { preview?: boolean },
+	): void;
 	changeSession(session: EditorSessionState): void;
 	exit(): void;
 	reportError(description: string, title?: string): void;
@@ -126,7 +131,10 @@ export function useEditorSessionController(
 				editorSession?.kind === "diff" &&
 				editorSession.path === path &&
 				editorSession.originalRef === nextOriginalRef &&
-				editorSession.modifiedRef === nextModifiedRef
+				editorSession.modifiedRef === nextModifiedRef &&
+				// A re-open with preview=false must still go through — that's
+				// how Enter pins the current preview tab.
+				(editorSession.preview ?? false) === (options?.preview ?? false)
 			) {
 				return;
 			}
@@ -168,11 +176,14 @@ export function useEditorSessionController(
 								? current.diffModifiedText
 								: undefined,
 							viewMode: isMarkdownPath(path) ? "source" : undefined,
+							// A dirty buffer is never demoted to preview.
+							preview: current.dirty ? false : Boolean(options?.preview),
 						};
 					}
 					return {
 						kind: "diff",
 						path,
+						line: options?.line,
 						inline: status !== "M",
 						dirty: false,
 						fileStatus: status,
@@ -180,6 +191,7 @@ export function useEditorSessionController(
 						modifiedRef: nextModifiedRef,
 						// Diff click is "see what changed" — default to source even for `.md`.
 						viewMode: isMarkdownPath(path) ? "source" : undefined,
+						preview: Boolean(options?.preview),
 					};
 				});
 			};
@@ -209,7 +221,12 @@ export function useEditorSessionController(
 	);
 
 	const openFileReference = useCallback(
-		(path: string, line?: number, column?: number) => {
+		(
+			path: string,
+			line?: number,
+			column?: number,
+			options?: { preview?: boolean },
+		) => {
 			if (!workspaceRootPath) {
 				pushToastRef.current(
 					"Open a workspace with a resolved root path before using the in-app editor.",
@@ -257,6 +274,9 @@ export function useEditorSessionController(
 						modifiedText: sameFile ? current.modifiedText : undefined,
 						mtimeMs: sameFile ? current.mtimeMs : undefined,
 						viewMode,
+						// A dirty buffer is never demoted to preview.
+						preview:
+							sameFile && current.dirty ? false : Boolean(options?.preview),
 					};
 				});
 			};

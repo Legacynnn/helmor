@@ -10,6 +10,11 @@ export type DiffOpenOptions = {
 	fileStatus: DiffFileStatus;
 	originalRef?: string;
 	modifiedRef?: string;
+	/** Jump to this 1-based line after opening (search results). */
+	line?: number;
+	/** Open as a VS Code-style preview tab: reuses the single preview slot
+	 * in the editor tab strip instead of appending a new tab. */
+	preview?: boolean;
 };
 
 /** What the inspector knows about the open editor target. We carry the
@@ -66,6 +71,9 @@ export type EditorSessionState = {
 	diffModifiedText?: string;
 	/** Markdown view mode. Ignored for non-markdown paths. */
 	viewMode?: EditorViewMode;
+	/** VS Code-style preview tab: at most one exists; the next preview open
+	 * replaces it in place. Pinned (non-preview) tabs accumulate. */
+	preview?: boolean;
 };
 
 const MARKDOWN_EXTENSIONS = [".md", ".markdown", ".mdx"];

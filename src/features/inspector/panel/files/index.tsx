@@ -23,6 +23,13 @@ type FilesTabProps = {
 	editorMode: boolean;
 	activeEditor?: ActiveEditorTarget | null;
 	onOpenEditorFile: (path: string, options?: DiffOpenOptions) => void;
+	/** Plain (non-diff) open, preview-tab capable. Preferred when provided. */
+	onOpenFileReference?: (
+		path: string,
+		line?: number,
+		column?: number,
+		options?: { preview?: boolean },
+	) => void;
 };
 
 function FilesTabImpl({
@@ -31,6 +38,7 @@ function FilesTabImpl({
 	editorMode,
 	activeEditor,
 	onOpenEditorFile,
+	onOpenFileReference,
 }: FilesTabProps) {
 	const { roots, editedPaths, truncated, isLoading } = useFileTree(
 		workspaceRootPath,
@@ -53,9 +61,18 @@ function FilesTabImpl({
 	const handleOpenFile = useCallback(
 		(relativePath: string) => {
 			if (!workspaceRootPath) return;
-			onOpenEditorFile(`${workspaceRootPath}/${relativePath}`);
+			const absolutePath = `${workspaceRootPath}/${relativePath}`;
+			// File-tree click = "look at the file", not "review a diff" — open
+			// in plain editor mode as a preview tab when the action exists.
+			if (onOpenFileReference) {
+				onOpenFileReference(absolutePath, undefined, undefined, {
+					preview: true,
+				});
+				return;
+			}
+			onOpenEditorFile(absolutePath);
 		},
-		[workspaceRootPath, onOpenEditorFile],
+		[workspaceRootPath, onOpenEditorFile, onOpenFileReference],
 	);
 
 	if (!workspaceRootPath) {

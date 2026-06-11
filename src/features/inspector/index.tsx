@@ -99,6 +99,14 @@ type WorkspaceInspectorSidebarProps = {
 	activeEditor?: ActiveEditorTarget | null;
 	preferredEditor?: DetectedEditor | null;
 	onOpenEditorFile(path: string, options?: DiffOpenOptions): void;
+	/** Open a file in plain (non-diff) editor mode — Files tab and search
+	 * results. `options.preview` reuses the editor's single preview tab. */
+	onOpenFileReference?: (
+		path: string,
+		line?: number,
+		column?: number,
+		options?: { preview?: boolean },
+	) => void;
 	onOpenMockReview?: (path: string) => void;
 	onCommitAction?: (mode: WorkspaceCommitButtonMode) => Promise<void>;
 	onReviewAction?: () => Promise<void>;
@@ -142,6 +150,7 @@ export function WorkspaceInspectorSidebar({
 	activeEditor,
 	preferredEditor = null,
 	onOpenEditorFile,
+	onOpenFileReference,
 	onCommitAction,
 	onReviewAction,
 	currentSessionId,
@@ -530,6 +539,7 @@ export function WorkspaceInspectorSidebar({
 						editorMode={editorMode}
 						activeEditor={activeEditor}
 						onOpenEditorFile={onOpenEditorFile}
+						onOpenFileReference={onOpenFileReference}
 					/>
 				}
 				gitPage={

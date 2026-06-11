@@ -70,6 +70,9 @@ export function ChangesGroup({
 				fileStatus: options?.fileStatus ?? "M",
 				originalRef,
 				modifiedRef,
+				// Single click opens in the reusable preview tab (VS Code style);
+				// Enter / a tab double-click pins it.
+				preview: true,
 			});
 		},
 		[onOpenEditorFile, originalRef, modifiedRef],

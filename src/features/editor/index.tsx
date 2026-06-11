@@ -44,6 +44,12 @@ import {
 import { cn } from "@/lib/utils";
 import { describeUnknownError } from "@/lib/workspace-helpers";
 import { useSelectionStore } from "@/shell/controllers/selection-store-context";
+import {
+	type EditorFileTab,
+	getEditorTabId,
+	openInTabs,
+	pinTab,
+} from "./tab-model";
 
 // Refined segmented-tab look: no tray, soft glassy pill on the active state.
 // Hover only changes text color (no bg) — otherwise hover-on-inactive sits next
@@ -84,11 +90,6 @@ type DiffController = Awaited<
 	ReturnType<MonacoRuntimeModule["createDiffEditor"]>
 >;
 
-type EditorFileTab = {
-	id: string;
-	session: EditorSessionState;
-};
-
 function getEditorBreadcrumbSegments(
 	path: string,
 	workspaceRootPath?: string | null,
@@ -110,23 +111,6 @@ function getEditorBreadcrumbSegments(
 
 function normalizePath(path: string): string {
 	return path.replace(/\\/g, "/");
-}
-
-function getEditorTabId(session: EditorSessionState): string {
-	return normalizePath(session.path);
-}
-
-function upsertEditorTab(
-	tabs: EditorFileTab[],
-	session: EditorSessionState,
-): EditorFileTab[] {
-	const id = getEditorTabId(session);
-	const nextTab = { id, session };
-	const existingIndex = tabs.findIndex((tab) => tab.id === id);
-	if (existingIndex === -1) {
-		return [...tabs, nextTab];
-	}
-	return tabs.map((tab, index) => (index === existingIndex ? nextTab : tab));
 }
 
 function EditorPathBreadcrumb({
@@ -204,12 +188,14 @@ function EditorFileTabs({
 	onSelectTab,
 	onCloseTab,
 	onOpenSearch,
+	onPinTab,
 }: {
 	tabs: EditorFileTab[];
 	activeTabId: string;
 	onSelectTab: (tab: EditorFileTab) => void;
 	onCloseTab: (tabId: string) => void;
 	onOpenSearch: () => void;
+	onPinTab: (tab: EditorFileTab) => void;
 }) {
 	return (
 		<div
@@ -235,6 +221,9 @@ function EditorFileTabs({
 								<TabsTrigger
 									key={tab.id}
 									value={tab.id}
+									onDoubleClick={() => {
+										if (tab.preview) onPinTab(tab);
+									}}
 									className={cn(
 										"group/tab relative h-full w-auto min-w-[7rem] max-w-[14rem] shrink-0 flex-none justify-start gap-1.5 overflow-hidden rounded-none border-0 bg-transparent px-3 text-ui text-muted-foreground shadow-none data-active:bg-background data-active:text-foreground data-active:shadow-none aria-selected:bg-background aria-selected:text-foreground aria-selected:shadow-none dark:data-active:border-transparent dark:data-active:bg-background dark:aria-selected:border-transparent dark:aria-selected:bg-background",
 										active ? "font-medium" : undefined,
@@ -246,7 +235,11 @@ function EditorFileTabs({
 											alt=""
 											className="size-4 shrink-0"
 										/>
-										<span className="truncate">
+										<span
+											// VS Code convention: preview tabs render italic until
+											// pinned (double-click, edit, or explicit open).
+											className={cn("truncate", tab.preview && "italic")}
+										>
 											{getBaseName(tab.session.path)}
 										</span>
 										{tab.session.dirty ? (
@@ -444,9 +437,9 @@ export function WorkspaceEditorSurface({
 	const onErrorRef = useRef(onError);
 	const applyValueRef = useRef(false);
 	const buildRequestIdRef = useRef(0);
-	const [fileTabs, setFileTabs] = useState<EditorFileTab[]>(() => [
-		{ id: getEditorTabId(editorSession), session: editorSession },
-	]);
+	const [fileTabs, setFileTabs] = useState<EditorFileTab[]>(() =>
+		openInTabs([], editorSession),
+	);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
@@ -509,7 +502,7 @@ export function WorkspaceEditorSurface({
 	}, [searchQuery, workspaceFilesQuery.data]);
 
 	function publishSessionChange(next: EditorSessionState) {
-		setFileTabs((tabs) => upsertEditorTab(tabs, next));
+		setFileTabs((tabs) => openInTabs(tabs, next));
 		onChangeSession(next);
 	}
 
@@ -557,7 +550,7 @@ export function WorkspaceEditorSurface({
 	});
 
 	useEffect(() => {
-		setFileTabs((tabs) => upsertEditorTab(tabs, editorSession));
+		setFileTabs((tabs) => openInTabs(tabs, editorSession));
 	}, [editorSession]);
 
 	useEffect(() => {
@@ -648,6 +641,15 @@ export function WorkspaceEditorSurface({
 		const surface = surfaceRef.current;
 		if (!surface) return;
 		if (surface.contains(document.activeElement)) return;
+		// Preview opens driven from the inspector (arrow-key nav in the changes
+		// list, file-tree clicks) must NOT steal focus — yanking it into Monaco
+		// would kill the very keyboard navigation that opened the preview.
+		if (
+			latestSessionRef.current.preview &&
+			document.activeElement?.closest('[data-focus-scope="inspector"]')
+		) {
+			return;
+		}
 		const controller = fileControllerRef.current ?? diffControllerRef.current;
 		if (controller) {
 			controller.focus();
@@ -836,8 +838,17 @@ export function WorkspaceEditorSurface({
 					// Slow path drops focus during the dispose→create cycle. If
 					// the user hasn't moved focus elsewhere while we were async,
 					// reclaim it so editor-scoped shortcuts work without a click.
+					// Inspector-driven preview opens keep their focus (see the
+					// reclaim effect above).
 					const surface = surfaceRef.current;
-					if (surface && !surface.contains(document.activeElement)) {
+					if (
+						surface &&
+						!surface.contains(document.activeElement) &&
+						!(
+							latestSessionRef.current.preview &&
+							document.activeElement?.closest('[data-focus-scope="inspector"]')
+						)
+					) {
 						controller.focus();
 					}
 					setSurfaceStatus({ kind: "ready" });
@@ -869,7 +880,14 @@ export function WorkspaceEditorSurface({
 
 					diffControllerRef.current = controller;
 					const surface = surfaceRef.current;
-					if (surface && !surface.contains(document.activeElement)) {
+					if (
+						surface &&
+						!surface.contains(document.activeElement) &&
+						!(
+							latestSessionRef.current.preview &&
+							document.activeElement?.closest('[data-focus-scope="inspector"]')
+						)
+					) {
 						controller.focus();
 					}
 					setSurfaceStatus({ kind: "ready" });
@@ -1129,6 +1147,10 @@ export function WorkspaceEditorSurface({
 						onSelectTab={(tab) => publishSessionChange(tab.session)}
 						onCloseTab={closeTabById}
 						onOpenSearch={openFileSearch}
+						onPinTab={(tab) => {
+							setFileTabs((tabs) => pinTab(tabs, tab.id));
+							publishSessionChange({ ...tab.session, preview: false });
+						}}
 					/>
 				</div>
 

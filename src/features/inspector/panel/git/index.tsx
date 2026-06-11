@@ -3,7 +3,7 @@
 // only — group, view and row components live in the sibling modules.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LaptopIcon } from "lucide-react";
-import { memo, useCallback } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
 	CommitButtonState,
@@ -33,6 +33,7 @@ import { BranchDiffSection } from "./branch-diff";
 import { ChangesGroup } from "./changes-group";
 import { GitSectionHeader } from "./header";
 import { useBranchSwitching, useChangeRowProjections } from "./use-change-rows";
+import { buildNavEntries, useChangesNav } from "./use-changes-nav";
 import { useChangesState } from "./use-changes-state";
 import { useGitMutations } from "./use-git-mutations";
 
@@ -163,10 +164,42 @@ function ChangesSectionImpl({
 	// background refresh or a placeholder render).
 	const isForgeRefreshing = workspaceId !== null && forgeIsRefreshing;
 
+	// ArrowUp/Down walk the visible rows and open diffs in the preview tab;
+	// Enter pins. The handler sits on the panel root so keydown from any
+	// focused row (they're all tabIndex={0}) bubbles into it.
+	const navEntries = useMemo(
+		() =>
+			buildNavEntries({
+				stagedChanges,
+				unstagedChanges,
+				committedChanges,
+				stagedOpen,
+				changesOpen,
+				branchDiffOpen,
+				targetBranch: workspaceTargetBranch,
+			}),
+		[
+			stagedChanges,
+			unstagedChanges,
+			committedChanges,
+			stagedOpen,
+			changesOpen,
+			branchDiffOpen,
+			workspaceTargetBranch,
+		],
+	);
+	const handleNavKeyDown = useChangesNav({
+		entries: navEntries,
+		activeEditor,
+		onOpenEditorFile,
+	});
+
 	return (
 		<div
 			aria-label="Git panel"
-			className="flex min-h-0 flex-1 flex-col overflow-hidden bg-sidebar"
+			className="flex min-h-0 flex-1 flex-col overflow-hidden bg-sidebar focus:outline-none"
+			tabIndex={-1}
+			onKeyDown={handleNavKeyDown}
 		>
 			<GitSectionHeader
 				commitButtonMode={commitButtonMode}
@@ -194,78 +227,84 @@ function ChangesSectionImpl({
 				{hasUncommittedChanges && (
 					<>
 						{stagedChanges.length > 0 && (
-							<ChangesGroup
-								label="Staged Changes"
-								count={stagedChanges.length}
-								open={stagedOpen}
-								onToggle={() => toggleStagedOpen()}
-								changes={stagedChanges}
-								treeView={changesTreeView}
-								onToggleTreeView={() => toggleChangesTreeView()}
-								action="unstage"
-								onStageAction={unstageFile}
-								onBatchAction={unstageAll}
-								editorMode={editorMode}
-								activeEditor={activeEditor}
-								onOpenEditorFile={onOpenEditorFile}
-								onOpenExternalEditor={handleOpenExternalEditor}
-								flashingPaths={flashingPaths}
-								workspaceBranch={workspaceBranch}
-								workspaceRemoteUrl={workspaceRemoteUrl}
-								originalRef="HEAD"
-								modifiedRef={INDEX_REF}
-							/>
+							<div data-nav-area="staged">
+								<ChangesGroup
+									label="Staged Changes"
+									count={stagedChanges.length}
+									open={stagedOpen}
+									onToggle={() => toggleStagedOpen()}
+									changes={stagedChanges}
+									treeView={changesTreeView}
+									onToggleTreeView={() => toggleChangesTreeView()}
+									action="unstage"
+									onStageAction={unstageFile}
+									onBatchAction={unstageAll}
+									editorMode={editorMode}
+									activeEditor={activeEditor}
+									onOpenEditorFile={onOpenEditorFile}
+									onOpenExternalEditor={handleOpenExternalEditor}
+									flashingPaths={flashingPaths}
+									workspaceBranch={workspaceBranch}
+									workspaceRemoteUrl={workspaceRemoteUrl}
+									originalRef="HEAD"
+									modifiedRef={INDEX_REF}
+								/>
+							</div>
 						)}
 						{unstagedChanges.length > 0 && (
-							<ChangesGroup
-								label="Changes"
-								icon={
-									<LaptopIcon
-										className="size-3 shrink-0 text-muted-foreground"
-										strokeWidth={2}
-									/>
-								}
-								count={unstagedChanges.length}
-								open={changesOpen}
-								onToggle={() => toggleChangesOpen()}
-								changes={unstagedChanges}
-								treeView={changesTreeView}
-								onToggleTreeView={() => toggleChangesTreeView()}
-								action="stage"
-								onStageAction={stageFile}
-								onBatchAction={stageAll}
-								onDiscard={discardFile}
-								editorMode={editorMode}
-								activeEditor={activeEditor}
-								onOpenEditorFile={onOpenEditorFile}
-								onOpenExternalEditor={handleOpenExternalEditor}
-								flashingPaths={flashingPaths}
-								workspaceBranch={workspaceBranch}
-								workspaceRemoteUrl={workspaceRemoteUrl}
-								originalRef={INDEX_REF}
-							/>
+							<div data-nav-area="unstaged">
+								<ChangesGroup
+									label="Changes"
+									icon={
+										<LaptopIcon
+											className="size-3 shrink-0 text-muted-foreground"
+											strokeWidth={2}
+										/>
+									}
+									count={unstagedChanges.length}
+									open={changesOpen}
+									onToggle={() => toggleChangesOpen()}
+									changes={unstagedChanges}
+									treeView={changesTreeView}
+									onToggleTreeView={() => toggleChangesTreeView()}
+									action="stage"
+									onStageAction={stageFile}
+									onBatchAction={stageAll}
+									onDiscard={discardFile}
+									editorMode={editorMode}
+									activeEditor={activeEditor}
+									onOpenEditorFile={onOpenEditorFile}
+									onOpenExternalEditor={handleOpenExternalEditor}
+									flashingPaths={flashingPaths}
+									workspaceBranch={workspaceBranch}
+									workspaceRemoteUrl={workspaceRemoteUrl}
+									originalRef={INDEX_REF}
+								/>
+							</div>
 						)}
 					</>
 				)}
 
 				{(committedChanges.length > 0 || branchSwitching) && (
-					<BranchDiffSection
-						targetBranch={workspaceTargetBranch}
-						count={committedChanges.length}
-						loading={branchSwitching}
-						open={branchDiffOpen}
-						onToggle={() => toggleBranchDiffOpen()}
-						changes={committedChanges}
-						treeView={branchDiffTreeView}
-						onToggleTreeView={() => toggleBranchDiffTreeView()}
-						editorMode={editorMode}
-						activeEditor={activeEditor}
-						onOpenEditorFile={onOpenEditorFile}
-						onOpenExternalEditor={handleOpenExternalEditor}
-						flashingPaths={flashingPaths}
-						workspaceBranch={workspaceBranch}
-						workspaceRemoteUrl={workspaceRemoteUrl}
-					/>
+					<div data-nav-area="committed">
+						<BranchDiffSection
+							targetBranch={workspaceTargetBranch}
+							count={committedChanges.length}
+							loading={branchSwitching}
+							open={branchDiffOpen}
+							onToggle={() => toggleBranchDiffOpen()}
+							changes={committedChanges}
+							treeView={branchDiffTreeView}
+							onToggleTreeView={() => toggleBranchDiffTreeView()}
+							editorMode={editorMode}
+							activeEditor={activeEditor}
+							onOpenEditorFile={onOpenEditorFile}
+							onOpenExternalEditor={handleOpenExternalEditor}
+							flashingPaths={flashingPaths}
+							workspaceBranch={workspaceBranch}
+							workspaceRemoteUrl={workspaceRemoteUrl}
+						/>
+					</div>
 				)}
 
 				{changesLoaded && !hasChanges && !branchSwitching && (

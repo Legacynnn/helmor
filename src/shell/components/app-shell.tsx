@@ -227,6 +227,7 @@ export function AppShell({
 				activeEditor: data.activeEditorTarget,
 				preferredEditor: chrome.preferredEditor,
 				onOpenEditorFile: data.editorSessionActions.openFile,
+				onOpenFileReference: data.editorSessionActions.openFileReference,
 				onCommitAction: data.handleCommitAction,
 				onReviewAction: () =>
 					data.handleInspectorReviewAction({

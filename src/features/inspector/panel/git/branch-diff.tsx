@@ -57,6 +57,8 @@ export function BranchDiffSection({
 				fileStatus: options?.fileStatus ?? "M",
 				originalRef: remoteOriginalRef,
 				modifiedRef: remoteModifiedRef,
+				// Single click opens in the reusable preview tab (VS Code style).
+				preview: true,
 			});
 		},
 		[onOpenEditorFile, remoteOriginalRef, remoteModifiedRef],
