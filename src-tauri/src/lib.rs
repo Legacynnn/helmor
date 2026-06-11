@@ -194,7 +194,9 @@ pub fn run() {
         .manage(workspace::scripts::ScriptProcessManager::new())
         .manage(terminal_sessions::hook_server::TerminalHookServer::default())
         .manage(terminal_sessions::status::HeuristicTracker::default())
-        .manage(resources::sampler::ResourceSampler::default())
+        .manage(std::sync::Arc::new(
+            resources::sampler::ResourceSampler::default(),
+        ))
         .manage(ui_sync::UiSyncManager::new())
         .manage(triage::ActiveStatusStore::new())
         .manage(global_hotkey::GlobalHotkeyState::default())

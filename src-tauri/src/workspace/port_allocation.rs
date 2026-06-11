@@ -38,6 +38,30 @@ pub struct PortRange {
     pub count: u16,
 }
 
+/// Return the workspace's already-allocated port range, or `None` if no range
+/// has been assigned yet (or the workspace does not exist).
+///
+/// This is a read-only SELECT — it never allocates. Use it on hot monitoring
+/// paths where you want to annotate existing ranges without triggering a write
+/// transaction for every unallocated workspace.
+pub fn lookup_workspace_port_range(workspace_id: &str) -> Result<Option<PortRange>> {
+    let conn = db::read_conn().context("Failed to borrow read connection for port range lookup")?;
+    let row: Option<(Option<i64>, Option<i64>)> = conn
+        .query_row(
+            "SELECT port_base, port_count FROM workspaces WHERE id = ?1",
+            [workspace_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    Ok(row.and_then(|(base, count)| match (base, count) {
+        (Some(b), Some(c)) if b >= 0 && c > 0 && b + c <= u16::MAX as i64 => Some(PortRange {
+            base: b as u16,
+            count: c as u16,
+        }),
+        _ => None,
+    }))
+}
+
 /// Return the workspace's port range, allocating one if it has none yet.
 ///
 /// The allocation runs in a single write transaction:

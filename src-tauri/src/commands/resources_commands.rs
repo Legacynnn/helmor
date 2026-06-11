@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use tauri::{AppHandle, State};
 
@@ -31,49 +32,61 @@ fn workspace_dirs() -> Vec<(String, std::path::PathBuf)> {
 }
 
 #[tauri::command]
-pub fn get_resource_snapshot(
-    sampler: State<'_, ResourceSampler>,
+pub async fn get_resource_snapshot(
+    sampler: State<'_, Arc<ResourceSampler>>,
     sidecar: State<'_, ManagedSidecar>,
 ) -> CmdResult<types::ResourceSnapshot> {
-    let mut snapshot = sampler.snapshot(sidecar.current_pid());
+    let sampler = Arc::clone(&sampler);
+    let sidecar_pid = sidecar.current_pid();
+    run_blocking(move || {
+        let mut snapshot = sampler.snapshot(sidecar_pid);
 
-    // Attribution (best-effort).
-    let dirs = workspace_dirs();
-    for process in &mut snapshot.processes {
-        let cwd = sampler.process_cwd(process.pid);
-        process.workspace_id = attribution::workspace_for_cwd(cwd.as_deref(), &dirs);
-    }
-
-    // Ports (collector failure degrades, never errors).
-    match ports::list_listening_ports() {
-        Ok(listened) => {
-            let tree_pids: HashSet<u32> = snapshot.processes.iter().map(|p| p.pid).collect();
-            let pid_names: Vec<(u32, String)> = snapshot
-                .processes
-                .iter()
-                .map(|p| (p.pid, p.name.clone()))
-                .collect();
-            let pid_workspaces: Vec<(u32, Option<String>)> = snapshot
-                .processes
-                .iter()
-                .map(|p| (p.pid, p.workspace_id.clone()))
-                .collect();
-            let ranges: Vec<(String, u16, u16)> = dirs
-                .iter()
-                .filter_map(|(id, _)| {
-                    crate::workspace::port_allocation::ensure_workspace_port_range(id)
-                        .ok()
-                        .flatten()
-                        .map(|r| (id.clone(), r.base, r.count))
-                })
-                .collect();
-            snapshot.ports =
-                ports::filter_ports(&listened, &tree_pids, &pid_names, &pid_workspaces, &ranges);
+        // Attribution (best-effort).
+        let dirs = workspace_dirs();
+        for process in &mut snapshot.processes {
+            let cwd = sampler.process_cwd(process.pid);
+            process.workspace_id = attribution::workspace_for_cwd(cwd.as_deref(), &dirs);
         }
-        Err(_) => snapshot.ports_unavailable = true,
-    }
 
-    Ok(snapshot)
+        // Ports (collector failure degrades, never errors).
+        match ports::list_listening_ports() {
+            Ok(listened) => {
+                let tree_pids: HashSet<u32> = snapshot.processes.iter().map(|p| p.pid).collect();
+                let pid_names: Vec<(u32, String)> = snapshot
+                    .processes
+                    .iter()
+                    .map(|p| (p.pid, p.name.clone()))
+                    .collect();
+                let pid_workspaces: Vec<(u32, Option<String>)> = snapshot
+                    .processes
+                    .iter()
+                    .map(|p| (p.pid, p.workspace_id.clone()))
+                    .collect();
+                // Read-only lookup: workspaces without an allocated range simply
+                // contribute no port range. This path must not allocate.
+                let ranges: Vec<(String, u16, u16)> = dirs
+                    .iter()
+                    .filter_map(|(id, _)| {
+                        crate::workspace::port_allocation::lookup_workspace_port_range(id)
+                            .ok()
+                            .flatten()
+                            .map(|r| (id.clone(), r.base, r.count))
+                    })
+                    .collect();
+                snapshot.ports = ports::filter_ports(
+                    &listened,
+                    &tree_pids,
+                    &pid_names,
+                    &pid_workspaces,
+                    &ranges,
+                );
+            }
+            Err(_) => snapshot.ports_unavailable = true,
+        }
+
+        Ok(snapshot)
+    })
+    .await
 }
 
 #[tauri::command]
