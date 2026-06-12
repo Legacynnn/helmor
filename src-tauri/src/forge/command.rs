@@ -97,6 +97,10 @@ where
 
     crate::platform::process::configure_tree_root(&mut command);
 
+    // Bound the number of concurrent forge subprocesses. The permit is held
+    // for the lifetime of this call (spawn → wait/timeout), so a burst of
+    // PR-status polls can no longer pile up dozens of `gh` processes.
+    let _permit = crate::forge::throttle::acquire_forge_permit();
     let child = command.spawn()?;
     let child_pid = child.id();
     let (tx, rx) = mpsc::channel();
