@@ -339,7 +339,7 @@ fn list_glab_logged_in_pairs() -> Result<Vec<(String, String)>> {
     }
     let pairs = match crate::forge::throttle::run_cached(
         "glab-auth-status".to_string(),
-        std::time::Duration::from_secs(6),
+        crate::forge::throttle::READ_CACHE_TTL,
         || run_command("glab", ["auth", "status"]),
     ) {
         Ok(output) if output.success => {

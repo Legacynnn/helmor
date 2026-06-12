@@ -15,10 +15,6 @@ use crate::forge::command::{command_detail, CommandOutput};
 
 pub(super) const GITHUB_HOST: &str = "github.com";
 
-/// Idempotent GitHub reads (PR/CI status) reuse a result for this long, so a
-/// burst of status polls coalesces instead of spawning a `gh` per poll.
-const READ_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(6);
-
 /// `gh api graphql` either returned a usable JSON body or it told us
 /// the user's token was rejected. Splitting the latter out lets callers
 /// degrade to the inspector "Connect" CTA without surfacing a generic
@@ -38,16 +34,18 @@ pub(super) fn run_graphql<T: for<'de> Deserialize<'de>>(
     variables: &[(&str, &str)],
 ) -> Result<GraphqlOutcome<T>> {
     let cache_key = graphql_cache_key(login, query, variables);
-    let cached =
-        crate::forge::throttle::run_cached(
-            cache_key,
-            READ_CACHE_TTL,
-            || match run_graphql_command(login, query, variables) {
-                Ok(GraphqlOutcome::Ok(output)) => Ok(output),
-                Ok(GraphqlOutcome::Auth) => Ok(auth_sentinel()),
-                Err(error) => Err(std::io::Error::other(format!("{error:#}"))),
-            },
-        );
+    let cached = crate::forge::throttle::run_cached(
+        cache_key,
+        crate::forge::throttle::READ_CACHE_TTL,
+        || match run_graphql_command(login, query, variables) {
+            Ok(GraphqlOutcome::Ok(output)) => Ok(output),
+            // A transient auth rejection is therefore cached for up to
+            // READ_CACHE_TTL (brief "Connect" CTA). That's an acceptable cost
+            // versus re-spawning `gh` on every status poll.
+            Ok(GraphqlOutcome::Auth) => Ok(auth_sentinel()),
+            Err(error) => Err(std::io::Error::other(format!("{error:#}"))),
+        },
+    );
 
     let output = match cached {
         Ok(output) => output,
@@ -65,7 +63,7 @@ pub(super) fn run_graphql<T: for<'de> Deserialize<'de>>(
 
 /// Build an identity-qualified cache key so different accounts never collide.
 fn graphql_cache_key(login: &str, query: &str, variables: &[(&str, &str)]) -> String {
-    let mut key = format!("gh-graphql:{login}:{query}");
+    let mut key = format!("gh-graphql:{login}\u{1f}{query}");
     for (name, value) in variables {
         key.push('\u{1f}');
         key.push_str(name);

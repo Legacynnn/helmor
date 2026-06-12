@@ -14,6 +14,11 @@ use super::command::CommandOutput;
 /// Maximum number of forge CLI subprocesses allowed to run concurrently.
 const MAX_CONCURRENT_FORGE_COMMANDS: usize = 4;
 
+/// How long an idempotent forge read (PR/CI status, auth status) is reused
+/// before a fresh spawn. Short enough that status stays current, long enough
+/// that a burst of polls coalesces into one `gh`/`glab` process.
+pub(crate) const READ_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(6);
+
 struct Semaphore {
     available: Mutex<usize>,
     cv: Condvar,
