@@ -1772,6 +1772,12 @@ describe("ClaudeSessionManager.listModels", () => {
 				supportsFastMode: true,
 			},
 			{
+				id: "claude-fable-5[1m]",
+				label: "Fable 5 1M",
+				cliModel: "claude-fable-5[1m]",
+				effortLevels: ["low", "medium", "high", "xhigh", "max"],
+			},
+			{
 				id: "claude-opus-4-7[1m]",
 				label: "Opus 4.7 1M",
 				cliModel: "claude-opus-4-7[1m]",

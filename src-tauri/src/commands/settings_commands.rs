@@ -41,12 +41,30 @@ pub async fn get_app_settings() -> CmdResult<std::collections::HashMap<String, S
     .await
 }
 
+/// Settings rows that feed the Rust `static_model_sections` catalog. A
+/// write to any of them must notify the frontend so the composer's model
+/// picker self-heals (e.g. a newly-fetched Cursor model shows without a
+/// reload). Routed through the global UI-sync bridge — not an ad-hoc
+/// per-component invalidate — so every window reacts.
+const MODEL_PROVIDER_SETTINGS_KEYS: [&str; 4] = [
+    "app.cursor_provider",
+    "app.opencode_provider",
+    "app.copilot_provider",
+    "app.claude_custom_providers",
+];
+
 #[tauri::command]
 pub async fn update_app_settings(
+    app: tauri::AppHandle,
     sidecar: State<'_, ManagedSidecar>,
     settings_map: std::collections::HashMap<String, String>,
 ) -> CmdResult<()> {
     let touched_cursor_key = settings_map.contains_key("app.cursor_provider");
+    let touched_provider_keys: Vec<String> = MODEL_PROVIDER_SETTINGS_KEYS
+        .iter()
+        .filter(|key| settings_map.contains_key(**key))
+        .map(|key| (*key).to_string())
+        .collect();
     run_blocking(move || {
         for (key, value) in &settings_map {
             if !key.starts_with("app.") && !key.starts_with("branch_prefix_") {
@@ -61,6 +79,16 @@ pub async fn update_app_settings(
     // Hot-push the key — restart would interrupt other providers.
     if touched_cursor_key {
         sidecar.push_cursor_api_key(crate::sidecar::load_cursor_api_key());
+    }
+
+    // Broadcast provider-row changes so the model picker re-fetches the
+    // catalog in every window. Other settings keys update local React state
+    // directly and don't need an echo.
+    for key in touched_provider_keys {
+        crate::ui_sync::publish(
+            &app,
+            crate::ui_sync::UiMutationEvent::SettingsChanged { key: Some(key) },
+        );
     }
     Ok(())
 }

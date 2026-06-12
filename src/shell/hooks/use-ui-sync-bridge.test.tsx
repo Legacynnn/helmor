@@ -222,6 +222,76 @@ describe("useUiSyncBridge", () => {
 		});
 	});
 
+	it("invalidates the model picker when a provider settings key changes", async () => {
+		const queryClient = makeClient();
+		const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+
+		renderHook(() =>
+			useUiSyncBridge({
+				queryClient,
+				processPendingCliSends: vi.fn(),
+				reloadSettings: vi.fn(),
+			}),
+		);
+
+		// Each provider's settings row feeds `static_model_sections` on the
+		// Rust side; a change to any of them must bust the cached picker so
+		// new/removed models (e.g. Cursor's Composer 2.5) show without a reload.
+		for (const key of [
+			"app.cursor_provider",
+			"app.opencode_provider",
+			"app.copilot_provider",
+			"app.claude_custom_providers",
+		]) {
+			invalidateQueries.mockClear();
+			act(() => {
+				capturedSubscription?.({ type: "settingsChanged", key });
+			});
+			await waitFor(() => {
+				expect(invalidateQueries).toHaveBeenCalledWith({
+					queryKey: helmorQueryKeys.agentModelSections,
+				});
+			});
+		}
+
+		// A full settings reload (key === null) covers the picker too.
+		invalidateQueries.mockClear();
+		act(() => {
+			capturedSubscription?.({ type: "settingsChanged", key: null });
+		});
+		await waitFor(() => {
+			expect(invalidateQueries).toHaveBeenCalledWith({
+				queryKey: helmorQueryKeys.agentModelSections,
+			});
+		});
+	});
+
+	it("does not invalidate the model picker for unrelated settings keys", async () => {
+		const queryClient = makeClient();
+		const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+
+		renderHook(() =>
+			useUiSyncBridge({
+				queryClient,
+				processPendingCliSends: vi.fn(),
+				reloadSettings: vi.fn(),
+			}),
+		);
+
+		act(() => {
+			capturedSubscription?.({
+				type: "settingsChanged",
+				key: "app.default_model_id",
+			});
+		});
+
+		await waitFor(() => {
+			expect(invalidateQueries).not.toHaveBeenCalledWith({
+				queryKey: helmorQueryKeys.agentModelSections,
+			});
+		});
+	});
+
 	describe("sidebar-list invalidate is gated", () => {
 		// These tests pin down the cross-component contract that wired up
 		// the unarchive-flicker bug: every backend event that fans out to

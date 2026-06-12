@@ -8,6 +8,7 @@ import {
 	type CopilotSession,
 	type PermissionHandler,
 	type PermissionRequestResult,
+	RuntimeConnection,
 	type SessionConfigBase,
 	type SessionEvent,
 } from "@github/copilot-sdk";
@@ -38,6 +39,22 @@ import {
 
 /// Cheap default on the title-gen hot path; callers may override via options.
 const TITLE_MODEL_ID = "gpt-4.1";
+
+/** The SDK's default connection resolves `@github/copilot` out of
+ *  node_modules and spawns it with `node` — fine in dev (`bun run
+ *  src/index.ts`), absent inside the compiled sidecar binary. The Tauri
+ *  host sets `HELMOR_COPILOT_BIN_PATH` (a staged `copilot` executable) in
+ *  release builds; until that staging lands, release builds surface a
+ *  clear startup error instead of a module-resolution crash. */
+function resolveCopilotConnection(): {
+	connection?: ReturnType<typeof RuntimeConnection.forStdio>;
+} {
+	const override = process.env.HELMOR_COPILOT_BIN_PATH;
+	if (override) {
+		return { connection: RuntimeConnection.forStdio({ path: override }) };
+	}
+	return {};
+}
 
 const COPILOT_PERMISSION_PREFIX = "copilot-";
 
@@ -119,7 +136,10 @@ export class CopilotSessionManager implements SessionManager {
 				this.handleClientDeath();
 			}
 		}
-		const client = new CopilotClient({ logLevel: "error" });
+		const client = new CopilotClient({
+			logLevel: "error",
+			...resolveCopilotConnection(),
+		});
 		try {
 			await client.start();
 		} catch (error) {

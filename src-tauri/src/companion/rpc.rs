@@ -309,7 +309,7 @@ async fn dispatch(
             Ok(Value::Null)
         }
         "update_app_settings" => {
-            crate::commands::settings_commands::update_app_settings(app.state::<crate::sidecar::ManagedSidecar>(), arg_json(&args, "settingsMap")?).await?;
+            crate::commands::settings_commands::update_app_settings(app.clone(), app.state::<crate::sidecar::ManagedSidecar>(), arg_json(&args, "settingsMap")?).await?;
             Ok(Value::Null)
         }
         "update_intended_target_branch" => to_value(crate::commands::workspace_commands::update_intended_target_branch(app.clone(), arg_string(&args, "workspaceId")?, arg_string(&args, "targetBranch")?).await?),
