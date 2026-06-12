@@ -28,7 +28,9 @@ export function StorageProcessesSection({
 	activeWorkspaceIds: Set<string>;
 }) {
 	const queryClient = useQueryClient();
-	const snapshot = useQuery(resourceSnapshotQueryOptions(5000));
+	// Match the sidebar widget's idle rate — both observers share one query
+	// key, so a slower interval here would override the widget's fast path.
+	const snapshot = useQuery(resourceSnapshotQueryOptions(2000));
 	const kill = useMutation({
 		mutationFn: (process: ProcessInfo) =>
 			killResourceProcess(process.pid, process.startTime),

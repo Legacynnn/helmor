@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, Copy, Cpu, Server, SquareTerminal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,10 @@ import {
 	type ProcessKind,
 	type ResourceSnapshot,
 } from "@/lib/api";
-import { helmorQueryKeys } from "@/lib/query-client";
+import {
+	helmorQueryKeys,
+	workspaceGroupsQueryOptions,
+} from "@/lib/query-client";
 import { publishShellEvent } from "@/shell/event-bus";
 import { formatBytes, formatCpu } from "./format";
 import type { ResourceSample } from "./hooks/history";
@@ -127,6 +130,15 @@ export function ResourcePopoverContent({
 	isError: boolean;
 	onClose: () => void;
 }) {
+	// Cheap: served from the already-populated sidebar cache (+ initialData).
+	const { data: workspaceGroups } = useQuery(workspaceGroupsQueryOptions());
+	const workspaceNames = new Map<string, string>();
+	for (const group of workspaceGroups) {
+		for (const row of group.rows) {
+			workspaceNames.set(row.id, row.title);
+		}
+	}
+
 	if (isError || !snapshot) {
 		return (
 			<div className="p-4 text-small text-muted-foreground">
@@ -159,7 +171,9 @@ export function ResourcePopoverContent({
 				{[...groups.entries()].map(([workspaceId, processes]) => (
 					<div key={workspaceId}>
 						<div className="px-3 pb-0.5 pt-1.5 text-mini font-medium text-muted-foreground">
-							{workspaceId === "__core__" ? "Helmor core" : workspaceId}
+							{workspaceId === "__core__"
+								? "Helmor core"
+								: (workspaceNames.get(workspaceId) ?? workspaceId)}
 						</div>
 						{processes.map((process) => (
 							<ProcessRow key={process.pid} process={process} />
