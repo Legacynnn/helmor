@@ -67,28 +67,23 @@ pub(crate) fn acquire_forge_permit() -> SemaphoreGuard<'static> {
 /// Result shape stored in the cache. `io::Error` is not `Clone`, so failures
 /// are stringified for sharing — but see [`run_cached`]: errors are evicted
 /// immediately and never actually served from cache.
-#[allow(dead_code)]
 type ShareableOutput = Result<CommandOutput, String>;
 
-#[allow(dead_code)]
 enum SlotState {
     Pending,
     Ready(ShareableOutput),
 }
 
-#[allow(dead_code)]
 struct Slot {
     state: Mutex<SlotState>,
     cv: Condvar,
 }
 
-#[allow(dead_code)]
 struct CacheEntry {
     inserted: Instant,
     slot: Arc<Slot>,
 }
 
-#[allow(dead_code)]
 fn read_cache() -> &'static Mutex<HashMap<String, CacheEntry>> {
     static CACHE: OnceLock<Mutex<HashMap<String, CacheEntry>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
@@ -99,7 +94,6 @@ fn read_cache() -> &'static Mutex<HashMap<String, CacheEntry>> {
 ///
 /// Use ONLY for idempotent reads (status queries, auth checks). Errors are
 /// never cached: the failing entry is evicted so the next caller retries.
-#[allow(dead_code)]
 pub(crate) fn run_cached<F>(
     key: String,
     ttl: Duration,

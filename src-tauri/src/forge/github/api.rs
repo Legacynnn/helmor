@@ -15,6 +15,10 @@ use crate::forge::command::{command_detail, CommandOutput};
 
 pub(super) const GITHUB_HOST: &str = "github.com";
 
+/// Idempotent GitHub reads (PR/CI status) reuse a result for this long, so a
+/// burst of status polls coalesces instead of spawning a `gh` per poll.
+const READ_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(6);
+
 /// `gh api graphql` either returned a usable JSON body or it told us
 /// the user's token was rejected. Splitting the latter out lets callers
 /// degrade to the inspector "Connect" CTA without surfacing a generic
@@ -25,20 +29,69 @@ pub(super) enum GraphqlOutcome<T> {
 }
 
 /// Run `gh api graphql -f query=… -f var=…` deserialised into `T`.
+///
+/// Cached + deduped: identical concurrent reads for the same login share one
+/// `gh` spawn, and rapid re-polls within `READ_CACHE_TTL` reuse the response.
 pub(super) fn run_graphql<T: for<'de> Deserialize<'de>>(
     login: &str,
     query: &str,
     variables: &[(&str, &str)],
 ) -> Result<GraphqlOutcome<T>> {
-    match run_graphql_command(login, query, variables)? {
-        GraphqlOutcome::Auth => Ok(GraphqlOutcome::Auth),
-        GraphqlOutcome::Ok(output) => {
-            let parsed = serde_json::from_str::<T>(&output.stdout)
-                .with_context(|| "Failed to decode GitHub GraphQL response".to_string())?;
-            Ok(GraphqlOutcome::Ok(parsed))
-        }
+    let cache_key = graphql_cache_key(login, query, variables);
+    let cached =
+        crate::forge::throttle::run_cached(
+            cache_key,
+            READ_CACHE_TTL,
+            || match run_graphql_command(login, query, variables) {
+                Ok(GraphqlOutcome::Ok(output)) => Ok(output),
+                Ok(GraphqlOutcome::Auth) => Ok(auth_sentinel()),
+                Err(error) => Err(std::io::Error::other(format!("{error:#}"))),
+            },
+        );
+
+    let output = match cached {
+        Ok(output) => output,
+        Err(error) => return Err(anyhow!("`gh api graphql` failed: {error}")),
+    };
+
+    if is_auth_sentinel(&output) {
+        return Ok(GraphqlOutcome::Auth);
+    }
+
+    let parsed = serde_json::from_str::<T>(&output.stdout)
+        .with_context(|| "Failed to decode GitHub GraphQL response".to_string())?;
+    Ok(GraphqlOutcome::Ok(parsed))
+}
+
+/// Build an identity-qualified cache key so different accounts never collide.
+fn graphql_cache_key(login: &str, query: &str, variables: &[(&str, &str)]) -> String {
+    let mut key = format!("gh-graphql:{login}:{query}");
+    for (name, value) in variables {
+        key.push('\u{1f}');
+        key.push_str(name);
+        key.push('=');
+        key.push_str(value);
+    }
+    key
+}
+
+/// A `CommandOutput` whose stdout carries an internal marker meaning "the
+/// token was rejected". Lets the auth outcome flow through `run_cached`
+/// (which only speaks `CommandOutput`) without inventing a second channel.
+fn auth_sentinel() -> CommandOutput {
+    CommandOutput {
+        stdout: AUTH_SENTINEL.to_string(),
+        stderr: String::new(),
+        success: false,
+        status: None,
     }
 }
+
+fn is_auth_sentinel(output: &CommandOutput) -> bool {
+    output.stdout == AUTH_SENTINEL
+}
+
+const AUTH_SENTINEL: &str = "\u{0}helmor:gh-auth-rejected\u{0}";
 
 /// Same as [`run_graphql`] but leaves the response as `serde_json::Value`
 /// for callers (mutation paths) that pluck individual fields out.
