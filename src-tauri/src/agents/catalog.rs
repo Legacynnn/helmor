@@ -87,6 +87,17 @@ fn official_claude_section() -> AgentModelSection {
                 &["low", "medium", "high", "xhigh", "max"],
                 true,
             ),
+            // Explicit Fable 5 pin. Wire id confirmed via the bundled
+            // claude-code's supportedModels (`claude-fable-5[1m]`, effort
+            // low→max, no fast mode); without this entry sessions resolved
+            // there only via user-level claude config and the UI fell back
+            // to the raw runtime id.
+            claude_model(
+                "claude-fable-5[1m]",
+                "Fable 5 1M",
+                &["low", "medium", "high", "xhigh", "max"],
+                false,
+            ),
             // Explicit 4.7 pin — this slot used to BE `default`; now that
             // `default` advanced to 4.8 we surface 4.7 as its own selectable
             // entry, above 4.6.
@@ -740,6 +751,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![
                 "default",
+                "claude-fable-5[1m]",
                 "claude-opus-4-7[1m]",
                 "claude-opus-4-6[1m]",
                 "sonnet",
@@ -808,6 +820,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![
                 "default",
+                "claude-fable-5[1m]",
                 "claude-opus-4-7[1m]",
                 "claude-opus-4-6[1m]",
                 "sonnet",
@@ -816,14 +829,14 @@ mod tests {
             ]
         );
         assert_eq!(
-            sections[0].options[5].provider_key.as_deref(),
+            sections[0].options[6].provider_key.as_deref(),
             Some("minimax")
         );
         assert_eq!(
-            sections[0].options[5].effort_levels,
+            sections[0].options[6].effort_levels,
             vec!["low", "medium", "high", "xhigh", "max"]
         );
-        assert!(!sections[0].options[5].supports_context_usage);
+        assert!(!sections[0].options[6].supports_context_usage);
         assert_eq!(sections[1].id, "codex");
     }
 
@@ -1201,9 +1214,14 @@ mod tests {
         let ids: Vec<&str> = claude.options.iter().map(|o| o.id.as_str()).collect();
         // User-facing ordering: 4.8 (default) on top, then 4.7, then 4.6.
         assert_eq!(
-            &ids[..3],
-            &["default", "claude-opus-4-7[1m]", "claude-opus-4-6[1m]"],
-            "Opus 4.8 must lead, with explicit 4.7 / 4.6 beneath it"
+            &ids[..4],
+            &[
+                "default",
+                "claude-fable-5[1m]",
+                "claude-opus-4-7[1m]",
+                "claude-opus-4-6[1m]"
+            ],
+            "Opus 4.8 must lead, with Fable 5 and explicit 4.7 / 4.6 beneath it"
         );
 
         // `default` → Opus 4.8: leads the list (so `useEnsureDefaultModel`
@@ -1217,8 +1235,18 @@ mod tests {
             vec!["low", "medium", "high", "xhigh", "max"]
         );
 
+        // Explicit Fable 5 pin: full effort tiers, no fast mode.
+        let fable5 = &claude.options[1];
+        assert_eq!(fable5.label, "Fable 5 1M");
+        assert_eq!(fable5.cli_model, "claude-fable-5[1m]");
+        assert!(!fable5.supports_fast_mode);
+        assert_eq!(
+            fable5.effort_levels,
+            vec!["low", "medium", "high", "xhigh", "max"]
+        );
+
         // Explicit 4.7 pin: same effort tiers as before, still no fast mode.
-        let opus47 = &claude.options[1];
+        let opus47 = &claude.options[2];
         assert_eq!(opus47.label, "Opus 4.7 1M");
         assert_eq!(opus47.cli_model, "claude-opus-4-7[1m]");
         assert!(!opus47.supports_fast_mode);
@@ -1228,7 +1256,7 @@ mod tests {
         );
 
         // 4.6 unchanged.
-        let opus46 = &claude.options[2];
+        let opus46 = &claude.options[3];
         assert_eq!(opus46.label, "Opus 4.6 1M");
         assert!(opus46.supports_fast_mode);
     }

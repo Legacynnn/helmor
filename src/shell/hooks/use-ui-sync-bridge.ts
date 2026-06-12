@@ -10,6 +10,16 @@ type Options = {
 	reloadSettings: () => Promise<void> | void;
 };
 
+// Settings keys whose rows feed the Rust `static_model_sections` catalog.
+// A change to any of them must bust the model-picker query so new / removed
+// provider models surface without an app reload.
+const MODEL_PROVIDER_SETTINGS_KEYS = new Set([
+	"app.cursor_provider",
+	"app.opencode_provider",
+	"app.copilot_provider",
+	"app.claude_custom_providers",
+]);
+
 function invalidateAllWorkspaceChanges(queryClient: QueryClient) {
 	void queryClient.invalidateQueries({
 		predicate: (query) => query.queryKey[0] === "workspaceChanges",
@@ -198,6 +208,15 @@ function handleUiMutation(
 				});
 				void queryClient.invalidateQueries({
 					queryKey: helmorQueryKeys.autoCloseOptInAsked,
+				});
+			}
+			// Provider-model rows drive the composer's model picker. Route the
+			// invalidation through the global bridge so the picker self-heals
+			// for ANY writer (Settings panel, CLI, a second window, backend
+			// self-heal) instead of relying on per-component ad-hoc busts.
+			if (event.key === null || MODEL_PROVIDER_SETTINGS_KEYS.has(event.key)) {
+				void queryClient.invalidateQueries({
+					queryKey: helmorQueryKeys.agentModelSections,
 				});
 			}
 			return;

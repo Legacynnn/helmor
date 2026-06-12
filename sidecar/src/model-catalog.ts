@@ -22,6 +22,16 @@ const MODEL_CATALOG: Record<Provider, readonly ProviderModelInfo[]> = {
 			effortLevels: ["low", "medium", "high", "xhigh", "max"],
 			supportsFastMode: true,
 		},
+		// Explicit Fable 5 pin — wire id confirmed via claude-code's
+		// supportedModels (`claude-fable-5[1m]`, effort low→max, no fast
+		// mode). MUST stay in sync with `official_claude_section` in
+		// `src-tauri/src/agents/catalog.rs`.
+		{
+			id: "claude-fable-5[1m]",
+			label: "Fable 5 1M",
+			cliModel: "claude-fable-5[1m]",
+			effortLevels: ["low", "medium", "high", "xhigh", "max"],
+		},
 		// Explicit 4.7 pin — previously this slot WAS `default`; now that
 		// `default` advanced to 4.8 we surface 4.7 as its own entry so users
 		// can still select it.

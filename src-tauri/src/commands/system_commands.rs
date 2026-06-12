@@ -1424,15 +1424,19 @@ fn agent_login_command(provider: &str) -> anyhow::Result<String> {
         "claude" => "auth login",
         "codex" => "login",
         "opencode" => "auth login",
+        // Copilot CLI has no non-interactive login subcommand; launch the
+        // TUI and the user authenticates via `/login` inside it.
+        "copilot" => "",
         _ => anyhow::bail!("Unknown agent provider: {provider}"),
     };
     // Quote the resolved binary path so spaces in `Helmor.app` survive
     // both the embedded PTY shell and AppleScript's `do shell script`.
-    Ok(format!(
-        "{} {}",
-        shell_quote(&resolve_agent_binary(provider)),
-        args
-    ))
+    let binary = shell_quote(&resolve_agent_binary(provider));
+    Ok(if args.is_empty() {
+        binary
+    } else {
+        format!("{binary} {args}")
+    })
 }
 
 fn agent_login_script_type(provider: &str, instance_id: &str) -> String {
