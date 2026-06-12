@@ -244,8 +244,12 @@ pub(crate) fn invalidate_caches_for_host(host: &str) {
 }
 
 fn list_github_accounts_full() -> Result<Vec<ForgeAccount>> {
-    let output = run_command("gh", ["auth", "status", "--json", "hosts"])
-        .with_context(|| "Failed to spawn `gh auth status --json hosts`".to_string())?;
+    let output = crate::forge::throttle::run_cached(
+        "gh-auth-status:hosts".to_string(),
+        std::time::Duration::from_secs(6),
+        || run_command("gh", ["auth", "status", "--json", "hosts"]),
+    )
+    .with_context(|| "Failed to spawn `gh auth status --json hosts`".to_string())?;
     if !output.success {
         if looks_like_unauthenticated(&command_detail(&output)) {
             return Ok(Vec::new());
