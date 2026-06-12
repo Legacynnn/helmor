@@ -15,6 +15,9 @@ use crate::forge::accounts::{AuthCheck, ForgeAccount, ForgeAccountBackend, RepoA
 use crate::forge::command::{command_detail, run_command, run_command_with_env, CommandOutput};
 use crate::forge::types::ForgeProvider;
 
+/// Cache key for the shared `gh auth status --json hosts` read (see throttle).
+const GH_AUTH_STATUS_CACHE_KEY: &str = "gh-auth-status:hosts";
+
 /// Singleton handle wired into [`crate::forge::accounts::backend_for`].
 pub(crate) static BACKEND: GithubAccountBackend = GithubAccountBackend;
 
@@ -241,11 +244,12 @@ mod logins_cache {
 pub(crate) fn invalidate_caches_for_host(host: &str) {
     logins_cache::invalidate(host);
     profile_cache::invalidate_host(host);
+    crate::forge::throttle::invalidate(GH_AUTH_STATUS_CACHE_KEY);
 }
 
 fn list_github_accounts_full() -> Result<Vec<ForgeAccount>> {
     let output = crate::forge::throttle::run_cached(
-        "gh-auth-status:hosts".to_string(),
+        GH_AUTH_STATUS_CACHE_KEY.to_string(),
         crate::forge::throttle::READ_CACHE_TTL,
         || run_command("gh", ["auth", "status", "--json", "hosts"]),
     )

@@ -94,6 +94,13 @@ fn read_cache() -> &'static Mutex<HashMap<String, CacheEntry>> {
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// Drop any cached entry for `key`, forcing the next [`run_cached`] call to
+/// recompute. Used when an external event (e.g. a fresh `gh auth login`)
+/// makes a cached read stale before its TTL elapses.
+pub(crate) fn invalidate(key: &str) {
+    read_cache().lock().unwrap().remove(key);
+}
+
 /// Run `compute` at most once per `key` per `ttl` window, coalescing
 /// concurrent identical calls onto a single in-flight computation.
 ///
@@ -253,6 +260,31 @@ mod tests {
         for output in outputs {
             assert_eq!(output.stdout, "shared-value");
         }
+    }
+
+    #[test]
+    fn invalidate_forces_recompute_before_ttl() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let ttl = Duration::from_secs(60);
+
+        let run = || {
+            let calls = Arc::clone(&calls);
+            run_cached("invalidate-key".to_string(), ttl, move || {
+                calls.fetch_add(1, Ordering::SeqCst);
+                Ok(sample_output("v"))
+            })
+            .unwrap()
+        };
+
+        run();
+        invalidate("invalidate-key");
+        run();
+
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            2,
+            "invalidate forces recompute"
+        );
     }
 
     #[test]
