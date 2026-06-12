@@ -31,6 +31,7 @@ pub mod gitlab;
 pub mod inbox;
 mod provider;
 pub(crate) mod remote;
+mod throttle;
 mod types;
 mod workspace;
 
