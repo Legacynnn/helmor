@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bot, Copy, Cpu, Server, SquareTerminal, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	killResourceProcess,
@@ -29,7 +29,12 @@ function Sparkline({ values }: { values: number[] }) {
 		.map((v, i) => `${(i / (values.length - 1)) * 100},${24 - (v / max) * 22}`)
 		.join(" ");
 	return (
-		<svg viewBox="0 0 100 24" className="h-6 w-full" preserveAspectRatio="none">
+		<svg
+			aria-hidden="true"
+			viewBox="0 0 100 24"
+			className="h-6 w-full"
+			preserveAspectRatio="none"
+		>
 			<polyline
 				points={points}
 				fill="none"
@@ -43,6 +48,15 @@ function Sparkline({ values }: { values: number[] }) {
 
 function ProcessRow({ process }: { process: ProcessInfo }) {
 	const [confirming, setConfirming] = useState(false);
+	const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	useEffect(
+		() => () => {
+			if (confirmTimeoutRef.current !== null) {
+				clearTimeout(confirmTimeoutRef.current);
+			}
+		},
+		[],
+	);
 	const queryClient = useQueryClient();
 	const kill = useMutation({
 		mutationFn: () => killResourceProcess(process.pid, process.startTime),
@@ -54,7 +68,10 @@ function ProcessRow({ process }: { process: ProcessInfo }) {
 	const Icon = KIND_ICONS[process.kind];
 	return (
 		<div className="flex items-center gap-2 px-3 py-1 text-small">
-			<Icon className="size-3.5 shrink-0 text-muted-foreground" />
+			<Icon
+				aria-hidden="true"
+				className="size-3.5 shrink-0 text-muted-foreground"
+			/>
 			<span className="min-w-0 flex-1 truncate">{process.name}</span>
 			<span className="text-mini tabular-nums text-muted-foreground">
 				{process.pid}
@@ -74,12 +91,19 @@ function ProcessRow({ process }: { process: ProcessInfo }) {
 					}
 					className={confirming ? "text-red-500" : "text-muted-foreground"}
 					onClick={() => {
+						if (confirmTimeoutRef.current !== null) {
+							clearTimeout(confirmTimeoutRef.current);
+							confirmTimeoutRef.current = null;
+						}
 						if (confirming) {
 							kill.mutate();
 							setConfirming(false);
 						} else {
 							setConfirming(true);
-							setTimeout(() => setConfirming(false), 3000);
+							confirmTimeoutRef.current = setTimeout(
+								() => setConfirming(false),
+								3000,
+							);
 						}
 					}}
 				>
@@ -178,7 +202,10 @@ export function ResourcePopoverContent({
 									{port.workspaceId}
 								</span>
 							) : null}
-							<Copy className="size-3 text-muted-foreground" />
+							<Copy
+								aria-hidden="true"
+								className="size-3 text-muted-foreground"
+							/>
 						</button>
 					))
 				)}

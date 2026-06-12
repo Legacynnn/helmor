@@ -74,6 +74,7 @@ import { LocalLlmPanel } from "./panels/local-llm";
 import { MobileCompanionPanel } from "./panels/mobile-companion";
 import { ProvidersPanel } from "./panels/providers";
 import { RepositorySettingsPanel } from "./panels/repository-settings";
+import { StoragePanel } from "./panels/storage";
 import { TerminalAgentsPanel } from "./panels/terminal-agents";
 import { TriagePanel } from "./panels/triage";
 
@@ -191,6 +192,7 @@ export const SettingsDialog = memo(function SettingsDialog({
 		"account",
 		"inbox",
 		"experimental",
+		"storage",
 		// Developer is intentionally last in the fixed group — it sits
 		// directly above the dynamic repository entries in the sidebar
 		// (so the bottom of the static nav reads: experimental →
@@ -610,6 +612,8 @@ export const SettingsDialog = memo(function SettingsDialog({
 									<MobileCompanionPanel />
 								</SettingsGroup>
 							)}
+
+							{activeSection === "storage" && <StoragePanel />}
 
 							{activeSection === "import" && <ConductorImportPanel />}
 
