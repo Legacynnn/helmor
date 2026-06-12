@@ -5,7 +5,11 @@
 //!   more than `MAX_CONCURRENT_FORGE_COMMANDS` forge subprocesses run at once.
 //! - [`run_cached`] — in-flight dedup + short-TTL cache for idempotent reads.
 
-use std::sync::{Condvar, Mutex, OnceLock};
+use std::collections::HashMap;
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+use super::command::CommandOutput;
 
 /// Maximum number of forge CLI subprocesses allowed to run concurrently.
 const MAX_CONCURRENT_FORGE_COMMANDS: usize = 4;
@@ -60,6 +64,102 @@ pub(crate) fn acquire_forge_permit() -> SemaphoreGuard<'static> {
     forge_semaphore().acquire()
 }
 
+/// Result shape stored in the cache. `io::Error` is not `Clone`, so failures
+/// are stringified for sharing — but see [`run_cached`]: errors are evicted
+/// immediately and never actually served from cache.
+#[allow(dead_code)]
+type ShareableOutput = Result<CommandOutput, String>;
+
+#[allow(dead_code)]
+enum SlotState {
+    Pending,
+    Ready(ShareableOutput),
+}
+
+#[allow(dead_code)]
+struct Slot {
+    state: Mutex<SlotState>,
+    cv: Condvar,
+}
+
+#[allow(dead_code)]
+struct CacheEntry {
+    inserted: Instant,
+    slot: Arc<Slot>,
+}
+
+#[allow(dead_code)]
+fn read_cache() -> &'static Mutex<HashMap<String, CacheEntry>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, CacheEntry>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Run `compute` at most once per `key` per `ttl` window, coalescing
+/// concurrent identical calls onto a single in-flight computation.
+///
+/// Use ONLY for idempotent reads (status queries, auth checks). Errors are
+/// never cached: the failing entry is evicted so the next caller retries.
+#[allow(dead_code)]
+pub(crate) fn run_cached<F>(
+    key: String,
+    ttl: Duration,
+    compute: F,
+) -> std::io::Result<CommandOutput>
+where
+    F: FnOnce() -> std::io::Result<CommandOutput>,
+{
+    let (slot, is_owner) = {
+        let mut cache = read_cache().lock().unwrap();
+        match cache.get(&key) {
+            Some(entry) if entry.inserted.elapsed() < ttl => (Arc::clone(&entry.slot), false),
+            _ => {
+                let slot = Arc::new(Slot {
+                    state: Mutex::new(SlotState::Pending),
+                    cv: Condvar::new(),
+                });
+                cache.insert(
+                    key.clone(),
+                    CacheEntry {
+                        inserted: Instant::now(),
+                        slot: Arc::clone(&slot),
+                    },
+                );
+                (slot, true)
+            }
+        }
+    };
+
+    if is_owner {
+        let computed = compute();
+        let shareable: ShareableOutput = match &computed {
+            Ok(output) => Ok(output.clone()),
+            Err(error) => Err(error.to_string()),
+        };
+
+        {
+            let mut state = slot.state.lock().unwrap();
+            *state = SlotState::Ready(shareable.clone());
+            slot.cv.notify_all();
+        }
+
+        if shareable.is_err() {
+            // Never serve a stale failure; let the next caller retry fresh.
+            read_cache().lock().unwrap().remove(&key);
+        }
+
+        return shareable.map_err(std::io::Error::other);
+    }
+
+    // Waiter: block until the owner publishes a result.
+    let mut state = slot.state.lock().unwrap();
+    loop {
+        match &*state {
+            SlotState::Ready(value) => return value.clone().map_err(std::io::Error::other),
+            SlotState::Pending => state = slot.cv.wait(state).unwrap(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,6 +167,107 @@ mod tests {
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
+
+    #[test]
+    fn run_cached_returns_cached_value_within_ttl() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let ttl = Duration::from_secs(60);
+
+        let compute = || {
+            calls.fetch_add(1, Ordering::SeqCst);
+            Ok(sample_output("hello"))
+        };
+
+        let first = run_cached("k".to_string(), ttl, compute).unwrap();
+        let second = run_cached("k".to_string(), ttl, || {
+            calls.fetch_add(1, Ordering::SeqCst);
+            Ok(sample_output("hello"))
+        })
+        .unwrap();
+
+        assert_eq!(first.stdout, "hello");
+        assert_eq!(second.stdout, "hello");
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "compute should run once");
+    }
+
+    #[test]
+    fn run_cached_recomputes_after_ttl_expires() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let ttl = Duration::from_millis(40);
+
+        let run = || {
+            let calls = Arc::clone(&calls);
+            run_cached("expiry".to_string(), ttl, move || {
+                calls.fetch_add(1, Ordering::SeqCst);
+                Ok(sample_output("v"))
+            })
+            .unwrap()
+        };
+
+        run();
+        thread::sleep(Duration::from_millis(60));
+        run();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 2, "expired entry recomputes");
+    }
+
+    #[test]
+    fn run_cached_dedupes_concurrent_identical_calls() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let ttl = Duration::from_secs(60);
+
+        let handles: Vec<_> = (0..5)
+            .map(|_| {
+                let calls = Arc::clone(&calls);
+                thread::spawn(move || {
+                    run_cached("shared".to_string(), ttl, move || {
+                        calls.fetch_add(1, Ordering::SeqCst);
+                        thread::sleep(Duration::from_millis(80));
+                        Ok(sample_output("shared-value"))
+                    })
+                    .unwrap()
+                })
+            })
+            .collect();
+
+        let outputs: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "only one underlying spawn");
+        for output in outputs {
+            assert_eq!(output.stdout, "shared-value");
+        }
+    }
+
+    #[test]
+    fn run_cached_errors_are_not_cached() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let ttl = Duration::from_secs(60);
+
+        let run = || {
+            let calls = Arc::clone(&calls);
+            run_cached("err".to_string(), ttl, move || {
+                calls.fetch_add(1, Ordering::SeqCst);
+                Err(std::io::Error::other("boom"))
+            })
+        };
+
+        assert!(run().is_err());
+        assert!(run().is_err());
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            2,
+            "errors retry, never cached"
+        );
+    }
+
+    fn sample_output(stdout: &str) -> CommandOutput {
+        CommandOutput {
+            stdout: stdout.to_string(),
+            stderr: String::new(),
+            success: true,
+            status: Some(0),
+        }
+    }
 
     #[test]
     fn semaphore_caps_concurrency() {
