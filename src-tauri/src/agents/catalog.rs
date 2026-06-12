@@ -42,6 +42,7 @@ pub fn static_model_sections() -> Vec<AgentModelSection> {
         super::custom_providers::configured_models(),
         load_cursor_prefs(),
         load_opencode_prefs(),
+        load_copilot_prefs(),
     )
 }
 
@@ -51,6 +52,7 @@ fn model_sections_for_inputs(
     custom: Vec<super::custom_providers::ClaudeProviderModel>,
     cursor_prefs: Option<CursorPrefs>,
     opencode_prefs: Option<OpencodePrefs>,
+    copilot_prefs: Option<CopilotPrefs>,
 ) -> Vec<AgentModelSection> {
     let mut claude_section = official_claude_section();
     claude_section
@@ -59,6 +61,7 @@ fn model_sections_for_inputs(
     let mut sections = vec![claude_section];
     sections.push(codex_section());
     sections.push(opencode_section_from_prefs(opencode_prefs));
+    sections.push(copilot_section_from_prefs(copilot_prefs));
     if let Some(cursor) = cursor_section_from_prefs(cursor_prefs) {
         sections.push(cursor);
     }
@@ -228,6 +231,125 @@ fn expand_opencode_options(prefs: OpencodePrefs) -> Vec<AgentModelOption> {
                     .unwrap_or_else(|| slug.clone());
                 let effort_levels = entry.map(|e| e.effort_levels.clone()).unwrap_or_default();
                 opencode_model(slug, &label, effort_levels)
+            })
+            .collect(),
+    }
+}
+
+// Fully dynamic from `app.copilot_provider`; no static seed. Ready requires
+// `status == "ready"` AND at least one resolved option — a connected account
+// with no usable models keeps the section Unavailable.
+fn copilot_section_from_prefs(prefs: Option<CopilotPrefs>) -> AgentModelSection {
+    let (status, options) = match prefs {
+        Some(prefs) if prefs.status == "ready" => {
+            let options = expand_copilot_options(prefs);
+            if options.is_empty() {
+                (AgentModelSectionStatus::Unavailable, Vec::new())
+            } else {
+                (AgentModelSectionStatus::Ready, options)
+            }
+        }
+        _ => (AgentModelSectionStatus::Unavailable, Vec::new()),
+    };
+    AgentModelSection {
+        id: "copilot".to_string(),
+        label: "GitHub Copilot".to_string(),
+        status,
+        options,
+    }
+}
+
+#[derive(Debug, Clone)]
+struct CopilotPrefs {
+    // `"ready"` ⟺ the Copilot subscription login is usable.
+    status: String,
+    enabled_ids: Option<Vec<String>>,
+    cached_models: Option<Vec<CopilotCachedModelEntry>>,
+}
+
+#[derive(Debug, Clone)]
+struct CopilotCachedModelEntry {
+    slug: String,
+    label: String,
+    // Copilot effort tiers; empty ⟺ no effort dropdown.
+    effort_levels: Vec<String>,
+}
+
+fn load_copilot_prefs() -> Option<CopilotPrefs> {
+    let raw = crate::models::settings::load_setting_value("app.copilot_provider")
+        .ok()
+        .flatten()?;
+    let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
+
+    let status = parsed
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("none")
+        .to_string();
+    let enabled_ids = match parsed.get("enabledModelIds") {
+        Some(serde_json::Value::Array(arr)) => Some(
+            arr.iter()
+                .filter_map(|item| item.as_str().map(str::to_string))
+                .collect(),
+        ),
+        _ => None,
+    };
+    let cached_models = match parsed.get("cachedModels") {
+        Some(serde_json::Value::Array(arr)) => {
+            let mut out: Vec<CopilotCachedModelEntry> = Vec::with_capacity(arr.len());
+            for item in arr {
+                let Some(slug) = item.get("slug").and_then(serde_json::Value::as_str) else {
+                    continue;
+                };
+                let label = item
+                    .get("label")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or(slug)
+                    .to_string();
+                let effort_levels = item
+                    .get("effortLevels")
+                    .and_then(serde_json::Value::as_array)
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(str::to_string))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                out.push(CopilotCachedModelEntry {
+                    slug: slug.to_string(),
+                    label,
+                    effort_levels,
+                });
+            }
+            Some(out)
+        }
+        _ => None,
+    };
+
+    Some(CopilotPrefs {
+        status,
+        enabled_ids,
+        cached_models,
+    })
+}
+
+// `enabledModelIds == null` → default-all cached models; explicit empty list → no options.
+fn expand_copilot_options(prefs: CopilotPrefs) -> Vec<AgentModelOption> {
+    let cache = prefs.cached_models.unwrap_or_default();
+    match prefs.enabled_ids {
+        None => cache
+            .iter()
+            .map(|entry| copilot_model(&entry.slug, &entry.label, entry.effort_levels.clone()))
+            .collect(),
+        Some(enabled) => enabled
+            .iter()
+            .map(|slug| {
+                let entry = cache.iter().find(|entry| &entry.slug == slug);
+                let label = entry
+                    .map(|e| e.label.clone())
+                    .unwrap_or_else(|| slug.clone());
+                let effort_levels = entry.map(|e| e.effort_levels.clone()).unwrap_or_default();
+                copilot_model(slug, &label, effort_levels)
             })
             .collect(),
     }
@@ -477,6 +599,21 @@ fn opencode_model(slug: &str, label: &str, effort_levels: Vec<String>) -> AgentM
     }
 }
 
+// `id`/`cli_model` are both the Copilot model slug. No context-usage
+// signal and no fast mode from the Copilot SDK today.
+fn copilot_model(slug: &str, label: &str, effort_levels: Vec<String>) -> AgentModelOption {
+    AgentModelOption {
+        id: slug.to_string(),
+        provider: "copilot".to_string(),
+        label: label.to_string(),
+        cli_model: slug.to_string(),
+        provider_key: None,
+        effort_levels,
+        supports_fast_mode: false,
+        supports_context_usage: false,
+    }
+}
+
 /// Build a Cursor option. Cursor wire ids collide with claude/codex
 /// (e.g. `default` = Claude Opus), so Helmor `id` is namespaced
 /// `cursor-<wire>`; `cli_model` keeps the bare wire id for `agent.send`.
@@ -551,6 +688,10 @@ pub fn resolve_model(model_id: &str, provider_hint: Option<&str>) -> ResolvedMod
         Some("codex") => "codex",
         Some("claude") => "claude",
         Some("opencode") => "opencode",
+        // Copilot slugs have no unique prefix (they collide with claude/
+        // codex catalog ids), so resolution is hint-only — the picker and
+        // persistence flows always carry the provider alongside the id.
+        Some("copilot") => "copilot",
         _ if model_id.starts_with("cursor-") => "cursor",
         _ if model_id.starts_with("composer-") => "cursor",
         // `/` is unique to opencode slugs (claude uses `|`, codex/cursor have none).
@@ -586,9 +727,9 @@ mod tests {
     #[test]
     fn static_model_sections_returns_hardcoded_catalog() {
         // `None` cursor_prefs (no API key) → cursor section omitted entirely.
-        let sections = model_sections_for_inputs(Vec::new(), None, None);
+        let sections = model_sections_for_inputs(Vec::new(), None, None, None);
 
-        assert_eq!(sections.len(), 3);
+        assert_eq!(sections.len(), 4);
         assert_eq!(sections[0].id, "claude");
         assert_eq!(sections[0].status, AgentModelSectionStatus::Ready);
         assert_eq!(
@@ -630,6 +771,12 @@ mod tests {
         assert_eq!(sections[2].status, AgentModelSectionStatus::Unavailable);
         assert!(sections[2].options.is_empty());
 
+        // No copilot prefs row → Unavailable, no options.
+        assert_eq!(sections[3].id, "copilot");
+        assert_eq!(sections[3].label, "GitHub Copilot");
+        assert_eq!(sections[3].status, AgentModelSectionStatus::Unavailable);
+        assert!(sections[3].options.is_empty());
+
         // No `app.cursor_provider` row → no API key → no Cursor section.
         assert!(sections.iter().all(|s| s.id != "cursor"));
     }
@@ -647,9 +794,10 @@ mod tests {
             }],
             None,
             None,
+            None,
         );
 
-        assert_eq!(sections.len(), 3);
+        assert_eq!(sections.len(), 4);
         assert_eq!(sections[0].id, "claude");
         assert_eq!(sections[0].label, "Claude Code");
         assert_eq!(
@@ -763,7 +911,7 @@ mod tests {
                 opencode_cache("hundun/deepseek-v4-pro", "Hundun · DeepSeek V4 Pro"),
             ]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs));
+        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs), None);
         let opencode = sections.iter().find(|s| s.id == "opencode").unwrap();
         assert_eq!(opencode.status, AgentModelSectionStatus::Ready);
         assert_eq!(
@@ -797,7 +945,7 @@ mod tests {
                 ),
             ]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs));
+        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs), None);
         let opencode = sections.iter().find(|s| s.id == "opencode").unwrap();
         let zen = opencode
             .options
@@ -826,7 +974,7 @@ mod tests {
                 opencode_cache("hundun/deepseek-v4-pro", "Hundun · DeepSeek V4 Pro"),
             ]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs));
+        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs), None);
         let opencode = sections.iter().find(|s| s.id == "opencode").unwrap();
         assert_eq!(opencode.status, AgentModelSectionStatus::Ready);
         assert_eq!(opencode.options.len(), 1);
@@ -844,7 +992,7 @@ mod tests {
                 "OpenCode Zen · Big Pickle",
             )]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs));
+        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs), None);
         let opencode = sections.iter().find(|s| s.id == "opencode").unwrap();
         assert_eq!(opencode.status, AgentModelSectionStatus::Ready);
         assert!(opencode.options.is_empty());
@@ -860,7 +1008,7 @@ mod tests {
                 "OpenCode Zen · Big Pickle",
             )]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs));
+        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs), None);
         let opencode = sections.iter().find(|s| s.id == "opencode").unwrap();
         assert_eq!(opencode.status, AgentModelSectionStatus::Unavailable);
         assert!(opencode.options.is_empty());
@@ -873,11 +1021,144 @@ mod tests {
             enabled_ids: Some(vec!["mystery/model".to_string()]),
             cached_models: Some(Vec::new()),
         };
-        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs));
+        let sections = model_sections_for_inputs(Vec::new(), None, Some(prefs), None);
         let opencode = sections.iter().find(|s| s.id == "opencode").unwrap();
         assert_eq!(opencode.options.len(), 1);
         assert_eq!(opencode.options[0].id, "mystery/model");
         assert_eq!(opencode.options[0].label, "mystery/model");
+    }
+
+    fn copilot_cache(slug: &str, label: &str) -> CopilotCachedModelEntry {
+        CopilotCachedModelEntry {
+            slug: slug.to_string(),
+            label: label.to_string(),
+            effort_levels: Vec::new(),
+        }
+    }
+
+    fn copilot_cache_effort(slug: &str, label: &str, efforts: &[&str]) -> CopilotCachedModelEntry {
+        CopilotCachedModelEntry {
+            slug: slug.to_string(),
+            label: label.to_string(),
+            effort_levels: efforts.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn copilot_section_default_all_emits_every_cached_model() {
+        let prefs = CopilotPrefs {
+            status: "ready".to_string(),
+            enabled_ids: None,
+            cached_models: Some(vec![
+                copilot_cache("gpt-5", "GPT-5"),
+                copilot_cache_effort(
+                    "claude-sonnet-4.5",
+                    "Claude Sonnet 4.5",
+                    &["low", "medium", "high"],
+                ),
+            ]),
+        };
+        let sections = model_sections_for_inputs(Vec::new(), None, None, Some(prefs));
+        let copilot = sections.iter().find(|s| s.id == "copilot").unwrap();
+        assert_eq!(copilot.label, "GitHub Copilot");
+        assert_eq!(copilot.status, AgentModelSectionStatus::Ready);
+        assert_eq!(
+            copilot
+                .options
+                .iter()
+                .map(|o| o.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["gpt-5", "claude-sonnet-4.5"]
+        );
+        let first = &copilot.options[0];
+        assert_eq!(first.provider, "copilot");
+        assert_eq!(first.cli_model, "gpt-5");
+        assert_eq!(first.label, "GPT-5");
+        assert!(first.effort_levels.is_empty());
+        assert!(!first.supports_fast_mode);
+        assert!(!first.supports_context_usage);
+        let second = &copilot.options[1];
+        assert_eq!(second.effort_levels, vec!["low", "medium", "high"]);
+    }
+
+    #[test]
+    fn copilot_section_respects_enabled_subset() {
+        let prefs = CopilotPrefs {
+            status: "ready".to_string(),
+            enabled_ids: Some(vec!["claude-sonnet-4.5".to_string()]),
+            cached_models: Some(vec![
+                copilot_cache("gpt-5", "GPT-5"),
+                copilot_cache("claude-sonnet-4.5", "Claude Sonnet 4.5"),
+            ]),
+        };
+        let sections = model_sections_for_inputs(Vec::new(), None, None, Some(prefs));
+        let copilot = sections.iter().find(|s| s.id == "copilot").unwrap();
+        assert_eq!(copilot.status, AgentModelSectionStatus::Ready);
+        assert_eq!(copilot.options.len(), 1);
+        assert_eq!(copilot.options[0].id, "claude-sonnet-4.5");
+        assert_eq!(copilot.options[0].label, "Claude Sonnet 4.5");
+    }
+
+    #[test]
+    fn copilot_section_explicit_empty_enabled_list_is_unavailable() {
+        // Unlike opencode (Ready with zero options), the copilot contract is
+        // Ready ⟺ status=="ready" AND at least one option resolves.
+        let prefs = CopilotPrefs {
+            status: "ready".to_string(),
+            enabled_ids: Some(Vec::new()),
+            cached_models: Some(vec![copilot_cache("gpt-5", "GPT-5")]),
+        };
+        let sections = model_sections_for_inputs(Vec::new(), None, None, Some(prefs));
+        let copilot = sections.iter().find(|s| s.id == "copilot").unwrap();
+        assert_eq!(copilot.status, AgentModelSectionStatus::Unavailable);
+        assert!(copilot.options.is_empty());
+    }
+
+    #[test]
+    fn copilot_section_status_none_is_unavailable_even_with_cache() {
+        let prefs = CopilotPrefs {
+            status: "none".to_string(),
+            enabled_ids: None,
+            cached_models: Some(vec![copilot_cache("gpt-5", "GPT-5")]),
+        };
+        let sections = model_sections_for_inputs(Vec::new(), None, None, Some(prefs));
+        let copilot = sections.iter().find(|s| s.id == "copilot").unwrap();
+        assert_eq!(copilot.status, AgentModelSectionStatus::Unavailable);
+        assert!(copilot.options.is_empty());
+    }
+
+    #[test]
+    fn copilot_section_unknown_enabled_slug_falls_back_to_slug_label() {
+        let prefs = CopilotPrefs {
+            status: "ready".to_string(),
+            enabled_ids: Some(vec!["mystery-model".to_string()]),
+            cached_models: Some(Vec::new()),
+        };
+        let sections = model_sections_for_inputs(Vec::new(), None, None, Some(prefs));
+        let copilot = sections.iter().find(|s| s.id == "copilot").unwrap();
+        assert_eq!(copilot.status, AgentModelSectionStatus::Ready);
+        assert_eq!(copilot.options.len(), 1);
+        assert_eq!(copilot.options[0].id, "mystery-model");
+        assert_eq!(copilot.options[0].label, "mystery-model");
+        assert!(copilot.options[0].effort_levels.is_empty());
+    }
+
+    #[test]
+    fn resolve_copilot_model_requires_hint() {
+        // Copilot ids collide with claude/codex catalogs, so the hint is the
+        // only routing signal.
+        let m = resolve_model("gpt-5", Some("copilot"));
+        assert_eq!(m.provider, "copilot");
+        assert_eq!(m.id, "gpt-5");
+        assert_eq!(m.cli_model, "gpt-5");
+
+        let m = resolve_model("claude-sonnet-4.5", Some("copilot"));
+        assert_eq!(m.provider, "copilot");
+        assert_eq!(m.cli_model, "claude-sonnet-4.5");
+
+        // Without the hint, prefix inference keeps the legacy routing.
+        let m = resolve_model("gpt-5", None);
+        assert_eq!(m.provider, "codex");
     }
 
     #[test]
@@ -915,7 +1196,7 @@ mod tests {
 
     #[test]
     fn official_claude_section_surfaces_opus_4_8_default_above_4_7_and_4_6() {
-        let sections = model_sections_for_inputs(Vec::new(), None, None);
+        let sections = model_sections_for_inputs(Vec::new(), None, None, None);
         let claude = sections.iter().find(|s| s.id == "claude").unwrap();
         let ids: Vec<&str> = claude.options.iter().map(|o| o.id.as_str()).collect();
         // User-facing ordering: 4.8 (default) on top, then 4.7, then 4.6.
@@ -997,7 +1278,7 @@ mod tests {
             enabled_ids: Some(vec!["gpt-5.3-codex".to_string()]),
             cached_models: Some(vec![cursor_cache("gpt-5.3-codex", "Codex 5.3", None)]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None);
+        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None, None);
         assert!(sections.iter().all(|s| s.id != "cursor"));
     }
 
@@ -1010,7 +1291,7 @@ mod tests {
             enabled_ids: Some(Vec::new()),
             cached_models: Some(vec![cursor_cache("gpt-5.3-codex", "Codex 5.3", None)]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None);
+        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None, None);
         assert!(sections.iter().all(|s| s.id != "cursor"));
     }
 
@@ -1028,7 +1309,7 @@ mod tests {
                 Some(vec![cursor_param("reasoning", &["low", "medium", "high"])]),
             )]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None);
+        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None, None);
         let cursor = sections.iter().find(|s| s.id == "cursor").unwrap();
         assert_eq!(cursor.options.len(), 1);
         let opt = &cursor.options[0];
@@ -1051,7 +1332,7 @@ mod tests {
                 Some(vec![cursor_param("fast", &["true", "false"])]),
             )]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None);
+        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None, None);
         let cursor = sections.iter().find(|s| s.id == "cursor").unwrap();
         let opt = &cursor.options[0];
         assert!(opt.effort_levels.is_empty());
@@ -1073,7 +1354,7 @@ mod tests {
                 Some(vec![cursor_param("thinking", &["false", "true"])]),
             )]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None);
+        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None, None);
         let opt = &sections.iter().find(|s| s.id == "cursor").unwrap().options[0];
         assert!(opt.effort_levels.is_empty());
         assert!(!opt.supports_fast_mode);
@@ -1097,7 +1378,7 @@ mod tests {
                 ]),
             )]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None);
+        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None, None);
         let opt = &sections.iter().find(|s| s.id == "cursor").unwrap().options[0];
         assert_eq!(opt.effort_levels, vec!["low", "medium", "high", "max"]);
         assert!(opt.supports_fast_mode);
@@ -1119,7 +1400,7 @@ mod tests {
                 ]),
             )]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None);
+        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None, None);
         let opt = &sections.iter().find(|s| s.id == "cursor").unwrap().options[0];
         assert_eq!(opt.effort_levels, vec!["max"]);
     }
@@ -1138,7 +1419,7 @@ mod tests {
                 ]),
             )]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None);
+        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None, None);
         let opt = &sections.iter().find(|s| s.id == "cursor").unwrap().options[0];
         assert_eq!(opt.effort_levels, vec!["low", "medium", "high"]);
         assert!(opt.supports_fast_mode);
@@ -1155,7 +1436,7 @@ mod tests {
             enabled_ids: Some(vec!["legacy".to_string()]),
             cached_models: Some(vec![cursor_cache("legacy", "Legacy Cached", None)]),
         };
-        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None);
+        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None, None);
         let opt = &sections.iter().find(|s| s.id == "cursor").unwrap().options[0];
         assert!(opt.effort_levels.is_empty());
         assert!(!opt.supports_fast_mode);
@@ -1171,7 +1452,7 @@ mod tests {
             enabled_ids: Some(vec!["mystery-model".to_string()]),
             cached_models: Some(Vec::new()),
         };
-        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None);
+        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None, None);
         let opt = &sections.iter().find(|s| s.id == "cursor").unwrap().options[0];
         assert_eq!(opt.cli_model, "mystery-model");
         assert_eq!(opt.label, "mystery-model");
@@ -1215,7 +1496,7 @@ mod tests {
             enabled_ids: Some(pick.iter().map(|s| s.to_string()).collect()),
             cached_models: Some(cached_models),
         };
-        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None);
+        let sections = model_sections_for_inputs(Vec::new(), Some(prefs), None, None);
         let cursor = sections.iter().find(|s| s.id == "cursor").unwrap();
         let by_wire: std::collections::HashMap<String, &AgentModelOption> = cursor
             .options

@@ -14,6 +14,7 @@ import { isAbortError } from "./abort.js";
 import { applyAgentProxyToProcessEnv } from "./agent-proxy.js";
 import { ClaudeSessionManager } from "./claude-session-manager.js";
 import { CodexAppServerManager } from "./codex-app-server-manager.js";
+import { CopilotSessionManager } from "./copilot-session-manager.js";
 import { CursorSessionManager } from "./cursor-session-manager.js";
 import { createSidecarEmitter } from "./emitter.js";
 import { resolveHostResponse, setHostWriter } from "./host-bridge.js";
@@ -49,11 +50,13 @@ const claudeManager = new ClaudeSessionManager();
 const codexManager = new CodexAppServerManager();
 const cursorManager = new CursorSessionManager();
 const opencodeManager = new OpencodeSessionManager();
+const copilotManager = new CopilotSessionManager();
 const managers: Record<Provider, SessionManager> = {
 	claude: claudeManager,
 	codex: codexManager,
 	cursor: cursorManager,
 	opencode: opencodeManager,
+	copilot: copilotManager,
 };
 
 // `parentGone` flips to true only when stdin EOFs — that's the
@@ -192,6 +195,7 @@ function collectErrorChainCodes(err: Error): string[] {
 function buildTitleProviderOrder(provider: Provider | null): Provider[] {
 	if (provider === "codex") return ["codex", "claude", "cursor"];
 	if (provider === "cursor") return ["cursor", "claude", "codex"];
+	if (provider === "copilot") return ["copilot", "claude", "codex", "cursor"];
 	return ["claude", "codex", "cursor"];
 }
 
@@ -254,7 +258,8 @@ async function handleGenerateTitle(
 			typeof params.provider === "string" &&
 			(params.provider === "claude" ||
 				params.provider === "codex" ||
-				params.provider === "cursor")
+				params.provider === "cursor" ||
+				params.provider === "copilot")
 				? params.provider
 				: null;
 		const claudeEnvironment = parseOptionalStringRecord(
@@ -322,6 +327,18 @@ async function handleGenerateTitle(
 						{ agentProxy, generateBranch },
 					);
 					logger.debug(`[${id}] generateTitle completed (codex)`);
+					return;
+				}
+				if (titleProvider === "copilot") {
+					await managers.copilot.generateTitle(
+						id,
+						userMessage,
+						branchRenamePrompt,
+						emitter,
+						TITLE_GENERATION_FALLBACK_TIMEOUT_MS,
+						{ generateBranch },
+					);
+					logger.debug(`[${id}] generateTitle completed (copilot)`);
 					return;
 				}
 				await managers.cursor.generateTitle(
@@ -660,11 +677,13 @@ for await (const line of rl) {
 				const message =
 					typeof params.message === "string" ? params.message : undefined;
 				logger.debug(`[${id}] permissionResponse`, { permissionId, behavior });
-				// Route by id prefix: `codex-`, `opencode-`, else Claude.
+				// Route by id prefix: `codex-`, `opencode-`, `copilot-`, else Claude.
 				if (permissionId.startsWith("codex-")) {
 					codexManager.resolvePermission(permissionId, behavior);
 				} else if (permissionId.startsWith("opencode-")) {
 					opencodeManager.resolvePermission(permissionId, behavior);
+				} else if (permissionId.startsWith("copilot-")) {
+					copilotManager.resolvePermission(permissionId, behavior);
 				} else {
 					claudeManager.resolvePermission(
 						permissionId,

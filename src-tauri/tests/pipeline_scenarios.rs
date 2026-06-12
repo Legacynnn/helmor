@@ -2005,3 +2005,194 @@ fn stream_top_level_partial_stays_top_level() {
         partial.id
     );
 }
+
+// ============================================================================
+// Copilot live-stream scenarios
+// ============================================================================
+//
+// The copilot provider has no DB-specific storage shape of its own — its
+// accumulator (`accumulator/copilot.rs`) synthesizes Claude-format
+// assistant/user messages, exactly like cursor. These scenarios drive the
+// LIVE pipeline (`MessagePipeline::push_event`) over the fixed sidecar
+// wire contract and freeze the normalized render; the historical
+// round-trip scenario replays the persisted turns through
+// `convert_historical` to pin reload symmetry. Raw jsonl replay coverage
+// lives in `pipeline_streams.rs` under `fixtures/streams/copilot/`.
+
+/// Drive a copilot pipeline over `events` and return it (not yet rendered).
+fn run_copilot(events: &[serde_json::Value]) -> MessagePipeline {
+    let mut pipeline = MessagePipeline::new("copilot", "gpt-5-fallback", "ctx", "sess");
+    for event in events {
+        let raw = serde_json::to_string(event).unwrap();
+        pipeline.push_event(event, &raw);
+    }
+    pipeline
+}
+
+/// Render + normalize the live thread, replacing the accumulator-minted
+/// UUIDs (assistant turn id, turn/completed id) with stable placeholders
+/// so the snapshot is deterministic. Hand-set ids (tool_call ids,
+/// `tool_result_<id>`) pass through untouched via the normalizer.
+fn finish_normalized(pipeline: &mut MessagePipeline) -> Vec<NormThreadMessage> {
+    let mut normalized = normalize_all(&pipeline.finish());
+    for (i, msg) in normalized.iter_mut().enumerate() {
+        msg.id = msg.id.as_ref().map(|_| format!("live-{i}"));
+    }
+    normalized
+}
+
+#[test]
+fn copilot_stream_happy_path_with_tool_call_and_final_dedupe() {
+    // Deltas stream the text, a tool call opens + closes mid-turn, and the
+    // terminal `assistant_message` carries the SAME full text — the
+    // snapshot must show it exactly once (dedupe), with the tool call
+    // paired to its result.
+    let events = vec![
+        json!({ "type": "copilot/session_init", "session_id": "cp-sess-1", "model": "gpt-5" }),
+        json!({ "type": "copilot/assistant_delta", "text": "Let me check " }),
+        json!({ "type": "copilot/assistant_delta", "text": "the files." }),
+        json!({
+            "type": "copilot/tool_call_start",
+            "tool_call_id": "cp-tool-1",
+            "tool_name": "bash",
+            "arguments": { "command": "ls src" },
+        }),
+        json!({
+            "type": "copilot/tool_call_end",
+            "tool_call_id": "cp-tool-1",
+            "success": true,
+            "content": "main.rs\nlib.rs",
+        }),
+        json!({ "type": "copilot/assistant_message", "text": "Let me check the files." }),
+    ];
+    let mut pipeline = run_copilot(&events);
+    assert_eq!(pipeline.accumulator.session_id(), Some("cp-sess-1"));
+    assert_eq!(pipeline.accumulator.resolved_model(), "gpt-5");
+    assert_yaml_snapshot!(finish_normalized(&mut pipeline));
+}
+
+#[test]
+fn copilot_final_message_without_deltas_renders_full_text() {
+    // Non-streaming path: no deltas were seen, so the terminal
+    // `assistant_message` text must be appended whole.
+    let events = vec![
+        json!({ "type": "copilot/session_init", "session_id": "cp-sess-2", "model": "gpt-5" }),
+        json!({ "type": "copilot/assistant_message", "text": "Direct answer, no streaming." }),
+    ];
+    assert_yaml_snapshot!(finish_normalized(&mut run_copilot(&events)));
+}
+
+#[test]
+fn copilot_reasoning_deltas_then_message_dedupes() {
+    // Reasoning streamed via deltas, then the redundant full
+    // `reasoning_message` arrives — the thinking block must contain the
+    // text exactly once, ahead of the answer text.
+    let events = vec![
+        json!({ "type": "copilot/session_init", "session_id": "cp-sess-3", "model": "gpt-5" }),
+        json!({ "type": "copilot/reasoning_delta", "text": "Weighing " }),
+        json!({ "type": "copilot/reasoning_delta", "text": "the options." }),
+        json!({ "type": "copilot/reasoning_message", "text": "Weighing the options." }),
+        json!({ "type": "copilot/assistant_message", "text": "Option B is better." }),
+    ];
+    assert_yaml_snapshot!(finish_normalized(&mut run_copilot(&events)));
+}
+
+#[test]
+fn copilot_reasoning_message_only_non_streaming() {
+    // Non-streaming reasoning: `reasoning_message` with no prior deltas
+    // appends the full reasoning text.
+    let events = vec![
+        json!({ "type": "copilot/reasoning_message", "text": "Full non-streamed reasoning." }),
+        json!({ "type": "copilot/assistant_message", "text": "Done." }),
+    ];
+    assert_yaml_snapshot!(finish_normalized(&mut run_copilot(&events)));
+}
+
+#[test]
+fn copilot_tool_failure_uses_error_text() {
+    // `success: false` → the `error` field becomes the tool_result text
+    // and the result is marked as an error.
+    let events = vec![
+        json!({
+            "type": "copilot/tool_call_start",
+            "tool_call_id": "cp-tool-9",
+            "tool_name": "bash",
+            "arguments": { "command": "cargo test" },
+        }),
+        json!({
+            "type": "copilot/tool_call_end",
+            "tool_call_id": "cp-tool-9",
+            "success": false,
+            "error": "command exited with code 101",
+        }),
+        json!({ "type": "copilot/assistant_message", "text": "The tests failed." }),
+    ];
+    assert_yaml_snapshot!(finish_normalized(&mut run_copilot(&events)));
+}
+
+#[test]
+fn copilot_abort_flush_renders_partial_text_and_pending_tool() {
+    // Abort path: deltas + an unanswered tool_call_start, no terminal
+    // `assistant_message`. `flush_copilot_in_progress` (what
+    // agents::streaming calls on abort) must drain the in-flight state —
+    // the tool renders without a result (no tool_result follow-up).
+    let events = vec![
+        json!({ "type": "copilot/assistant_delta", "text": "Halfway through " }),
+        json!({ "type": "copilot/assistant_delta", "text": "an answer" }),
+        json!({
+            "type": "copilot/tool_call_start",
+            "tool_call_id": "cp-tool-5",
+            "tool_name": "read",
+            "arguments": { "path": "/tmp/notes.txt" },
+        }),
+    ];
+    let mut pipeline = run_copilot(&events);
+    pipeline.accumulator.flush_copilot_in_progress();
+    assert_yaml_snapshot!(finish_normalized(&mut pipeline));
+}
+
+#[test]
+fn copilot_unknown_event_types_are_noop() {
+    // Forward-compat: unknown `copilot/*` types neither render nor land
+    // in the dropped-event coverage guard.
+    let events = vec![
+        json!({ "type": "copilot/usage_update", "input_tokens": 12 }),
+        json!({ "type": "copilot/turn_metadata", "anything": true }),
+    ];
+    let pipeline = run_copilot(&events);
+    assert!(pipeline.accumulator.dropped_event_types().is_empty());
+    assert_eq!(pipeline.accumulator.collected().len(), 0);
+}
+
+#[test]
+fn copilot_historical_reload_round_trip() {
+    // Persist the turns the accumulator writes (post-accumulator storage
+    // shape) and replay them through `convert_historical` — the reload
+    // render must match the live shape: thinking + paired tool call +
+    // text, with the tool_result merged back onto its tool_use.
+    let events = vec![
+        json!({ "type": "copilot/reasoning_delta", "text": "Check the dir first." }),
+        json!({
+            "type": "copilot/tool_call_start",
+            "tool_call_id": "cp-tool-2",
+            "tool_name": "bash",
+            "arguments": { "command": "pwd" },
+        }),
+        json!({
+            "type": "copilot/tool_call_end",
+            "tool_call_id": "cp-tool-2",
+            "success": true,
+            "content": "/repo",
+        }),
+        json!({ "type": "copilot/assistant_message", "text": "You are in /repo." }),
+    ];
+    let pipeline = run_copilot(&events);
+    let acc = &pipeline.accumulator;
+    let records: Vec<HistoricalRecord> = (0..acc.turns_len())
+        .map(|i| {
+            let turn = acc.turn_at(i);
+            make_record(&format!("hist-{i}"), turn.role.as_str(), &turn.content_json)
+        })
+        .collect();
+    assert_yaml_snapshot!(run_normalized(records));
+}

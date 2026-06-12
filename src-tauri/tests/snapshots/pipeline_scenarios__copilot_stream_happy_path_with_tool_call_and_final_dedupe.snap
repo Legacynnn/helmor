@@ -1,0 +1,32 @@
+---
+source: tests/pipeline_scenarios.rs
+expression: finish_normalized(&mut pipeline)
+---
+- role: assistant
+  id: live-0
+  content_length: 2
+  content:
+    - type: tool-call
+      tool_name: bash
+      tool_call_id: cp-tool-1
+      args_keys:
+        - command
+      args_text_length: 20
+      has_result: true
+      result_kind: string
+      result_preview: "main.rs\nlib.rs"
+      streaming_status: ~
+    - type: text
+      text: Let me check the files.
+  status:
+    type: complete
+    reason: stop
+  streaming: ~
+- role: system
+  id: live-1
+  content_length: 1
+  content:
+    - type: text
+      text: 0.0s
+  status: ~
+  streaming: ~

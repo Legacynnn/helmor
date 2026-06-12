@@ -129,6 +129,7 @@ async fn dispatch(
         "list_archived_workspaces" => to_value(crate::commands::workspace_commands::list_archived_workspaces().await?),
         "list_branches_for_local_picker" => to_value(crate::commands::workspace_commands::list_branches_for_local_picker(arg_string(&args, "repoId")?).await?),
         "list_branches_for_workspace_picker" => to_value(crate::commands::workspace_commands::list_branches_for_workspace_picker(arg_string(&args, "repoId")?).await?),
+        "list_copilot_models" => to_value(crate::agents::list_copilot_models(app.state::<crate::sidecar::ManagedSidecar>(), arg_opt_bool(&args, "forceReload")).await?),
         "list_cursor_models" => to_value(crate::agents::list_cursor_models(app.state::<crate::sidecar::ManagedSidecar>(), arg_opt_string(&args, "apiKey")).await?),
         "list_editor_files" => to_value(crate::commands::editor_commands::list_editor_files(arg_string(&args, "workspaceRootPath")?).await?),
         "list_forge_accounts" => to_value(crate::commands::forge_commands::list_forge_accounts(arg_json(&args, "gitlabHosts")?).await?),

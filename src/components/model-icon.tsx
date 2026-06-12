@@ -3,6 +3,7 @@ import {
 	ClaudeColorIcon,
 	CursorIcon,
 	DeepSeekIcon,
+	GithubCopilotIcon,
 	KimiIcon,
 	MinimaxIcon,
 	OpenAIColorIcon,
@@ -31,6 +32,8 @@ export function ModelIcon({
 	className?: string;
 }) {
 	if (model?.provider === "cursor") return <CursorIcon className={className} />;
+	if (model?.provider === "copilot")
+		return <GithubCopilotIcon className={className} />;
 	if (model?.provider === "codex")
 		return <OpenAIColorIcon className={className} />;
 	if (model?.provider === "opencode") {

@@ -10,6 +10,7 @@
 //!   collection helpers used by both submodules.
 
 mod codex;
+mod copilot;
 mod cursor;
 mod opencode;
 mod streaming;
@@ -157,6 +158,10 @@ pub struct StreamAccumulator {
     // ── Cursor state ─────────────────────────────────────────────────
     /// Per-run cursor state; see `cursor.rs`.
     cursor_state: cursor::CursorRunState,
+
+    // ── Copilot state ────────────────────────────────────────────────
+    /// Per-run copilot state; see `copilot.rs`.
+    copilot_state: copilot::CopilotRunState,
 
     // ── opencode state ───────────────────────────────────────────────
     /// Per-turn opencode part accumulation; see `opencode.rs`.
@@ -324,6 +329,7 @@ impl StreamAccumulator {
             codex_partial_idx: None,
             codex_turn_started_at: None,
             cursor_state: cursor::new_run_state(),
+            copilot_state: copilot::new_run_state(),
             opencode_state: opencode::new_run_state(),
             opencode_partial_idx: None,
             dropped_event_types: Vec::new(),
@@ -507,6 +513,21 @@ impl StreamAccumulator {
             Some("cursor/assistant") => cursor::handle_assistant_delta(self, value),
             Some("cursor/tool_call_start") => cursor::handle_tool_call_start(self, value),
             Some("cursor/tool_call_end") => cursor::handle_tool_call_end(self, value),
+
+            // ── Copilot events (namespaced by the sidecar manager) ────
+            // session_init's top-level `session_id` + `model` are lifted
+            // by the generic extractors at the top of this function.
+            Some("copilot/session_init") => PushOutcome::NoOp,
+            Some("copilot/assistant_delta") => copilot::handle_assistant_delta(self, value),
+            Some("copilot/assistant_message") => copilot::handle_assistant_message(self, value),
+            Some("copilot/reasoning_delta") => copilot::handle_reasoning_delta(self, value),
+            Some("copilot/reasoning_message") => copilot::handle_reasoning_message(self, value),
+            Some("copilot/tool_call_start") => copilot::handle_tool_call_start(self, value),
+            Some("copilot/tool_call_end") => copilot::handle_tool_call_end(self, value),
+            // Forward-compat: any other `copilot/*` type is a deliberate
+            // NoOp (not a dropped-event-type failure) — the sidecar may
+            // grow informational events ahead of pipeline support.
+            Some(t) if t.starts_with("copilot/") => PushOutcome::NoOp,
 
             // ── opencode events (namespaced by the sidecar manager) ───
             Some("opencode/session_init") => PushOutcome::NoOp,
@@ -791,6 +812,12 @@ impl StreamAccumulator {
     /// Idempotent.
     pub fn flush_cursor_in_progress(&mut self) {
         cursor::flush_in_progress(self);
+    }
+
+    /// Drain in-flight copilot state on abort (no terminal
+    /// `assistant_message` will arrive). Idempotent.
+    pub fn flush_copilot_in_progress(&mut self) {
+        copilot::flush_in_progress(self);
     }
 
     /// Finalize the in-flight opencode message on abort. Idempotent.

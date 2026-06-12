@@ -81,6 +81,7 @@ pub struct AgentLoginStatus {
     pub codex: bool,
     pub cursor: bool,
     pub opencode: bool,
+    pub copilot: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub codex_provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -456,8 +457,9 @@ fn helmor_skills_status() -> anyhow::Result<HelmorSkillsStatus> {
             claude: claude_login_ready(),
             codex: codex_auth_status().ready,
             cursor: cursor_login_ready(),
-            // opencode readiness comes from the login-status path, not here.
+            // opencode/copilot readiness comes from the login-status path, not here.
             opencode: false,
+            copilot: false,
             codex_provider: None,
             codex_auth_method: None,
         },
@@ -597,8 +599,9 @@ pub async fn install_helmor_skills() -> CmdResult<HelmorSkillsStatus> {
             claude: claude_login_ready(),
             codex: codex_auth_status().ready,
             cursor: cursor_login_ready(),
-            // opencode readiness comes from the login-status path, not here.
+            // opencode/copilot readiness comes from the login-status path, not here.
             opencode: false,
+            copilot: false,
             codex_provider: None,
             codex_auth_method: None,
         };
@@ -805,6 +808,7 @@ fn run_components_check_inner(force: bool) -> ComponentsUpdateCheck {
         codex: codex_auth_status().ready,
         cursor: cursor_login_ready(),
         opencode: false,
+        copilot: false,
         codex_provider: None,
         codex_auth_method: None,
     };
@@ -1163,6 +1167,7 @@ pub async fn get_agent_login_status() -> CmdResult<AgentLoginStatus> {
             codex: codex.ready,
             cursor: cursor_login_ready(),
             opencode: opencode_login_ready(),
+            copilot: copilot_login_ready(),
             codex_provider: codex.provider,
             codex_auth_method: codex.auth_method.map(str::to_string),
         })
@@ -1278,6 +1283,34 @@ fn opencode_login_ready() -> bool {
         .map(|arr| !arr.is_empty())
         .unwrap_or(false);
     status_ready || connected_nonempty
+}
+
+// Read from the sidecar-computed settings row (`app.copilot_provider`).
+// Ready when the login flow reported `status == "ready"`, or when a
+// previous session left a non-empty model cache behind (stale-but-usable).
+fn copilot_login_ready() -> bool {
+    let raw = match crate::models::settings::load_setting_value("app.copilot_provider") {
+        Ok(Some(value)) => value,
+        Ok(None) => return false,
+        Err(error) => {
+            tracing::debug!("Failed to read app.copilot_provider: {error}");
+            return false;
+        }
+    };
+    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&raw) else {
+        return false;
+    };
+    let status_ready = parsed
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        .map(|status| status == "ready")
+        .unwrap_or(false);
+    let cached_models_nonempty = parsed
+        .get("cachedModels")
+        .and_then(serde_json::Value::as_array)
+        .map(|arr| !arr.is_empty())
+        .unwrap_or(false);
+    status_ready || cached_models_nonempty
 }
 
 fn claude_login_ready() -> bool {

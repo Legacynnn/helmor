@@ -1,0 +1,8 @@
+{"type":"copilot/session_init","session_id":"copilot-tool-1","model":"gpt-5"}
+{"type":"copilot/reasoning_delta","text":"I should list "}
+{"type":"copilot/reasoning_delta","text":"the directory first."}
+{"type":"copilot/tool_call_start","tool_call_id":"call-abc123","tool_name":"bash","arguments":{"command":"ls /tmp/copilot-probe"}}
+{"type":"copilot/tool_call_end","tool_call_id":"call-abc123","success":true,"content":"notes.md\nprobe.ts\n"}
+{"type":"copilot/assistant_delta","text":"The directory contains "}
+{"type":"copilot/assistant_delta","text":"`notes.md` and `probe.ts`."}
+{"type":"copilot/assistant_message","text":"The directory contains `notes.md` and `probe.ts`."}

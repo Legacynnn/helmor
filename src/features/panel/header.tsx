@@ -28,6 +28,7 @@ import { HelmorThinkingIndicator } from "@/components/helmor-thinking-indicator"
 import {
 	ClaudeIcon,
 	CursorIcon,
+	GithubCopilotIcon,
 	OpenAIIcon,
 	OpenCodeIcon,
 } from "@/components/icons";
@@ -235,12 +236,8 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 			<div
 				aria-label="Workspace header"
 				className="flex h-9 items-center justify-between gap-3 px-[18px]"
-				data-tauri-drag-region
 			>
-				<div
-					data-tauri-drag-region
-					className="relative z-0 flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-small"
-				>
+				<div className="relative z-0 flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-small">
 					<TrafficLightSpacer
 						side="left"
 						width={60}
@@ -878,6 +875,11 @@ function SessionProviderIcon({
 	}
 	if (agentType === "opencode") {
 		return <OpenCodeIcon className="size-3 shrink-0 text-muted-foreground" />;
+	}
+	if (agentType === "copilot") {
+		return (
+			<GithubCopilotIcon className="size-3 shrink-0 text-muted-foreground" />
+		);
 	}
 	return <ClaudeIcon className="size-3 shrink-0 text-muted-foreground" />;
 }

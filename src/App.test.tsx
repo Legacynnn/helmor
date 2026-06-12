@@ -126,7 +126,10 @@ describe("App", () => {
 		expect(panel).toHaveClass("relative");
 		expect(panel).toHaveClass("bg-background");
 		expect(dragRegion).toHaveAttribute("data-tauri-drag-region");
+		expect(dragRegion).toHaveClass("z-10");
 		expect(viewport).toHaveClass("bg-background");
+		expect(viewport).toHaveClass("relative");
+		expect(viewport).toHaveClass("z-20");
 		expect(composer).toBeInTheDocument();
 		expect(input).toHaveAttribute("aria-multiline", "true");
 		expect(
@@ -465,6 +468,60 @@ describe("App", () => {
 		expect(
 			screen.getByRole("separator", { name: "Resize inspector sidebar" }),
 		).toHaveAttribute("aria-valuenow", "388");
+	});
+
+	it("collapses and expands the left sidebar with Cmd+B", async () => {
+		render(<App />);
+		await screen.findByRole("main", { name: "Application shell" });
+
+		expect(getPaneInlineWidth("sidebar")).toBe("336px");
+
+		fireEvent.keyDown(window, {
+			code: "KeyB",
+			key: "b",
+			metaKey: true,
+		});
+
+		await waitFor(() => {
+			expect(getPaneInlineWidth("sidebar")).toBe("0px");
+		});
+
+		fireEvent.keyDown(window, {
+			code: "KeyB",
+			key: "b",
+			metaKey: true,
+		});
+
+		await waitFor(() => {
+			expect(getPaneInlineWidth("sidebar")).toBe("336px");
+		});
+	});
+
+	it("collapses and expands the right sidebar with Cmd+L", async () => {
+		render(<App />);
+		await screen.findByRole("main", { name: "Application shell" });
+
+		expect(getPaneInlineWidth("inspector")).toBe("336px");
+
+		fireEvent.keyDown(window, {
+			code: "KeyL",
+			key: "l",
+			metaKey: true,
+		});
+
+		await waitFor(() => {
+			expect(getPaneInlineWidth("inspector")).toBe("0px");
+		});
+
+		fireEvent.keyDown(window, {
+			code: "KeyL",
+			key: "l",
+			metaKey: true,
+		});
+
+		await waitFor(() => {
+			expect(getPaneInlineWidth("inspector")).toBe("336px");
+		});
 	});
 
 	it("shows the update button beside the sidebar toggle when an update is ready", async () => {

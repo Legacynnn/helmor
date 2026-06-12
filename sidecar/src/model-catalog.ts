@@ -111,6 +111,9 @@ const MODEL_CATALOG: Record<Provider, readonly ProviderModelInfo[]> = {
 			cliModel: "openai/gpt-5-codex",
 		},
 	],
+	// Dynamic-only — live set comes from `CopilotSessionManager.listModels`
+	// (the SDK's `client.listModels()`); no static fallback entries.
+	copilot: [],
 	// Static fallback only — `CursorSessionManager.listModels` hits the live
 	// `Cursor.models.list` API for the full set with up-to-date capability
 	// metadata. This list is what shows when the API key isn't configured

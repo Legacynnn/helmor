@@ -136,6 +136,21 @@ pub fn capabilities_for_provider(provider: &str) -> ProviderCapabilities {
                 PermissionMode::BypassPermissions,
             ],
         },
+        // GitHub Copilot (subscription auth via the `copilot` CLI login
+        // flow). No plan artefact, no /goal loop, no context ring, no
+        // steer, no slash-command discovery yet — Codex-style two-mode
+        // permission dropdown only.
+        "copilot" => ProviderCapabilities {
+            provider: "copilot".into(),
+            display_name: "GitHub Copilot".into(),
+            supports_plan_mode: false,
+            supports_active_goal: false,
+            supports_context_usage: false,
+            supports_steer: false,
+            supports_slash_commands: false,
+            requires_api_key: false,
+            permission_modes: vec![PermissionMode::Default, PermissionMode::BypassPermissions],
+        },
         // Default arm covers "claude" and anything we haven't onboarded
         // yet — keeping the safe defaults equal to Claude's behaviour
         // means an unknown id never accidentally disables the
@@ -162,7 +177,7 @@ pub fn capabilities_for_provider(provider: &str) -> ProviderCapabilities {
 /// Convenience: list every provider Helmor ships today. Frontends use
 /// this to render the capability table in settings (eventually), and
 /// tests use it to assert there are no holes in the matrix.
-pub const KNOWN_PROVIDERS: &[&str] = &["claude", "codex", "cursor", "opencode"];
+pub const KNOWN_PROVIDERS: &[&str] = &["claude", "codex", "cursor", "opencode", "copilot"];
 
 #[cfg(test)]
 mod tests {
@@ -280,12 +295,36 @@ mod tests {
     }
 
     #[test]
+    fn copilot_capabilities() {
+        let caps = capabilities_for_provider("copilot");
+        assert_eq!(caps.provider, "copilot");
+        assert_eq!(
+            caps.display_name, "GitHub Copilot",
+            "must not fall back to Claude"
+        );
+        assert!(!caps.supports_plan_mode);
+        assert!(!caps.supports_active_goal);
+        assert!(!caps.supports_context_usage);
+        assert!(!caps.supports_steer);
+        assert!(!caps.supports_slash_commands);
+        assert!(
+            !caps.requires_api_key,
+            "Copilot authenticates via CLI subscription login"
+        );
+        // Codex-style two-mode dropdown.
+        assert_eq!(
+            caps.permission_modes,
+            vec![PermissionMode::Default, PermissionMode::BypassPermissions]
+        );
+    }
+
+    #[test]
     fn unknown_provider_falls_back_to_claude_defaults() {
-        // Forward-compat: a future provider id (e.g. "copilot") that
+        // Forward-compat: a future provider id (e.g. "pi") that
         // lands without a matrix update must not break composer UX —
         // we default to Claude's feature surface, which is the
         // broadest, until the matrix is updated.
-        let caps = capabilities_for_provider("copilot");
+        let caps = capabilities_for_provider("pi");
         let claude = capabilities_for_provider("claude");
         assert_eq!(caps.provider, claude.provider);
         assert_eq!(caps.supports_plan_mode, claude.supports_plan_mode);

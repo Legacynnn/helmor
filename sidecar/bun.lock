@@ -10,6 +10,7 @@
         "@cursor/sdk": "^1.0.12",
         "@earendil-works/pi-agent-core": "^0.75.4",
         "@earendil-works/pi-ai": "^0.75.4",
+        "@github/copilot-sdk": "^1.0.1",
         "@openai/codex": "0.134.0",
         "@opencode-ai/sdk": "1.16.2",
         "opencode-ai": "1.16.2",
@@ -139,6 +140,26 @@
     "@fastify/busboy": ["@fastify/busboy@2.1.1", "", {}, "sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA=="],
 
     "@gar/promisify": ["@gar/promisify@1.1.3", "", {}, "sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw=="],
+
+    "@github/copilot": ["@github/copilot@1.0.61", "", { "dependencies": { "detect-libc": "^2.1.2" }, "optionalDependencies": { "@github/copilot-darwin-arm64": "1.0.61", "@github/copilot-darwin-x64": "1.0.61", "@github/copilot-linux-arm64": "1.0.61", "@github/copilot-linux-x64": "1.0.61", "@github/copilot-linuxmusl-arm64": "1.0.61", "@github/copilot-linuxmusl-x64": "1.0.61", "@github/copilot-win32-arm64": "1.0.61", "@github/copilot-win32-x64": "1.0.61" }, "bin": { "copilot": "npm-loader.js" } }, "sha512-E4f7YXTL2uUZY/ypnfsUruAeSgrHx3AGYEbm5N0DrpzPqoNAZqV6kHEWM4vu+W/nGvydIfPxmOTqaMEhM8r0Uw=="],
+
+    "@github/copilot-darwin-arm64": ["@github/copilot-darwin-arm64@1.0.61", "", { "os": "darwin", "cpu": "arm64", "bin": { "copilot-darwin-arm64": "copilot" } }, "sha512-10prvjHRXB0SD28NsIpzdNDgLquQYUwaH5Ev9KVdIWdBPAvlQsHmQ4JSCyD/UILc/nrrr02CKUgum+mZRKUKIg=="],
+
+    "@github/copilot-darwin-x64": ["@github/copilot-darwin-x64@1.0.61", "", { "os": "darwin", "cpu": "x64", "bin": { "copilot-darwin-x64": "copilot" } }, "sha512-NXUjageJ3mxDfHtXGYu//XhJ+dhJFYObT4R3jeWgIHhd+4lX7FlC754nwlBP/ZuVhJ3ND22JK9sua9d2F3Cbwg=="],
+
+    "@github/copilot-linux-arm64": ["@github/copilot-linux-arm64@1.0.61", "", { "os": "linux", "cpu": "arm64", "bin": { "copilot-linux-arm64": "copilot" } }, "sha512-dwB2+QSMr622JkePeK56M7YWXsTT/DQzKfpDq8Lk2kmGU052RZAarRmt8gcNm4anofN7pMSrqc3YHj1TM84MFw=="],
+
+    "@github/copilot-linux-x64": ["@github/copilot-linux-x64@1.0.61", "", { "os": "linux", "cpu": "x64", "bin": { "copilot-linux-x64": "copilot" } }, "sha512-q6n8R8oybvuCmmkP+43w809Wpud/wwRi/fFSZEYJagiNGmYJ00SDkrfJxHbZsAFMpaJC+oTswqzJHjRoZbO74w=="],
+
+    "@github/copilot-linuxmusl-arm64": ["@github/copilot-linuxmusl-arm64@1.0.61", "", { "os": "linux", "cpu": "arm64", "bin": { "copilot-linuxmusl-arm64": "copilot" } }, "sha512-yWo7JXnZS11eJpm68E1RWKMR47EwzPKj3V7GX0EMTd8Fw0T2Aurk9wt9p3c9w0v02nTO1DqJhi68KVWJPdVqvA=="],
+
+    "@github/copilot-linuxmusl-x64": ["@github/copilot-linuxmusl-x64@1.0.61", "", { "os": "linux", "cpu": "x64", "bin": { "copilot-linuxmusl-x64": "copilot" } }, "sha512-nHzx27Ac4B0fpD9CcmvyrGOBEMJ01CPRgVRP0yAl4wpU4cM2I6+9TPyfYThlWDqZqiUKGXC1ZRQ+B8cJREVGmA=="],
+
+    "@github/copilot-sdk": ["@github/copilot-sdk@1.0.1", "", { "dependencies": { "@github/copilot": "^1.0.61", "vscode-jsonrpc": "^8.2.1", "zod": "^4.3.6" } }, "sha512-w6AaS0WqqTE/3iyUrZznvgCLQhsUF7ZmEVCneacuHCfOzlH0r6ww9WUmyA0zgqmXO75V0IYrkIcnFke/qJkkDg=="],
+
+    "@github/copilot-win32-arm64": ["@github/copilot-win32-arm64@1.0.61", "", { "os": "win32", "cpu": "arm64", "bin": { "copilot-win32-arm64": "copilot.exe" } }, "sha512-k6knzI+K5HlZeJDS/yeJAfoYD4xcURWfuqunpTCyk1pDbIFxmrLSqR/TDi7KNlpsf883n5WqpnB06K5kysdHHQ=="],
+
+    "@github/copilot-win32-x64": ["@github/copilot-win32-x64@1.0.61", "", { "os": "win32", "cpu": "x64", "bin": { "copilot-win32-x64": "copilot.exe" } }, "sha512-L6NZ6o73VZFHd7OoRaztV3Prh1PbW9HXqYsAx+XywNALQvE1u489WBUC1ggfYBW5MTBCf8mxSkYQdb3Am2omsw=="],
 
     "@google/genai": ["@google/genai@1.52.0", "", { "dependencies": { "google-auth-library": "^10.3.0", "p-retry": "^4.6.2", "protobufjs": "^7.5.4", "ws": "^8.18.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.2" }, "optionalPeers": ["@modelcontextprotocol/sdk"] }, "sha512-gwSvbpiN/17O9TbsqSsE/OzZcpv5Fo4RQjdngGgogtuB9RsyJ8ZHhX5KjHj1bp5N9snN2eK8LDGXSaWW2hof8Q=="],
 
@@ -687,6 +708,8 @@
     "util-deprecate": ["util-deprecate@1.0.2", "", {}, "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw=="],
 
     "vary": ["vary@1.1.2", "", {}, "sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg=="],
+
+    "vscode-jsonrpc": ["vscode-jsonrpc@8.2.1", "", {}, "sha512-kdjOSJ2lLIn7r1rtrMbbNCHjyMPfRnowdKjBQ+mGq6NAW5QY2bEZC/khaC5OR8svbbjvLEaIXkOq45e2X9BIbQ=="],
 
     "web-streams-polyfill": ["web-streams-polyfill@3.3.3", "", {}, "sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw=="],
 

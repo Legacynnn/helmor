@@ -245,7 +245,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		id: "sidebar.right.toggle",
 		title: "Toggle right sidebar",
 		group: "System",
-		defaultHotkey: "Mod+Alt+B",
+		defaultHotkey: "Mod+L",
 		scopes: ["app"],
 		editable: true,
 	},
@@ -285,10 +285,9 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		id: "composer.focus",
 		title: "Focus chat input",
 		group: "Composer",
-		defaultHotkey: "Mod+L",
-		// App-scoped so the user can pop focus back to the composer from
-		// anywhere — including the terminal — making composer ↔ terminal
-		// (Mod+L vs Mod+Shift+J) a clean two-way switch.
+		// Unbound by default because Mod+L is reserved for toggling the right
+		// sidebar. Users can assign a focus shortcut from settings if they want.
+		defaultHotkey: null,
 		scopes: ["app"],
 		editable: true,
 	},

@@ -1,0 +1,22 @@
+---
+source: tests/pipeline_scenarios.rs
+expression: finish_normalized(&mut run_copilot(&events))
+---
+- role: assistant
+  id: live-0
+  content_length: 1
+  content:
+    - type: text
+      text: "Direct answer, no streaming."
+  status:
+    type: complete
+    reason: stop
+  streaming: ~
+- role: system
+  id: live-1
+  content_length: 1
+  content:
+    - type: text
+      text: 0.0s
+  status: ~
+  streaming: ~

@@ -159,7 +159,12 @@ export type DataInfo = {
 	archiveRoot: string;
 };
 
-export type AgentProvider = "claude" | "codex" | "cursor" | "opencode";
+export type AgentProvider =
+	| "claude"
+	| "codex"
+	| "cursor"
+	| "opencode"
+	| "copilot";
 
 export type LocalLlmStatus = {
 	enabled: boolean;
@@ -908,13 +913,19 @@ export async function clearWindowVibrancy(): Promise<void> {
 	await invoke("clear_window_vibrancy");
 }
 
-export type AgentLoginProvider = "claude" | "codex" | "cursor" | "opencode";
+export type AgentLoginProvider =
+	| "claude"
+	| "codex"
+	| "cursor"
+	| "opencode"
+	| "copilot";
 
 export type AgentLoginStatusResult = {
 	claude: boolean;
 	codex: boolean;
 	cursor: boolean;
 	opencode: boolean;
+	copilot: boolean;
 	codexProvider?: string | null;
 	codexAuthMethod?: "login" | "apiKey" | string | null;
 };
@@ -1160,6 +1171,17 @@ export const DEFAULT_PROVIDER_CAPABILITIES: ProviderCapabilities[] = [
 		requiresApiKey: false,
 		permissionModes: ["default", "acceptEdits", "plan", "bypassPermissions"],
 	},
+	{
+		provider: "copilot",
+		displayName: "GitHub Copilot",
+		supportsPlanMode: false,
+		supportsActiveGoal: false,
+		supportsContextUsage: false,
+		supportsSteer: false,
+		supportsSlashCommands: false,
+		requiresApiKey: false,
+		permissionModes: ["default", "bypassPermissions"],
+	},
 ];
 
 /** Look up a single provider's capabilities from a previously-fetched
@@ -1226,6 +1248,26 @@ export async function listOpencodeModels(
 	} catch (error) {
 		throw new Error(
 			describeInvokeError(error, "Unable to list opencode models."),
+		);
+	}
+}
+
+export type CopilotModelEntry = {
+	// Catalog slug — doubles as the picker id.
+	id: string;
+	label: string;
+	cliModel: string;
+	// Effort tiers. Empty ⟺ no effort switch.
+	effortLevels?: string[];
+};
+
+/// Live GitHub Copilot model list via the bundled `copilot` CLI.
+export async function listCopilotModels(): Promise<CopilotModelEntry[]> {
+	try {
+		return await invoke<CopilotModelEntry[]>("list_copilot_models");
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to list GitHub Copilot models."),
 		);
 	}
 }

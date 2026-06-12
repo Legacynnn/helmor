@@ -5,6 +5,7 @@ import type {
 import {
 	ClaudeIcon,
 	CursorIcon,
+	GithubCopilotIcon,
 	OpenAIIcon,
 	OpenCodeIcon,
 } from "@/components/icons";
@@ -42,6 +43,17 @@ export function buildAgentLoginItems(
 					? "Connected and ready to run OpenCode models in Helmor."
 					: "Sign in with `opencode auth login` to use OpenCode models in Helmor.",
 			status: resolve(status?.opencode),
+		},
+		{
+			icon: GithubCopilotIcon,
+			provider: "copilot",
+			label: "GitHub Copilot",
+			description: checking
+				? CHECKING_COPY
+				: status?.copilot
+					? "Connected and ready to run GitHub Copilot models in Helmor."
+					: "Sign in with the `copilot` CLI to use your Copilot subscription in Helmor.",
+			status: resolve(status?.copilot),
 		},
 		{
 			icon: OpenAIIcon,

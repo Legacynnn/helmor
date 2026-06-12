@@ -1,0 +1,3 @@
+{"type":"copilot/session_init","session_id":"copilot-final-1","model":"gpt-5"}
+{"type":"copilot/reasoning_message","text":"Simple arithmetic, no tools needed."}
+{"type":"copilot/assistant_message","text":"The answer is 4."}

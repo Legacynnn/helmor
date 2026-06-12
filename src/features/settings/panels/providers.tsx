@@ -3,6 +3,7 @@ import { useRef } from "react";
 import {
 	ClaudeColorIcon,
 	CursorIcon,
+	GithubCopilotIcon,
 	OpenAIIcon,
 	OpenCodeIcon,
 } from "@/components/icons";
@@ -11,6 +12,10 @@ import { getAgentLoginStatus, getAgentVersions } from "@/lib/api";
 import { helmorQueryKeys } from "@/lib/query-client";
 import { SettingsGroup } from "../components/settings-row";
 import { AgentProxyPanel, ClaudeCustomProvidersPanel } from "./model-providers";
+import {
+	CopilotModels,
+	type CopilotModelsHandle,
+} from "./providers/copilot-models";
 import { CursorCardBody } from "./providers/cursor-card-body";
 import { OpencodeCustomProvidersPanel } from "./providers/opencode-custom-providers";
 import {
@@ -34,6 +39,7 @@ export function ProvidersPanel() {
 	});
 	const versions = versionsQuery.data;
 	const opencodeModelsRef = useRef<OpencodeModelsHandle | null>(null);
+	const copilotModelsRef = useRef<CopilotModelsHandle | null>(null);
 
 	// First status fetch in flight → show "Connecting…" instead of a premature
 	// "Log in". opencode also stays connecting while a model sync (server boot)
@@ -41,6 +47,8 @@ export function ProvidersPanel() {
 	const statusLoading = statusQuery.isLoading;
 	const opencodeSyncing =
 		useIsMutating({ mutationKey: ["opencodeModelSync"] }) > 0;
+	const copilotSyncing =
+		useIsMutating({ mutationKey: ["copilotModelSync"] }) > 0;
 
 	const refetchStatus = () => {
 		void statusQuery.refetch();
@@ -103,6 +111,25 @@ export function ProvidersPanel() {
 					loginProvider="codex"
 					onLoginExit={refetchStatus}
 				/>
+				<ProviderRow
+					icon={GithubCopilotIcon}
+					name="GitHub Copilot"
+					ready={Boolean(status?.copilot)}
+					connecting={statusLoading || copilotSyncing}
+					loginProvider="copilot"
+					onLoginExit={() => {
+						refetchStatus();
+						copilotModelsRef.current?.refresh();
+					}}
+					collapsible
+				>
+					<ProviderConfigRow
+						label="Models"
+						description="Pick which models appear in the composer's picker."
+					>
+						<CopilotModels ref={copilotModelsRef} />
+					</ProviderConfigRow>
+				</ProviderRow>
 				<ProviderRow
 					icon={CursorIcon}
 					name="Cursor"

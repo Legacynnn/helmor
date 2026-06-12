@@ -1,0 +1,28 @@
+---
+source: tests/pipeline_scenarios.rs
+expression: run_normalized(records)
+---
+- role: assistant
+  id: msg-1
+  content_length: 3
+  content:
+    - type: reasoning
+      text_length: 20
+      text_preview: Check the dir first.
+      streaming: ~
+    - type: tool-call
+      tool_name: bash
+      tool_call_id: cp-tool-2
+      args_keys:
+        - command
+      args_text_length: 17
+      has_result: true
+      result_kind: string
+      result_preview: /repo
+      streaming_status: ~
+    - type: text
+      text: You are in /repo.
+  status:
+    type: complete
+    reason: stop
+  streaming: ~

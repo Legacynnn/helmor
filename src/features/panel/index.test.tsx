@@ -105,6 +105,10 @@ const SESSIONS: WorkspaceSessionSummary[] = [
 	},
 ];
 
+function expectOutsideDragRegion(element: HTMLElement): void {
+	expect(element.closest("[data-tauri-drag-region]")).toBeNull();
+}
+
 describe("WorkspacePanel", () => {
 	beforeEach(() => {
 		apiMocks.createSession.mockReset();
@@ -168,6 +172,39 @@ describe("WorkspacePanel", () => {
 		);
 
 		expect(screen.getByTestId("thinking-indicator")).toBeInTheDocument();
+	});
+
+	it("keeps conversation header actions outside Tauri drag regions", () => {
+		render(
+			<TooltipProvider delayDuration={0}>
+				<QueryClientProvider client={createHelmorQueryClient()}>
+					<WorkspacePanel
+						workspace={WORKSPACE}
+						sessions={SESSIONS}
+						selectedSessionId="session-1"
+						sessionPanes={[]}
+						sending={false}
+						headerActions={
+							<>
+								<button type="button">Open in Test Editor</button>
+								<button type="button">Export session as image</button>
+								<button type="button">Collapse right sidebar</button>
+							</>
+						}
+					/>
+				</QueryClientProvider>
+			</TooltipProvider>,
+		);
+
+		expectOutsideDragRegion(
+			screen.getByRole("button", { name: "Open in Test Editor" }),
+		);
+		expectOutsideDragRegion(
+			screen.getByRole("button", { name: "Export session as image" }),
+		);
+		expectOutsideDragRegion(
+			screen.getByRole("button", { name: "Collapse right sidebar" }),
+		);
 	});
 
 	it("optimistically seeds the new session before switching selection", async () => {

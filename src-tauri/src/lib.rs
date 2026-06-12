@@ -575,6 +575,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             agents::list_agent_model_sections,
+            agents::list_copilot_models,
             agents::list_cursor_models,
             agents::list_opencode_models,
             agents::list_provider_capabilities,

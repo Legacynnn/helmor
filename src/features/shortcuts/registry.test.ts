@@ -93,13 +93,13 @@ describe("shortcut registry", () => {
 		expect(findShortcutConflict({}, "terminal.close", "Mod+W")).toBeNull();
 		// Pointing a terminal-scoped shortcut at a chat-only hotkey is fine:
 		// composer.togglePlanMode is "chat", terminal.close is "terminal" — no
-		// overlap. (Mod+L is now app-scoped via composer.focus, so it would
+		// overlap. (Mod+L is now app-scoped via sidebar.right.toggle, so it would
 		// conflict with terminal.close — tested separately below.)
 		expect(findShortcutConflict({}, "terminal.close", "Shift+Tab")).toBeNull();
 		// App-scoped shortcuts overlap with every scope, so binding a
 		// terminal-scoped shortcut to an app-scoped hotkey IS a conflict.
 		expect(findShortcutConflict({}, "terminal.close", "Mod+L")?.id).toBe(
-			"composer.focus",
+			"sidebar.right.toggle",
 		);
 		// Two chat-scoped shortcuts pointed at the same hotkey: conflict.
 		expect(
@@ -114,6 +114,11 @@ describe("shortcut registry", () => {
 	it("keeps every shortcut id unique", () => {
 		const ids = SHORTCUT_DEFINITIONS.map((definition) => definition.id);
 		expect(new Set<ShortcutId>(ids).size).toBe(ids.length);
+	});
+
+	it("uses Cmd+B for the left sidebar and Cmd+L for the right sidebar", () => {
+		expect(getShortcut({}, "sidebar.left.toggle")).toBe("Mod+B");
+		expect(getShortcut({}, "sidebar.right.toggle")).toBe("Mod+L");
 	});
 
 	it("defines the terminal-session launcher shortcut and frees Mod+Shift+T", () => {

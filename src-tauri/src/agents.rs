@@ -242,6 +242,15 @@ pub async fn list_opencode_models(
 }
 
 #[tauri::command]
+pub async fn list_copilot_models(
+    sidecar: tauri::State<'_, crate::sidecar::ManagedSidecar>,
+    force_reload: Option<bool>,
+) -> CmdResult<Vec<queries::CopilotModelEntry>> {
+    // force_reload busts the sidecar's cached Copilot model list.
+    queries::fetch_copilot_models(sidecar.inner(), force_reload.unwrap_or(false))
+}
+
+#[tauri::command]
 pub async fn send_agent_message_stream(
     app: AppHandle,
     sidecar: tauri::State<'_, crate::sidecar::ManagedSidecar>,

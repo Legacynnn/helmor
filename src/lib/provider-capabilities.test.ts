@@ -57,7 +57,7 @@ describe("findProviderCapabilities", () => {
 		// Forward-compat: callers receiving null are expected to fall
 		// back to safe defaults. This mirrors the Rust helper's
 		// behaviour (Claude defaults) at the data-access boundary.
-		expect(findProviderCapabilities(table, "copilot")).toBeNull();
+		expect(findProviderCapabilities(table, "mystery-agent")).toBeNull();
 	});
 
 	it("returns null on an empty table", () => {
@@ -112,6 +112,7 @@ describe("DEFAULT_PROVIDER_CAPABILITIES (cold-start initialData)", () => {
 			"codex",
 			"cursor",
 			"opencode",
+			"copilot",
 		]);
 	});
 
@@ -152,6 +153,21 @@ describe("DEFAULT_PROVIDER_CAPABILITIES (cold-start initialData)", () => {
 		expect(opencode?.supportsContextUsage).toBe(true);
 		expect(opencode?.supportsActiveGoal).toBe(false);
 		expect(opencode?.requiresApiKey).toBe(false);
+		// GitHub Copilot must resolve to itself, not fall back to "Claude":
+		// no plan mode, no steer, no slash commands, no context-usage ring,
+		// and only the default/bypass permission modes.
+		const copilot = findProviderCapabilities(
+			DEFAULT_PROVIDER_CAPABILITIES,
+			"copilot",
+		);
+		expect(copilot?.displayName).toBe("GitHub Copilot");
+		expect(copilot?.supportsPlanMode).toBe(false);
+		expect(copilot?.supportsSteer).toBe(false);
+		expect(copilot?.supportsSlashCommands).toBe(false);
+		expect(copilot?.supportsContextUsage).toBe(false);
+		expect(copilot?.supportsActiveGoal).toBe(false);
+		expect(copilot?.requiresApiKey).toBe(false);
+		expect(copilot?.permissionModes).toEqual(["default", "bypassPermissions"]);
 	});
 
 	it("is wired as the query's initialData so the cold-start window is closed", () => {

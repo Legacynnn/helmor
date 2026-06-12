@@ -162,6 +162,22 @@ export type OpencodeProviderSettings = {
 	cacheVersion?: number;
 };
 
+// GitHub Copilot subscription provider. `slug` mirrors the catalog id the
+// Rust picker keys on.
+export type CopilotCachedModel = {
+	slug: string;
+	label: string;
+	// Effort tiers. Empty ⟺ no effort switch.
+	effortLevels?: string[];
+};
+
+export type CopilotProviderSettings = {
+	status: "ready" | "none";
+	/** `null` = every cached model enabled; `[]` = user cleared everything. */
+	enabledModelIds: string[] | null;
+	cachedModels: CopilotCachedModel[] | null;
+};
+
 export type AgentProxySettings = {
 	mode: "none" | "system" | "custom";
 	customUrl: string;
@@ -328,6 +344,7 @@ export type AppSettings = {
 	claudeCustomProviders: ClaudeCustomProviderSettings;
 	cursorProvider: CursorProviderSettings;
 	opencodeProvider: OpencodeProviderSettings;
+	copilotProvider: CopilotProviderSettings;
 	agentProxy: AgentProxySettings;
 	localLlm: LocalLlmSettings;
 	inboxSourceConfig: InboxSourceConfig;
@@ -435,6 +452,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
 		connected: [],
 		cachedModels: null,
 		enabledModelIds: null,
+	},
+	copilotProvider: {
+		status: "none",
+		enabledModelIds: null,
+		cachedModels: null,
 	},
 	agentProxy: {
 		mode: "none",
@@ -603,6 +625,7 @@ const SETTINGS_KEY_MAP: Record<
 	claudeCustomProviders: "app.claude_custom_providers",
 	cursorProvider: "app.cursor_provider",
 	opencodeProvider: "app.opencode_provider",
+	copilotProvider: "app.copilot_provider",
 	agentProxy: "app.agent_proxy",
 	localLlm: "app.local_llm",
 	inboxSourceConfig: "app.inbox_source_config",
@@ -989,6 +1012,41 @@ function parseOpencodeProviderSettings(
 	}
 }
 
+function parseCopilotProviderSettings(
+	raw: string | undefined,
+): CopilotProviderSettings {
+	if (!raw) return DEFAULT_SETTINGS.copilotProvider;
+	try {
+		const parsed = JSON.parse(raw) as Record<string, unknown>;
+		return {
+			status: parsed.status === "ready" ? "ready" : "none",
+			enabledModelIds: parseEnabledModelIds(parsed.enabledModelIds),
+			cachedModels: parseCopilotCachedModels(parsed.cachedModels),
+		};
+	} catch {
+		return DEFAULT_SETTINGS.copilotProvider;
+	}
+}
+
+function parseCopilotCachedModels(value: unknown): CopilotCachedModel[] | null {
+	if (!Array.isArray(value)) return null;
+	const models: CopilotCachedModel[] = [];
+	for (const entry of value) {
+		if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+		const obj = entry as Record<string, unknown>;
+		if (typeof obj.slug !== "string" || typeof obj.label !== "string") continue;
+		const effortLevels = Array.isArray(obj.effortLevels)
+			? obj.effortLevels.filter((v): v is string => typeof v === "string")
+			: undefined;
+		models.push({
+			slug: obj.slug,
+			label: obj.label,
+			...(effortLevels && effortLevels.length > 0 ? { effortLevels } : {}),
+		});
+	}
+	return models;
+}
+
 function parseStringArray(value: unknown): string[] {
 	if (!Array.isArray(value)) return [];
 	return value.filter((item): item is string => typeof item === "string");
@@ -1333,6 +1391,9 @@ export async function loadSettings(): Promise<AppSettings> {
 			opencodeProvider: parseOpencodeProviderSettings(
 				raw[SETTINGS_KEY_MAP.opencodeProvider],
 			),
+			copilotProvider: parseCopilotProviderSettings(
+				raw[SETTINGS_KEY_MAP.copilotProvider],
+			),
 			agentProxy: parseAgentProxySettings(raw[SETTINGS_KEY_MAP.agentProxy]),
 			localLlm: parseLocalLlmSettings(raw[SETTINGS_KEY_MAP.localLlm]),
 			inboxSourceConfig: parseInboxSourceConfig(
@@ -1381,6 +1442,7 @@ export async function saveSettings(patch: Partial<AppSettings>): Promise<void> {
 				key === "claudeCustomProviders" ||
 				key === "cursorProvider" ||
 				key === "opencodeProvider" ||
+				key === "copilotProvider" ||
 				key === "agentProxy" ||
 				key === "localLlm" ||
 				key === "inboxSourceConfig" ||

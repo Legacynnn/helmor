@@ -1,0 +1,26 @@
+---
+source: tests/pipeline_scenarios.rs
+expression: finish_normalized(&mut run_copilot(&events))
+---
+- role: assistant
+  id: live-0
+  content_length: 2
+  content:
+    - type: reasoning
+      text_length: 28
+      text_preview: Full non-streamed reasoning.
+      streaming: ~
+    - type: text
+      text: Done.
+  status:
+    type: complete
+    reason: stop
+  streaming: ~
+- role: system
+  id: live-1
+  content_length: 1
+  content:
+    - type: text
+      text: 0.0s
+  status: ~
+  streaming: ~

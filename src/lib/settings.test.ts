@@ -433,4 +433,82 @@ describe("settings", () => {
 			"xhigh",
 		]);
 	});
+
+	it("defaults the copilot provider when the key is absent", async () => {
+		invokeMock.mockResolvedValue({});
+
+		const settings = await loadSettings();
+
+		expect(settings.copilotProvider).toEqual({
+			status: "none",
+			enabledModelIds: null,
+			cachedModels: null,
+		});
+	});
+
+	it("parses a copilot cache with status, enabled ids and effortLevels", async () => {
+		invokeMock.mockResolvedValue({
+			"app.copilot_provider": JSON.stringify({
+				status: "ready",
+				enabledModelIds: ["gpt-5.5"],
+				cachedModels: [
+					{
+						slug: "gpt-5.5",
+						label: "GPT-5.5",
+						effortLevels: ["low", "medium", "high"],
+					},
+					{ slug: "claude-sonnet-4.5", label: "Claude Sonnet 4.5" },
+				],
+			}),
+		});
+
+		const settings = await loadSettings();
+
+		expect(settings.copilotProvider.status).toBe("ready");
+		expect(settings.copilotProvider.enabledModelIds).toEqual(["gpt-5.5"]);
+		expect(settings.copilotProvider.cachedModels).toEqual([
+			{
+				slug: "gpt-5.5",
+				label: "GPT-5.5",
+				effortLevels: ["low", "medium", "high"],
+			},
+			{ slug: "claude-sonnet-4.5", label: "Claude Sonnet 4.5" },
+		]);
+	});
+
+	it("keeps copilot enabledModelIds null (= all enabled) and drops malformed entries", async () => {
+		invokeMock.mockResolvedValue({
+			"app.copilot_provider": JSON.stringify({
+				status: "bogus",
+				enabledModelIds: null,
+				cachedModels: [
+					{ slug: "gpt-5.5", label: "GPT-5.5" },
+					{ slug: 42, label: "nope" },
+					"junk",
+				],
+			}),
+		});
+
+		const settings = await loadSettings();
+
+		expect(settings.copilotProvider.status).toBe("none");
+		expect(settings.copilotProvider.enabledModelIds).toBeNull();
+		expect(settings.copilotProvider.cachedModels).toEqual([
+			{ slug: "gpt-5.5", label: "GPT-5.5" },
+		]);
+	});
+
+	it("falls back to copilot defaults on malformed JSON", async () => {
+		invokeMock.mockResolvedValue({
+			"app.copilot_provider": "{not json",
+		});
+
+		const settings = await loadSettings();
+
+		expect(settings.copilotProvider).toEqual({
+			status: "none",
+			enabledModelIds: null,
+			cachedModels: null,
+		});
+	});
 });

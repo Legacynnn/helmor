@@ -1,0 +1,5 @@
+{"type":"copilot/session_init","session_id":"copilot-plain-1","model":"gpt-5"}
+{"type":"copilot/assistant_delta","text":"2 plus "}
+{"type":"copilot/assistant_delta","text":"2 equals "}
+{"type":"copilot/assistant_delta","text":"4."}
+{"type":"copilot/assistant_message","text":"2 plus 2 equals 4."}

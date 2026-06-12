@@ -822,6 +822,23 @@ describe("resolveSessionDisplayProvider", () => {
 		).toBe("opencode");
 	});
 
+	it("keeps the copilot icon regardless of the selected model", () => {
+		expect(
+			resolveSessionDisplayProvider({
+				session: {
+					id: "session-copilot",
+					agentType: "copilot",
+					model: null,
+					lastUserMessageAt: null,
+				},
+				modelSelections: {
+					"session:session-copilot": "gpt-4o",
+				},
+				modelSections: MODEL_SECTIONS,
+			}),
+		).toBe("copilot");
+	});
+
 	it("falls back to the selected model's provider when the session has no agent", () => {
 		expect(
 			resolveSessionDisplayProvider({

@@ -146,7 +146,7 @@ export function WorkspacePaneSurface({
 
 			<div
 				aria-label="Workspace viewport"
-				className="flex min-h-0 flex-1 flex-col bg-background"
+				className="relative z-20 flex min-h-0 flex-1 flex-col bg-background"
 			>
 				{workspaceViewMode === "editor" && editorSession && (
 					<WorkspaceEditorSurface
