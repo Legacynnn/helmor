@@ -216,13 +216,27 @@ mod tests {
         let calls = Arc::new(AtomicUsize::new(0));
         let ttl = Duration::from_secs(60);
 
-        let handles: Vec<_> = (0..5)
+        let owner = {
+            let calls = Arc::clone(&calls);
+            thread::spawn(move || {
+                run_cached("shared".to_string(), ttl, move || {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    thread::sleep(Duration::from_millis(80));
+                    Ok(sample_output("shared-value"))
+                })
+                .unwrap()
+            })
+        };
+
+        // Give the owner time to insert its Pending slot before waiters race in.
+        thread::sleep(Duration::from_millis(10));
+
+        let waiters: Vec<_> = (0..4)
             .map(|_| {
                 let calls = Arc::clone(&calls);
                 thread::spawn(move || {
                     run_cached("shared".to_string(), ttl, move || {
                         calls.fetch_add(1, Ordering::SeqCst);
-                        thread::sleep(Duration::from_millis(80));
                         Ok(sample_output("shared-value"))
                     })
                     .unwrap()
@@ -230,9 +244,13 @@ mod tests {
             })
             .collect();
 
-        let outputs: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        let mut outputs = vec![owner.join().unwrap()];
+        for waiter in waiters {
+            outputs.push(waiter.join().unwrap());
+        }
 
         assert_eq!(calls.load(Ordering::SeqCst), 1, "only one underlying spawn");
+        assert_eq!(outputs.len(), 5);
         for output in outputs {
             assert_eq!(output.stdout, "shared-value");
         }
@@ -257,6 +275,40 @@ mod tests {
             calls.load(Ordering::SeqCst),
             2,
             "errors retry, never cached"
+        );
+    }
+
+    #[test]
+    fn run_cached_error_propagates_to_concurrent_waiters() {
+        let ttl = Duration::from_secs(60);
+
+        let owner = thread::spawn(move || {
+            run_cached("err-concurrent".to_string(), ttl, move || {
+                thread::sleep(Duration::from_millis(60));
+                Err::<CommandOutput, _>(std::io::Error::other("boom"))
+            })
+        });
+
+        thread::sleep(Duration::from_millis(10));
+
+        let waiters: Vec<_> = (0..4)
+            .map(|_| {
+                thread::spawn(move || {
+                    run_cached("err-concurrent".to_string(), ttl, move || {
+                        Err::<CommandOutput, _>(std::io::Error::other("boom"))
+                    })
+                })
+            })
+            .collect();
+
+        let mut results = vec![owner.join().unwrap()];
+        for waiter in waiters {
+            results.push(waiter.join().unwrap());
+        }
+
+        assert!(
+            results.iter().all(|r| r.is_err()),
+            "all callers receive the error"
         );
     }
 
