@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/tooltip";
 import { FeedbackButton } from "@/features/feedback";
 import { WorkspacesSidebarContainer } from "@/features/navigation/container";
+import { ResourceWidget } from "@/features/resources";
 import { SettingsButton } from "@/features/settings";
 import { getShortcut } from "@/features/shortcuts/registry";
 import { InlineShortcutDisplay } from "@/features/shortcuts/shortcut-display";
@@ -274,6 +275,9 @@ export function ShellSidebarPane({
 							shortcut={getShortcut(appSettings.shortcuts, "settings.open")}
 						/>
 						<FeedbackButton onClick={onOpenFeedback} />
+						<div className="ml-auto">
+							<ResourceWidget />
+						</div>
 					</div>
 				</div>
 			</div>

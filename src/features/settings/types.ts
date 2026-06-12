@@ -14,6 +14,7 @@ export type SettingsSection =
 	| "developer"
 	| "account"
 	| "inbox"
+	| "storage"
 	| `repo:${string}`;
 
 // Tab inside the Inbox/Contexts panel. Exported so the shell event bus
