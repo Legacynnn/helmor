@@ -317,6 +317,12 @@ export type AppSettings = {
 	 *  exactly once at the merged-edge; skipped if the workspace has an
 	 *  active agent session or fails archive validation. */
 	autoArchiveOnMerge: boolean;
+	/** Days after which log files are pruned by the daily auto-cleanup
+	 *  pass. `0` disables log pruning. */
+	autoCleanLogsDays: number;
+	/** When true, the daily auto-cleanup pass deletes on-disk files left
+	 *  behind by archived workspaces. */
+	autoDeleteDeadWorkspaceFiles: boolean;
 	onboardingCompleted: boolean;
 	shortcuts: ShortcutOverrides;
 	claudeCustomProviders: ClaudeCustomProviderSettings;
@@ -409,6 +415,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
 	alwaysShowContextUsage: true,
 	showUsageStats: true,
 	autoArchiveOnMerge: false,
+	autoCleanLogsDays: 0,
+	autoDeleteDeadWorkspaceFiles: false,
 	onboardingCompleted: false,
 	shortcuts: {},
 	claudeCustomProviders: {
@@ -588,6 +596,8 @@ const SETTINGS_KEY_MAP: Record<
 	alwaysShowContextUsage: "app.always_show_context_usage",
 	showUsageStats: "app.show_usage_stats",
 	autoArchiveOnMerge: "app.auto_archive_on_merge",
+	autoCleanLogsDays: "app.auto_clean_logs_days",
+	autoDeleteDeadWorkspaceFiles: "app.auto_delete_dead_workspace_files",
 	onboardingCompleted: "app.onboarding_completed",
 	shortcuts: "app.shortcuts",
 	claudeCustomProviders: "app.claude_custom_providers",
@@ -1301,6 +1311,14 @@ export async function loadSettings(): Promise<AppSettings> {
 				raw[SETTINGS_KEY_MAP.autoArchiveOnMerge] !== undefined
 					? raw[SETTINGS_KEY_MAP.autoArchiveOnMerge] === "true"
 					: DEFAULT_SETTINGS.autoArchiveOnMerge,
+			autoCleanLogsDays: readClampedInt(
+				raw[SETTINGS_KEY_MAP.autoCleanLogsDays],
+				{ min: 0, max: 365, fallback: DEFAULT_SETTINGS.autoCleanLogsDays },
+			),
+			autoDeleteDeadWorkspaceFiles:
+				raw[SETTINGS_KEY_MAP.autoDeleteDeadWorkspaceFiles] !== undefined
+					? raw[SETTINGS_KEY_MAP.autoDeleteDeadWorkspaceFiles] === "true"
+					: DEFAULT_SETTINGS.autoDeleteDeadWorkspaceFiles,
 			onboardingCompleted:
 				raw[SETTINGS_KEY_MAP.onboardingCompleted] !== undefined
 					? raw[SETTINGS_KEY_MAP.onboardingCompleted] === "true"

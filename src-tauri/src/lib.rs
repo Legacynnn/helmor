@@ -278,6 +278,11 @@ pub fn run() {
                 Err(e) => tracing::warn!("Failed to reconcile orphaned workspaces: {e:#}"),
             }
 
+            // Daily auto-cleanup loop (log pruning + dead workspace file
+            // removal). Policy lives in settings; the loop no-ops while
+            // both knobs are off. First pass is delayed 5 minutes.
+            resources::auto_cleanup::spawn(app.handle().clone());
+
             // Repair `.agent-contexts/` provisioning for existing worktree
             // workspaces. This is best-effort because a missing scratch dir
             // should never block the app from starting.

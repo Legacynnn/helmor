@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatBytes } from "@/features/resources/format";
@@ -16,7 +17,15 @@ import {
 	storageBreakdownQueryOptions,
 } from "@/lib/query-client";
 import { SettingsGroup, SettingsRow } from "../components/settings-row";
+import { StorageAutoCleanupSection } from "./storage-auto-cleanup";
 import { StorageProcessesSection } from "./storage-processes";
+
+/** sonner error toast for a failed storage mutation. */
+function reportStorageError(title: string, error: unknown) {
+	toast.error(title, {
+		description: error instanceof Error ? error.message : String(error),
+	});
+}
 
 const SEGMENT_COLORS = [
 	"bg-chart-1",
@@ -82,14 +91,19 @@ export function StoragePanel() {
 	const deleteDirs = useMutation({
 		mutationFn: deleteWorkspaceStorage,
 		onSettled: invalidate,
+		onError: (error) =>
+			reportStorageError("Couldn't delete workspace files", error),
 	});
 	const clearLogs = useMutation({
 		mutationFn: () => clearOldLogs(7),
 		onSettled: invalidate,
+		onError: (error) => reportStorageError("Couldn't clear logs", error),
 	});
 	const vacuum = useMutation({
 		mutationFn: vacuumDatabase,
 		onSettled: invalidate,
+		onError: (error) =>
+			reportStorageError("Couldn't compact the database", error),
 	});
 
 	const activeWorkspaceIds = new Set(
@@ -238,6 +252,8 @@ export function StoragePanel() {
 					</Button>
 				</SettingsRow>
 			</SettingsGroup>
+
+			<StorageAutoCleanupSection />
 
 			<ConfirmDialog
 				open={confirm !== null}

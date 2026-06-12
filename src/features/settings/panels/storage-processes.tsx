@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { killResourceProcess, type ProcessInfo } from "@/lib/api";
 import {
@@ -34,6 +35,10 @@ export function StorageProcessesSection({
 		onSettled: () =>
 			queryClient.invalidateQueries({
 				queryKey: helmorQueryKeys.resourceSnapshot,
+			}),
+		onError: (error) =>
+			toast.error("Couldn't kill process", {
+				description: error instanceof Error ? error.message : String(error),
 			}),
 	});
 
