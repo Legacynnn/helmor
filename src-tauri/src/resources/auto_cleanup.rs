@@ -60,7 +60,7 @@ pub fn spawn(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(5 * 60)).await;
         loop {
-            run_once();
+            let _ = tauri::async_runtime::spawn_blocking(run_once).await;
             crate::ui_sync::publish(&app, crate::ui_sync::UiMutationEvent::StorageChanged);
             tokio::time::sleep(Duration::from_secs(24 * 60 * 60)).await;
         }
