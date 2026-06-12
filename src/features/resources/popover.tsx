@@ -213,7 +213,7 @@ export function ResourcePopoverContent({
 							</span>
 							{port.workspaceId ? (
 								<span className="rounded bg-accent px-1 text-mini">
-									{port.workspaceId}
+									{workspaceNames.get(port.workspaceId) ?? port.workspaceId}
 								</span>
 							) : null}
 							<Copy
