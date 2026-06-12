@@ -11,10 +11,12 @@ import {
 	vacuumDatabase,
 } from "@/lib/api";
 import {
+	activeStreamsQueryOptions,
 	helmorQueryKeys,
 	storageBreakdownQueryOptions,
 } from "@/lib/query-client";
 import { SettingsGroup, SettingsRow } from "../components/settings-row";
+import { StorageProcessesSection } from "./storage-processes";
 
 const SEGMENT_COLORS = [
 	"bg-chart-1",
@@ -65,6 +67,7 @@ function UsageBar({ breakdown }: { breakdown: StorageBreakdown }) {
 export function StoragePanel() {
 	const queryClient = useQueryClient();
 	const query = useQuery(storageBreakdownQueryOptions());
+	const activeStreams = useQuery(activeStreamsQueryOptions());
 	const [confirm, setConfirm] = useState<{
 		title: string;
 		detail: string;
@@ -88,6 +91,12 @@ export function StoragePanel() {
 		mutationFn: vacuumDatabase,
 		onSettled: invalidate,
 	});
+
+	const activeWorkspaceIds = new Set(
+		activeStreams.data
+			.map((stream) => stream.workspaceId)
+			.filter((id): id is string => id !== null),
+	);
 
 	const breakdown = query.data;
 	const reclaimable = breakdown?.workspaces.filter((w) => w.reclaimable) ?? [];
@@ -190,6 +199,8 @@ export function StoragePanel() {
 					</div>
 				) : null}
 			</SettingsGroup>
+
+			<StorageProcessesSection activeWorkspaceIds={activeWorkspaceIds} />
 
 			<SettingsGroup>
 				<SettingsRow
