@@ -39,6 +39,7 @@ pub async fn list_session_thread_messages(
 
 /// `seed_session_id`: see `sessions::CreateSessionOverrides::seed_session_id` —
 /// frontend-provided UUID used as the new `sessions.id` when present.
+#[allow(clippy::too_many_arguments)] // Tauri IPC command — args mirror the frontend call.
 #[tauri::command]
 pub async fn create_session(
     workspace_id: String,
@@ -48,6 +49,8 @@ pub async fn create_session(
     effort_level: Option<String>,
     fast_mode: Option<bool>,
     seed_session_id: Option<String>,
+    session_kind: Option<String>,
+    agent_type: Option<String>,
 ) -> CmdResult<sessions::CreateSessionResponse> {
     run_blocking(move || {
         sessions::create_session(
@@ -59,6 +62,8 @@ pub async fn create_session(
                 effort_level: effort_level.as_deref(),
                 fast_mode,
                 seed_session_id: seed_session_id.as_deref(),
+                session_kind: session_kind.as_deref(),
+                agent_type: agent_type.as_deref(),
             },
         )
     })
@@ -84,9 +89,6 @@ pub async fn unhide_session(session_id: String) -> CmdResult<()> {
 pub async fn delete_session(session_id: String) -> CmdResult<()> {
     run_blocking(move || {
         sessions::delete_session(&session_id)?;
-        // Permanent delete: drop any persisted terminal scrollback (no-op for
-        // chat sessions). Hide deliberately keeps the log for History restore.
-        crate::terminal_sessions::scrollback::clear(&session_id);
         Ok(())
     })
     .await

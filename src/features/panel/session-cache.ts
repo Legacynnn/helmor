@@ -2,25 +2,18 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { WorkspaceDetail, WorkspaceSessionSummary } from "@/lib/api";
 import { helmorQueryKeys } from "@/lib/query-client";
 
-type OptimisticSessionKindOptions = {
-	/** "chat" (SDK thread) or "terminal" (PTY agent CLI). Defaults to "chat". */
-	sessionKind?: WorkspaceSessionSummary["sessionKind"];
-	/** Terminal agent id (e.g. "claude-code") for terminal sessions; drives the
-	 * tab label during the optimistic window. Defaults to null. */
-	agentType?: string | null;
-};
-
 export function buildOptimisticSession(
 	workspaceId: string,
 	sessionId: string,
 	createdAt: string,
-	options: OptimisticSessionKindOptions = {},
+	sessionKind: "gui" | "terminal" = "gui",
+	agentType: string | null = null,
 ): WorkspaceSessionSummary {
 	return {
 		id: sessionId,
 		workspaceId,
-		title: "Untitled",
-		agentType: options.agentType ?? null,
+		title: sessionKind === "terminal" ? "Terminal" : "Untitled",
+		agentType,
 		status: "idle",
 		model: null,
 		permissionMode: "default",
@@ -32,19 +25,21 @@ export function buildOptimisticSession(
 		updatedAt: createdAt,
 		lastUserMessageAt: null,
 		isHidden: false,
-		sessionKind: options.sessionKind ?? "chat",
 		actionKind: null,
+		sessionKind,
 		active: true,
 	};
 }
 
-type SeedNewSessionInCacheOptions = OptimisticSessionKindOptions & {
+type SeedNewSessionInCacheOptions = {
 	queryClient: QueryClient;
 	workspaceId: string;
 	sessionId: string;
 	workspace?: WorkspaceDetail | null;
 	existingSessions?: WorkspaceSessionSummary[];
 	createdAt?: string;
+	sessionKind?: "gui" | "terminal";
+	agentType?: string | null;
 };
 
 export function seedNewSessionInCache({
@@ -54,14 +49,15 @@ export function seedNewSessionInCache({
 	workspace = null,
 	existingSessions,
 	createdAt = new Date().toISOString(),
-	sessionKind = "chat",
+	sessionKind = "gui",
 	agentType = null,
 }: SeedNewSessionInCacheOptions): WorkspaceSessionSummary {
 	const optimisticSession = buildOptimisticSession(
 		workspaceId,
 		sessionId,
 		createdAt,
-		{ sessionKind, agentType },
+		sessionKind,
+		agentType,
 	);
 
 	queryClient.setQueryData(
@@ -75,8 +71,8 @@ export function seedNewSessionInCache({
 			return {
 				...base,
 				activeSessionId: sessionId,
-				activeSessionTitle: "Untitled",
-				activeSessionAgentType: agentType,
+				activeSessionTitle: optimisticSession.title,
+				activeSessionAgentType: null,
 				activeSessionStatus: "idle",
 				sessionCount:
 					base.activeSessionId === sessionId

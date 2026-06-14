@@ -15,7 +15,6 @@ const claudeCaps: ProviderCapabilities = {
 	supportsSteer: true,
 	supportsSlashCommands: true,
 	requiresApiKey: false,
-	permissionModes: ["default", "acceptEdits", "plan", "bypassPermissions"],
 };
 
 const codexCaps: ProviderCapabilities = {
@@ -27,19 +26,17 @@ const codexCaps: ProviderCapabilities = {
 	supportsSteer: true,
 	supportsSlashCommands: true,
 	requiresApiKey: false,
-	permissionModes: ["default", "bypassPermissions"],
 };
 
 const cursorCaps: ProviderCapabilities = {
 	provider: "cursor",
 	displayName: "Cursor",
-	supportsPlanMode: false,
+	supportsPlanMode: true,
 	supportsActiveGoal: false,
 	supportsContextUsage: false,
 	supportsSteer: false,
 	supportsSlashCommands: true,
 	requiresApiKey: true,
-	permissionModes: ["default"],
 };
 
 const table: ProviderCapabilities[] = [claudeCaps, codexCaps, cursorCaps];
@@ -58,6 +55,10 @@ describe("findProviderCapabilities", () => {
 		// back to safe defaults. This mirrors the Rust helper's
 		// behaviour (Claude defaults) at the data-access boundary.
 		expect(findProviderCapabilities(table, "mystery-agent")).toBeNull();
+	});
+
+	it("maps custom Codex providers (codex:<id>) to the official Codex row", () => {
+		expect(findProviderCapabilities(table, "codex:hundun")).toBe(codexCaps);
 	});
 
 	it("returns null on an empty table", () => {
@@ -112,6 +113,8 @@ describe("DEFAULT_PROVIDER_CAPABILITIES (cold-start initialData)", () => {
 			"codex",
 			"cursor",
 			"opencode",
+			"mimo",
+			"kimi",
 			"copilot",
 		]);
 	});
@@ -137,7 +140,6 @@ describe("DEFAULT_PROVIDER_CAPABILITIES (cold-start initialData)", () => {
 			"codex",
 		);
 		expect(codex?.displayName).toBe("Codex");
-		expect(codex?.permissionModes).toEqual(["default", "bypassPermissions"]);
 		const cursor = findProviderCapabilities(
 			DEFAULT_PROVIDER_CAPABILITIES,
 			"cursor",
@@ -167,7 +169,26 @@ describe("DEFAULT_PROVIDER_CAPABILITIES (cold-start initialData)", () => {
 		expect(copilot?.supportsContextUsage).toBe(false);
 		expect(copilot?.supportsActiveGoal).toBe(false);
 		expect(copilot?.requiresApiKey).toBe(false);
-		expect(copilot?.permissionModes).toEqual(["default", "bypassPermissions"]);
+		// Kimi (ACP) must resolve to itself, not fall back to "Claude".
+		const kimi = findProviderCapabilities(
+			DEFAULT_PROVIDER_CAPABILITIES,
+			"kimi",
+		);
+		expect(kimi?.displayName).toBe("Kimi");
+		expect(kimi?.requiresApiKey).toBe(false);
+		expect(kimi?.supportsSlashCommands).toBe(true);
+		expect(kimi?.supportsPlanMode).toBe(false);
+		expect(kimi?.supportsContextUsage).toBe(false);
+		expect(kimi?.supportsSteer).toBe(false);
+		// MiMo Code (opencode-protocol fork) mirrors OpenCode's capability row.
+		const mimo = findProviderCapabilities(
+			DEFAULT_PROVIDER_CAPABILITIES,
+			"mimo",
+		);
+		expect(mimo?.displayName).toBe("MiMo Code");
+		expect(mimo?.supportsContextUsage).toBe(true);
+		expect(mimo?.supportsActiveGoal).toBe(false);
+		expect(mimo?.requiresApiKey).toBe(false);
 	});
 
 	it("is wired as the query's initialData so the cold-start window is closed", () => {

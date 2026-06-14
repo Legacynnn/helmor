@@ -87,6 +87,10 @@ export function GooseIcon(props: SVGProps<SVGSVGElement>) {
 	return <GooseMono {...props} />;
 }
 
+export function MiMoCodeIcon(props: SVGProps<SVGSVGElement>) {
+	return <XiaomiMiMoMono {...props} />;
+}
+
 /** pi has no lobehub icon yet — π glyph matching the brand wordmark. */
 export function PiIcon(props: SVGProps<SVGSVGElement>) {
 	return (

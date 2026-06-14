@@ -22,7 +22,6 @@ import {
 	getSessionContextUsage,
 	getSessionPlanState,
 	getStorageBreakdown,
-	getTerminalAgentDetails,
 	getWorkspaceAccountProfile,
 	getWorkspaceForge,
 	listActiveStreams,
@@ -31,7 +30,6 @@ import {
 	listInboxKindLabels,
 	listRepositories,
 	listSlashCommands,
-	listTerminalAgents,
 	listWorkspaceCandidateDirectories,
 	listWorkspaceChanges,
 	listWorkspaceDiffStats,
@@ -39,6 +37,7 @@ import {
 	listWorkspaceLinkedDirectories,
 	listWorkspaceTree,
 	loadAgentModelSections,
+	loadAllAgentModelSections,
 	loadArchivedWorkspaces,
 	loadAutoCloseActionKinds,
 	loadAutoCloseOptInAsked,
@@ -56,12 +55,14 @@ import {
 // mobile browser companion too (not just the Tauri webview).
 import { invoke } from "./ipc";
 import { parsePrUrl } from "./pr-url";
+// Lazy-cycle-safe: session-thread-cache imports `helmorQueryKeys` from this
+// module, but both sides only dereference inside function bodies.
+import { shareMessages } from "./session-thread-cache";
 import {
 	getSessionThreadPaginationState,
 	setSessionThreadPaginationState,
 } from "./session-thread-pagination";
 
-const SESSION_STALE_TIME = 10 * 60_000;
 const CHANGES_STALE_TIME = 3_000;
 const CHANGES_REFETCH_INTERVAL = 10_000;
 const WORKSPACE_FORGE_REFETCH_INTERVAL = 60_000;
@@ -75,12 +76,11 @@ export const helmorQueryKeys = {
 	archivedWorkspaces: ["archivedWorkspaces"] as const,
 	repositories: ["repositories"] as const,
 	agentModelSections: ["agentModelSections"] as const,
-	opencodeCustomProviders: ["opencodeCustomProviders"] as const,
+	allAgentModelSections: ["allAgentModelSections"] as const,
+	customProviders: (family: string) => ["customProviders", family] as const,
+	kimiProviderConfig: ["kimiProviderConfig"] as const,
 	agentLoginStatus: ["agentLoginStatus"] as const,
 	agentVersions: ["agentVersions"] as const,
-	terminalAgents: ["terminalAgents"] as const,
-	terminalAgentDetails: (agentId: string) =>
-		["terminalAgentDetails", agentId] as const,
 	providerCapabilities: ["providerCapabilities"] as const,
 	workspaceDetail: (workspaceId: string) =>
 		["workspaceDetail", workspaceId] as const,
@@ -124,12 +124,6 @@ export const helmorQueryKeys = {
 	forgeAccountsAll: ["forgeAccounts"] as const,
 	workspaceAccountProfile: (workspaceId: string) =>
 		["workspaceAccountProfile", workspaceId] as const,
-	/// Lightweight per-host login set probe (no profile fetch). Used as
-	/// the focus-driven auth liveness check: account / repo settings
-	/// surfaces refetch this on window focus, and a delta in the set
-	/// invalidates the heavyweight `forgeAccounts` cache.
-	forgeLogins: (provider: string, host: string) =>
-		["forgeLogins", provider, host] as const,
 	inboxItemDetail: (
 		provider: string,
 		login: string,
@@ -445,26 +439,6 @@ export function inboxKindLabelsQueryOptions(provider: ForgeProvider) {
 	});
 }
 
-export function terminalAgentsQueryOptions() {
-	return queryOptions({
-		queryKey: helmorQueryKeys.terminalAgents,
-		queryFn: listTerminalAgents,
-		// Cheap fs probes; 30s keeps the picker snappy while still catching
-		// freshly-installed CLIs without an app restart.
-		staleTime: 30_000,
-		refetchOnWindowFocus: false,
-	});
-}
-
-export function terminalAgentDetailsQueryOptions(agentId: string) {
-	return queryOptions({
-		queryKey: helmorQueryKeys.terminalAgentDetails(agentId),
-		queryFn: () => getTerminalAgentDetails(agentId),
-		staleTime: 30_000,
-		refetchOnWindowFocus: false,
-	});
-}
-
 export function agentModelSectionsQueryOptions() {
 	return queryOptions({
 		queryKey: helmorQueryKeys.agentModelSections,
@@ -477,6 +451,18 @@ export function agentModelSectionsQueryOptions() {
 		// id namespacing) — a long staleTime + on-disk persistence
 		// previously stuck users on a pre-upgrade shape until they
 		// happened to invalidate the query manually.
+		staleTime: 0,
+		refetchOnWindowFocus: false,
+		retry: false,
+		meta: PERSIST_META,
+	});
+}
+
+/** Full, unfiltered catalog for the Settings "Models" multi-selects. */
+export function allAgentModelSectionsQueryOptions() {
+	return queryOptions({
+		queryKey: helmorQueryKeys.allAgentModelSections,
+		queryFn: loadAllAgentModelSections,
 		staleTime: 0,
 		refetchOnWindowFocus: false,
 		retry: false,
@@ -742,7 +728,26 @@ export function sessionThreadMessagesQueryOptions(sessionId: string) {
 		// working unchanged.
 		queryFn: () => loadSessionThreadMessages(sessionId),
 		gcTime: SESSION_GC_TIME,
-		staleTime: SESSION_STALE_TIME,
+		// Threads never go stale by clock — every write path broadcasts a
+		// `sessionTurnPersisted` / `sessionMessagesAppended` UiMutationEvent
+		// that marks this key stale explicitly. Keeps warm revisits and
+		// window-focus refetches at zero IPC.
+		staleTime: Number.POSITIVE_INFINITY,
+		// Reuse per-message references on refetch via the same helper the
+		// streaming writes use, so per-message memos bail out. First fetch
+		// passes `oldData === undefined` and must flow straight through —
+		// `shareMessages` iterates prev unconditionally. Note: a key whose
+		// first write comes from `setQueryData` before any observer mounts
+		// is built with default options (default structural sharing for
+		// that one write) — known and fine; this fn applies once an
+		// observer mounts with these options.
+		structuralSharing: (oldData, newData) =>
+			oldData == null
+				? newData
+				: shareMessages(
+						oldData as ThreadMessageLike[],
+						newData as ThreadMessageLike[],
+					),
 	});
 }
 

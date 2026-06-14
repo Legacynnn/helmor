@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { createSidecarEmitter, type SidecarEmitter } from "../src/emitter.js";
@@ -35,6 +35,13 @@ const serverState = {
 };
 const gitAccessState = {
 	directories: [] as string[],
+	// `mock.module` is global to the `bun test` process and binds at collection
+	// time, so it can't be cleanly restored for files that run after us. Instead
+	// the stub delegates to the real module unless a codex test is actively
+	// driving it (set in beforeEach, released in afterAll), so git-access.test.ts
+	// still gets real behavior no matter the file order. Latent until Windows CI,
+	// where the filesystem ordering runs us before git-access.test.ts.
+	driving: false,
 };
 const codexConfigState = {
 	result: {
@@ -159,8 +166,20 @@ mock.module("../src/codex-app-server.js", () => ({
 	CodexAppServer: MockCodexAppServer,
 }));
 
+// `mock.module` is global to the whole `bun test` process and is NOT undone by
+// `mock.restore()`. Capture the real module first so afterAll can put it back —
+// otherwise git-access.test.ts (and any other file that runs after us) imports
+// this stub instead of the real `resolveGitAccessDirectories`. File order is
+// filesystem-dependent, so the leak only failed on Windows CI.
+// Capture the real function VALUE before mocking — `mock.module` mutates the
+// module namespace in place, so holding the namespace object isn't enough.
+const realResolveGitAccessDirectories = (await import("../src/git-access.js"))
+	.resolveGitAccessDirectories;
 mock.module("../src/git-access.js", () => ({
-	resolveGitAccessDirectories: async () => [...gitAccessState.directories],
+	resolveGitAccessDirectories: async (cwd: string | undefined) =>
+		gitAccessState.driving
+			? [...gitAccessState.directories]
+			: realResolveGitAccessDirectories(cwd),
 }));
 
 mock.module("../src/codex-config.js", () => ({
@@ -174,6 +193,12 @@ mock.module("../src/codex-config.js", () => ({
 const { CodexAppServerManager } = await import(
 	"../src/codex-app-server-manager.js"
 );
+
+// Release control so the still-installed stub delegates to the real module for
+// any test file that runs after us.
+afterAll(() => {
+	gitAccessState.driving = false;
+});
 
 describe("CodexAppServerManager", () => {
 	let emitter: SidecarEmitter;
@@ -189,6 +214,7 @@ describe("CodexAppServerManager", () => {
 		serverState.instances = [];
 		serverState.responses = [];
 		gitAccessState.directories = [];
+		gitAccessState.driving = true;
 		codexConfigState.result = {
 			kind: "alreadyEnabled",
 			path: "/fake/.codex/config.toml",
@@ -222,7 +248,7 @@ describe("CodexAppServerManager", () => {
 
 		const models = await manager.listModels();
 
-		expect(models).toHaveLength(4);
+		expect(models).toHaveLength(3);
 		expect(models).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
@@ -953,6 +979,88 @@ describe("CodexAppServerManager", () => {
 		});
 	});
 
+	test("requestUserInput round-trips raw questions out and canonical answers back", async () => {
+		const manager = new CodexAppServerManager();
+		const events: Array<Record<string, unknown>> = [];
+		const capturingEmitter = createSidecarEmitter((event) => {
+			events.push(event as Record<string, unknown>);
+		});
+
+		serverState.beforeTurnCompleted = () => {
+			serverState.onRequest?.({
+				id: "rpc-user-input-1",
+				method: "item/tool/requestUserInput",
+				params: {
+					threadId: "thread-1",
+					turnId: "turn-1",
+					questions: [
+						{
+							id: "q0",
+							header: "Mode",
+							question: "Pick one",
+							options: [{ label: "Fast", description: "skip checks" }],
+						},
+					],
+				},
+			});
+
+			const userInputEvent = events.find(
+				(e) => e.type === "userInputRequest",
+			) as Record<string, unknown> | undefined;
+			expect(userInputEvent).toBeDefined();
+			const payload = userInputEvent?.payload as Record<string, unknown>;
+			// Raw Codex questions pass through — Rust normalizes them.
+			expect(payload.kind).toBe("ask-user-question");
+			expect(payload.questions).toEqual([
+				expect.objectContaining({ id: "q0", question: "Pick one" }),
+			]);
+
+			const userInputId = userInputEvent?.userInputId as string;
+			const claimed = manager.resolveUserInput(userInputId, {
+				action: "submit",
+				// Unified AUQ content: answers keyed by question text.
+				content: { answers: { "Pick one": "Fast" } },
+			});
+			expect(claimed).toBe(true);
+		};
+
+		await manager.sendMessage(
+			"REQ-user-input",
+			{
+				sessionId: "session-user-input",
+				prompt: "ask me something",
+				model: "gpt-5.5",
+				cwd: "/tmp",
+				resume: undefined,
+				permissionMode: undefined,
+				effortLevel: "high",
+				fastMode: false,
+				images: [],
+			},
+			capturingEmitter,
+		);
+
+		// Reverse-mapped to Codex's `{ id: { answers: [value] } }` shape.
+		const response = serverState.responses.find(
+			(r) => r.id === "rpc-user-input-1",
+		);
+		expect(response?.result).toEqual({
+			answers: { q0: { answers: ["Fast"] } },
+		});
+
+		// Resolved Q&A marker for the transcript card (persisted by Rust).
+		const resolved = events.find((e) => e.type === "user_question") as
+			| Record<string, unknown>
+			| undefined;
+		expect(resolved).toBeDefined();
+		expect(resolved?.source).toBe("Codex");
+		expect(resolved?.action).toBe("submit");
+		expect(resolved?.answers).toEqual({ "Pick one": "Fast" });
+		expect(resolved?.questions).toEqual([
+			expect.objectContaining({ id: "q0" }),
+		]);
+	});
+
 	test("plain Allow on tool-call approval sends accept without _meta", async () => {
 		const manager = new CodexAppServerManager();
 		const events: Array<Record<string, unknown>> = [];
@@ -1080,6 +1188,7 @@ describe("CodexAppServerManager goal pre-flight", () => {
 		serverState.instances = [];
 		serverState.responses = [];
 		gitAccessState.directories = [];
+		gitAccessState.driving = true;
 		codexConfigState.result = {
 			kind: "alreadyEnabled",
 			path: "/fake/.codex/config.toml",

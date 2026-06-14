@@ -6,38 +6,11 @@
 //! adding a new provider (Copilot/ACP via #511, Pi via #321, …) is a
 //! single edit here plus a row in the test matrix below.
 //!
-//! Scope of this slice is intentionally narrow:
-//! - shape + helper only; no new provider, no behavior change for the
-//!   three providers Helmor ships today;
-//! - capabilities are the ones that have real call sites today
-//!   (active-goal, plan-mode, slash commands, context usage, steer,
-//!   display name, permission modes). Adding a new field is cheap;
-//!   adding a field with no call site is noise.
+//! Permission is modeled as a binary: a turn either runs in `plan`
+//! (read-only) mode or with full access. `supports_plan_mode` is the
+//! only flag the composer needs — it gates the Plan toggle.
 
 use serde::{Deserialize, Serialize};
-
-/// Permission-mode literals the composer's dropdown surfaces. Carried
-/// as `&'static str` so the order is stable and the values match the
-/// SDK strings the sidecars expect on the wire.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum PermissionMode {
-    Default,
-    AcceptEdits,
-    Plan,
-    BypassPermissions,
-}
-
-impl PermissionMode {
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::Default => "default",
-            Self::AcceptEdits => "acceptEdits",
-            Self::Plan => "plan",
-            Self::BypassPermissions => "bypassPermissions",
-        }
-    }
-}
 
 /// Static capability table for a single provider. Carried in
 /// [`AgentModelSection`] etc. so the frontend can branch on data
@@ -56,10 +29,9 @@ pub struct ProviderCapabilities {
     /// etc. Lets us rename "Codex" to "OpenAI" (or vice versa) in one
     /// place without grepping for every string literal.
     pub display_name: String,
-    /// Provider emits a "current plan" artefact the frontend can pin —
-    /// either Codex `turn/plan/updated` or Claude `ExitPlanMode`. The
-    /// pipeline maps both onto the same projection (see
-    /// `agents::session_plan`).
+    /// Provider has a read-only plan mode the composer surfaces as the
+    /// Plan toggle (and that emits a pinnable plan artefact). When false
+    /// the toggle is hidden and every turn runs with full access.
     pub supports_plan_mode: bool,
     /// Provider has a long-running goal/autopilot loop the frontend
     /// needs to special-case during composer submit + stop (today:
@@ -82,13 +54,9 @@ pub struct ProviderCapabilities {
     /// embedded login terminal flow. True for Cursor; false for Claude
     /// + Codex.
     pub requires_api_key: bool,
-    /// Permission modes the composer's permission-mode dropdown should
-    /// offer for this provider, in display order. The first entry is
-    /// the default selection for new sessions.
-    pub permission_modes: Vec<PermissionMode>,
 }
 
-/// Capabilities for the three providers Helmor ships today.
+/// Capabilities for the providers Helmor ships today.
 ///
 /// New providers (e.g. Copilot via #511, Pi via #321) land here with a
 /// matrix entry in [`tests::capabilities_table`] documenting every
@@ -104,22 +72,17 @@ pub fn capabilities_for_provider(provider: &str) -> ProviderCapabilities {
             supports_steer: true,
             supports_slash_commands: true,
             requires_api_key: false,
-            permission_modes: vec![PermissionMode::Default, PermissionMode::BypassPermissions],
         },
         "cursor" => ProviderCapabilities {
             provider: "cursor".into(),
             display_name: "Cursor".into(),
-            supports_plan_mode: false,
+            supports_plan_mode: true,
             supports_active_goal: false,
             supports_context_usage: false,
             supports_steer: false,
             supports_slash_commands: true,
             requires_api_key: true,
-            permission_modes: vec![PermissionMode::Default],
         },
-        // Plan mode runs the read-only `plan` agent (approval rides the question
-        // flow). No /goal loop; has the context ring, steer, and slash commands.
-        // Logs in via the embedded flow (not an API-key entry).
         "opencode" => ProviderCapabilities {
             provider: "opencode".into(),
             display_name: "OpenCode".into(),
@@ -129,12 +92,33 @@ pub fn capabilities_for_provider(provider: &str) -> ProviderCapabilities {
             supports_steer: true,
             supports_slash_commands: true,
             requires_api_key: false,
-            permission_modes: vec![
-                PermissionMode::Default,
-                PermissionMode::AcceptEdits,
-                PermissionMode::Plan,
-                PermissionMode::BypassPermissions,
-            ],
+        },
+        // MiMo Code is an opencode-protocol fork — identical capability
+        // surface, different branding.
+        "mimo" => ProviderCapabilities {
+            provider: "mimo".into(),
+            display_name: "MiMo Code".into(),
+            supports_plan_mode: true,
+            supports_active_goal: false,
+            supports_context_usage: true,
+            supports_steer: true,
+            supports_slash_commands: true,
+            requires_api_key: false,
+        },
+        "kimi" => ProviderCapabilities {
+            provider: "kimi".into(),
+            display_name: "Kimi".into(),
+            // ACP exposes session modes + a usage signal, but v1 wires
+            // neither: no Plan toggle, no context ring. ACP allows only one
+            // foreground turn at a time, so there is no mid-turn steer.
+            supports_plan_mode: false,
+            supports_active_goal: false,
+            supports_context_usage: false,
+            supports_steer: false,
+            // ACP `available_commands_update` feeds the slash-command popup.
+            supports_slash_commands: true,
+            // Auth is the embedded `kimi login` device-code terminal, not a key.
+            requires_api_key: false,
         },
         // GitHub Copilot (subscription auth via the `copilot` CLI login
         // flow). No plan artefact, no /goal loop, no context ring, no
@@ -149,7 +133,6 @@ pub fn capabilities_for_provider(provider: &str) -> ProviderCapabilities {
             supports_steer: false,
             supports_slash_commands: false,
             requires_api_key: false,
-            permission_modes: vec![PermissionMode::Default, PermissionMode::BypassPermissions],
         },
         // Default arm covers "claude" and anything we haven't onboarded
         // yet — keeping the safe defaults equal to Claude's behaviour
@@ -164,12 +147,6 @@ pub fn capabilities_for_provider(provider: &str) -> ProviderCapabilities {
             supports_steer: true,
             supports_slash_commands: true,
             requires_api_key: false,
-            permission_modes: vec![
-                PermissionMode::Default,
-                PermissionMode::AcceptEdits,
-                PermissionMode::Plan,
-                PermissionMode::BypassPermissions,
-            ],
         },
     }
 }
@@ -177,7 +154,9 @@ pub fn capabilities_for_provider(provider: &str) -> ProviderCapabilities {
 /// Convenience: list every provider Helmor ships today. Frontends use
 /// this to render the capability table in settings (eventually), and
 /// tests use it to assert there are no holes in the matrix.
-pub const KNOWN_PROVIDERS: &[&str] = &["claude", "codex", "cursor", "opencode", "copilot"];
+pub const KNOWN_PROVIDERS: &[&str] = &[
+    "claude", "codex", "cursor", "opencode", "copilot", "mimo", "kimi",
+];
 
 #[cfg(test)]
 mod tests {
@@ -198,10 +177,6 @@ mod tests {
                 !caps.display_name.is_empty(),
                 "{provider}: display_name must not be empty"
             );
-            assert!(
-                caps.permission_modes.contains(&PermissionMode::Default),
-                "{provider}: every provider must support the 'default' permission mode"
-            );
         }
     }
 
@@ -218,15 +193,6 @@ mod tests {
         assert!(caps.supports_steer);
         assert!(caps.supports_slash_commands);
         assert!(!caps.requires_api_key, "Claude uses embedded login");
-        assert_eq!(
-            caps.permission_modes,
-            vec![
-                PermissionMode::Default,
-                PermissionMode::AcceptEdits,
-                PermissionMode::Plan,
-                PermissionMode::BypassPermissions,
-            ]
-        );
     }
 
     #[test]
@@ -242,19 +208,16 @@ mod tests {
         assert!(caps.supports_steer);
         assert!(caps.supports_slash_commands);
         assert!(!caps.requires_api_key, "Codex uses embedded login");
-        // Codex doesn't expose `acceptEdits` / `plan` — only the two
-        // bypass-or-default modes its sidecar understands.
-        assert_eq!(
-            caps.permission_modes,
-            vec![PermissionMode::Default, PermissionMode::BypassPermissions]
-        );
     }
 
     #[test]
     fn cursor_capabilities() {
         let caps = capabilities_for_provider("cursor");
         assert_eq!(caps.provider, "cursor");
-        assert!(!caps.supports_plan_mode);
+        assert!(
+            caps.supports_plan_mode,
+            "Cursor plan mode surfaces createPlan as a plan-review card"
+        );
         assert!(!caps.supports_active_goal);
         assert!(
             !caps.supports_context_usage,
@@ -263,7 +226,6 @@ mod tests {
         assert!(!caps.supports_steer);
         assert!(caps.supports_slash_commands);
         assert!(caps.requires_api_key, "Cursor authenticates via API key");
-        assert_eq!(caps.permission_modes, vec![PermissionMode::Default]);
     }
 
     #[test]
@@ -283,14 +245,46 @@ mod tests {
         assert!(caps.supports_steer);
         assert!(caps.supports_slash_commands);
         assert!(!caps.requires_api_key, "opencode uses embedded login");
+    }
+
+    #[test]
+    fn mimo_capabilities() {
+        let caps = capabilities_for_provider("mimo");
+        assert_eq!(caps.provider, "mimo");
         assert_eq!(
-            caps.permission_modes,
-            vec![
-                PermissionMode::Default,
-                PermissionMode::AcceptEdits,
-                PermissionMode::Plan,
-                PermissionMode::BypassPermissions,
-            ]
+            caps.display_name, "MiMo Code",
+            "must not fall back to Claude"
+        );
+        assert!(
+            caps.supports_plan_mode,
+            "mimo inherits opencode's read-only plan agent"
+        );
+        assert!(!caps.supports_active_goal, "mimo has no /goal loop");
+        assert!(caps.supports_context_usage);
+        assert!(caps.supports_steer);
+        assert!(caps.supports_slash_commands);
+        assert!(!caps.requires_api_key, "mimo uses embedded login");
+    }
+
+    #[test]
+    fn kimi_capabilities() {
+        let caps = capabilities_for_provider("kimi");
+        assert_eq!(caps.provider, "kimi");
+        assert_eq!(caps.display_name, "Kimi", "must not fall back to Claude");
+        assert!(!caps.supports_plan_mode, "kimi plan mode not wired in v1");
+        assert!(!caps.supports_active_goal);
+        assert!(
+            !caps.supports_context_usage,
+            "kimi context ring not wired in v1"
+        );
+        assert!(!caps.supports_steer, "ACP allows one foreground turn");
+        assert!(
+            caps.supports_slash_commands,
+            "ACP available_commands_update feeds the popup"
+        );
+        assert!(
+            !caps.requires_api_key,
+            "kimi uses the embedded login terminal"
         );
     }
 
@@ -311,11 +305,6 @@ mod tests {
             !caps.requires_api_key,
             "Copilot authenticates via CLI subscription login"
         );
-        // Codex-style two-mode dropdown.
-        assert_eq!(
-            caps.permission_modes,
-            vec![PermissionMode::Default, PermissionMode::BypassPermissions]
-        );
     }
 
     #[test]
@@ -328,7 +317,6 @@ mod tests {
         let claude = capabilities_for_provider("claude");
         assert_eq!(caps.provider, claude.provider);
         assert_eq!(caps.supports_plan_mode, claude.supports_plan_mode);
-        assert_eq!(caps.permission_modes, claude.permission_modes);
     }
 
     /// Wire-format gate: the frontend reads the capability shape
@@ -346,22 +334,7 @@ mod tests {
         assert!(json.get("supportsSteer").is_some());
         assert!(json.get("supportsSlashCommands").is_some());
         assert!(json.get("requiresApiKey").is_some());
-        assert!(json.get("permissionModes").is_some());
         let raw = serde_json::to_string(&caps).unwrap();
         assert!(!raw.contains('_'), "snake_case field leaked: {raw}");
-    }
-
-    #[test]
-    fn permission_mode_serializes_to_sdk_wire_strings() {
-        for (mode, wire) in [
-            (PermissionMode::Default, "default"),
-            (PermissionMode::AcceptEdits, "acceptEdits"),
-            (PermissionMode::Plan, "plan"),
-            (PermissionMode::BypassPermissions, "bypassPermissions"),
-        ] {
-            assert_eq!(mode.as_str(), wire);
-            let json = serde_json::to_string(&mode).unwrap();
-            assert_eq!(json, format!("\"{wire}\""));
-        }
     }
 }

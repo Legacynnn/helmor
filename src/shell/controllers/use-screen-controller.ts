@@ -1,23 +1,22 @@
-import { useCallback, useMemo, useState } from "react";
+// Top-level SCREEN controller (Dashboard / Tasks / History).
+//
+// Re-homed onto TanStack Router after the navigation merge: the active screen
+// now lives in the router's `?screen` search param instead of the fork's
+// original `useState` + `localStorage` store. The PUBLIC SHAPE is unchanged
+// (`ActiveScreen` with its sentinel "none", `ScreenActions`, `ScreenController`)
+// so every consumer — `app-shell.tsx`, `app-shell-layout.tsx`,
+// `shell-sidebar-pane.tsx`, `screen-host.tsx`, and the Dashboard container —
+// keeps working verbatim. Only the storage backing changed: "none" maps to "no
+// `?screen` param", and the three real screens map to the param value.
 
-export type ActiveScreen = "none" | "dashboard" | "tasks" | "history";
+import { useCallback, useMemo } from "react";
+import type { ScreenParam } from "@/router/index";
+import {
+	setRouterActiveScreen,
+	useRouterActiveScreen,
+} from "@/router/use-router-screen";
 
-const STORAGE_KEY = "helmor.activeScreen";
-const VALID: readonly ActiveScreen[] = [
-	"none",
-	"dashboard",
-	"tasks",
-	"history",
-];
-
-function readStored(): ActiveScreen {
-	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
-		return VALID.includes(raw as ActiveScreen) ? (raw as ActiveScreen) : "none";
-	} catch {
-		return "none";
-	}
-}
+export type ActiveScreen = "none" | ScreenParam;
 
 export type ScreenActions = {
 	setActiveScreen(screen: ActiveScreen): void;
@@ -30,22 +29,18 @@ export type ScreenController = {
 };
 
 export function useScreenController(): ScreenController {
-	const [activeScreen, setActiveScreenState] =
-		useState<ActiveScreen>(readStored);
+	// `null` (no `?screen` param) is the "no top-level screen" state, surfaced to
+	// consumers as the legacy "none" sentinel.
+	const routerScreen = useRouterActiveScreen();
+	const activeScreen: ActiveScreen = routerScreen ?? "none";
 
 	const setActiveScreen = useCallback((screen: ActiveScreen) => {
-		setActiveScreenState(screen);
-		try {
-			localStorage.setItem(STORAGE_KEY, screen);
-		} catch {
-			// ignore persistence failures (private mode, etc.)
-		}
+		// "none" clears the param (drops back to the conversation/start surface);
+		// any real screen writes it.
+		setRouterActiveScreen(screen === "none" ? null : screen);
 	}, []);
 
-	const openWorkspaceView = useCallback(
-		() => setActiveScreen("none"),
-		[setActiveScreen],
-	);
+	const openWorkspaceView = useCallback(() => setRouterActiveScreen(null), []);
 
 	const screenActions = useMemo<ScreenActions>(
 		() => ({ setActiveScreen, openWorkspaceView }),

@@ -1,7 +1,6 @@
-import { memo, type ReactNode, useEffect, useRef } from "react";
+import { memo, type ReactNode, useEffect, useState } from "react";
 import { SourceDetailView } from "@/features/source-detail";
-import { terminalAgentLabel } from "@/features/terminals/agent-meta";
-import { TerminalSessionPane } from "@/features/terminals/terminal-session-pane";
+import { TerminalSessionPanel } from "@/features/terminal/terminal-session-panel";
 import type {
 	AgentProvider,
 	ChangeRequestInfo,
@@ -10,6 +9,7 @@ import type {
 } from "@/lib/api";
 import { HelmorProfiler } from "@/lib/dev-react-profiler";
 import type { ContextCard } from "@/lib/sources/types";
+import { cn } from "@/lib/utils";
 import type { WorkspaceScriptType } from "@/lib/workspace-script-actions";
 import { WorkspacePanelHeader } from "./header";
 import { EmptyState, preloadStreamdown } from "./message-components";
@@ -54,7 +54,6 @@ type WorkspacePanelProps = {
 	headerActions?: ReactNode;
 	headerLeading?: ReactNode;
 	newSessionShortcut?: string | null;
-	newTerminalShortcut?: string | null;
 	missingScriptTypes?: WorkspaceScriptType[];
 	onInitializeScript?: (scriptType: WorkspaceScriptType) => void;
 };
@@ -87,7 +86,6 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	headerActions,
 	headerLeading,
 	newSessionShortcut,
-	newTerminalShortcut,
 	missingScriptTypes = [],
 	onInitializeScript,
 }: WorkspacePanelProps) {
@@ -98,23 +96,28 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 		sessionPanes[0] ??
 		null;
 
-	// Terminal sessions: a pane spawns its PTY on first selection and then
-	// stays mounted (CSS-hidden) so scrollback survives tab switches. The
-	// `openedTerminalIds` ref remembers which sessions have been opened —
-	// without it every terminal tab would spawn its agent CLI eagerly.
-	const selectedIsTerminal = selectedSession?.sessionKind === "terminal";
-	const openedTerminalIds = useRef<Set<string>>(new Set());
-	if (selectedIsTerminal && selectedSessionId) {
-		openedTerminalIds.current.add(selectedSessionId);
-	}
-	const visibleSessionIds = new Set(sessions.map((session) => session.id));
-	for (const id of [...openedTerminalIds.current]) {
-		if (!visibleSessionIds.has(id)) openedTerminalIds.current.delete(id);
-	}
-	const mountedTerminalSessions = sessions.filter(
+	// Terminal panels stay MOUNTED across session switches (CSS-hidden, like
+	// the inspector terminals). Unmount + chunk-replay cannot reproduce a TUI's
+	// incremental ANSI rendering — cursor-relative sequences replayed against a
+	// fresh screen / different size corrupt the layout. Track every terminal
+	// session the user has visited; it unmounts only when its session closes.
+	const visibleTerminalId =
+		!contextPreviewActive && selectedSession?.sessionKind === "terminal"
+			? selectedSession.id
+			: null;
+	const [visitedTerminalIds, setVisitedTerminalIds] = useState<
+		ReadonlySet<string>
+	>(new Set());
+	useEffect(() => {
+		if (!visibleTerminalId) return;
+		setVisitedTerminalIds((prev) =>
+			prev.has(visibleTerminalId) ? prev : new Set(prev).add(visibleTerminalId),
+		);
+	}, [visibleTerminalId]);
+	const terminalSessions = sessions.filter(
 		(session) =>
 			session.sessionKind === "terminal" &&
-			openedTerminalIds.current.has(session.id),
+			(visitedTerminalIds.has(session.id) || session.id === visibleTerminalId),
 	);
 
 	useEffect(() => {
@@ -170,34 +173,38 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 					onWorkspaceChanged={onWorkspaceChanged}
 					onRequestCloseSession={onRequestCloseSession}
 					newSessionShortcut={newSessionShortcut}
-					newTerminalShortcut={newTerminalShortcut}
 				/>
 
 				<div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-					{workspace
-						? mountedTerminalSessions.map((session) => (
-								<TerminalSessionPane
-									key={session.id}
-									sessionId={session.id}
-									repoId={workspace.repoId}
-									workspaceId={workspace.id}
-									agentLabel={terminalAgentLabel(session.agentType)}
-									initialStatus={session.status}
-									isActive={
-										selectedIsTerminal &&
-										session.id === selectedSessionId &&
-										!contextPreviewActive
-									}
-								/>
-							))
-						: null}
+					{terminalSessions.map((session) => (
+						<div
+							key={session.id}
+							className={cn(
+								"min-h-0 flex-1 flex-col",
+								session.id === visibleTerminalId ? "flex" : "hidden",
+							)}
+						>
+							<TerminalSessionPanel
+								repoId={workspace?.repoId ?? null}
+								workspaceId={session.workspaceId}
+								sessionId={session.id}
+								agentKind={session.agentType}
+								providerSessionId={session.providerSessionId}
+								isActive={session.id === visibleTerminalId}
+								workspaceReady={Boolean(
+									workspace && workspace.state !== "initializing",
+								)}
+							/>
+						</div>
+					))}
 					{contextPreviewActive && contextPreviewCard ? (
 						<div className="min-h-0 flex-1 overflow-hidden px-0 pt-4 pb-3">
 							<SourceDetailView card={contextPreviewCard} />
 						</div>
-					) : selectedIsTerminal ? null : activePane?.hasLoaded ? (
+					) : visibleTerminalId ? null : activePane?.hasLoaded ? (
 						<ActiveThreadViewport
 							hasSession={!!selectedSession}
+							workspaceName={workspace?.directoryName ?? null}
 							pane={activePane}
 							missingScriptTypes={missingScriptTypes}
 							onInitializeScript={onInitializeScript}
@@ -209,6 +216,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 							<EmptyState
 								workspaceState={workspace?.state ?? null}
 								hasSession={!!selectedSession}
+								workspaceName={workspace?.directoryName ?? null}
 								missingScriptTypes={missingScriptTypes}
 								onInitializeScript={onInitializeScript}
 							/>

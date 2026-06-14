@@ -20,7 +20,7 @@ const baseSession: WorkspaceSessionSummary = {
 	isHidden: false,
 	actionKind: null,
 	active: true,
-	sessionKind: "chat",
+	sessionKind: "gui",
 };
 
 describe("shouldConfirmRunningSessionClose", () => {

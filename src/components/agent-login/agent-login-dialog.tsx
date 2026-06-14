@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
 	ClaudeColorIcon,
 	GithubCopilotIcon,
+	KimiIcon,
+	MiMoCodeIcon,
 	OpenAIIcon,
 	OpenCodeIcon,
 } from "@/components/icons";
@@ -24,6 +26,10 @@ function providerIcon(provider: AgentLoginProvider) {
 		return <OpenCodeIcon className={`${className} text-foreground`} />;
 	if (provider === "copilot")
 		return <GithubCopilotIcon className={`${className} text-foreground`} />;
+	if (provider === "kimi")
+		return <KimiIcon className={`${className} text-foreground`} />;
+	if (provider === "mimo")
+		return <MiMoCodeIcon className={`${className} text-foreground`} />;
 	return <OpenAIIcon className={`${className} text-foreground`} />;
 }
 

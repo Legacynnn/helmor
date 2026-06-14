@@ -13,6 +13,7 @@ import { useAppShellState } from "@/shell/hooks/use-app-shell-state";
 import { AppShellLayout } from "./app-shell-layout";
 import { WorkspaceHeaderActions } from "./workspace-header-actions";
 import { WorkspaceHeaderLeading } from "./workspace-header-leading";
+import { buildWorkspacePaneProps } from "./workspace-pane-props";
 
 export function AppShell({
 	onOpenSettings,
@@ -25,9 +26,15 @@ export function AppShell({
 }) {
 	const s = useAppShellState({ onOpenSettings });
 	const { sel, data, chrome, panels } = s;
+	// Router-owned selection (Stage 3b) — same primitives `useAppShellState`
+	// threads into the data/chrome layers, so the P1-A header memo deps below
+	// see byte-identical values, just sourced from the router.
+	const selectedWorkspaceId = s.selectedWorkspaceId;
+	// Top-level screen state (Dashboard/Tasks/History), also router-backed now —
+	// it lives in the `?screen` search param (see `useScreenController`).
 	const screen = useScreenController();
 	// Selecting a workspace from the always-visible sidebar must drop any active
-	// top-level screen (Dashboard/Tasks/History) so the conversation surfaces.
+	// top-level screen so the conversation surfaces.
 	const handleSelectWorkspace = useCallback(
 		(workspaceId: string | null) => {
 			screen.screenActions.openWorkspaceView();
@@ -35,8 +42,6 @@ export function AppShell({
 		},
 		[screen.screenActions, sel.handleSelectWorkspace],
 	);
-	const selectedWorkspaceId = sel.selection.selectedWorkspaceId;
-	const selectedSessionId = sel.selection.selectedSessionId;
 	const inspectorCollapsed = sel.contextPanel.inspectorCollapsed;
 	const setInspectorCollapsed = sel.contextPanelActions.setInspectorCollapsed;
 
@@ -52,10 +57,7 @@ export function AppShell({
 			<WorkspaceHeaderLeading
 				appUpdateStatus={s.appUpdateStatus}
 				leftSidebarToggleShortcut={chrome.leftSidebarToggleShortcut}
-				miniModePending={chrome.miniModePending}
-				miniModeToggleShortcut={chrome.miniModeToggleShortcut}
 				showOnDesktop={panels.sidebarCollapsed}
-				onToggleMiniMode={chrome.handleToggleMiniMode}
 				onExpandSidebar={() => panels.setSidebarCollapsed(false)}
 			/>
 		),
@@ -63,9 +65,6 @@ export function AppShell({
 			panels.sidebarCollapsed,
 			s.appUpdateStatus,
 			chrome.leftSidebarToggleShortcut,
-			chrome.miniModePending,
-			chrome.miniModeToggleShortcut,
-			chrome.handleToggleMiniMode,
 		],
 	);
 	const headerActionsNode = useMemo(
@@ -73,7 +72,6 @@ export function AppShell({
 			selectedWorkspaceId ? (
 				<WorkspaceHeaderActions
 					workspaceId={selectedWorkspaceId}
-					sessionId={selectedSessionId}
 					installedEditors={chrome.installedEditors}
 					preferredEditor={chrome.preferredEditor}
 					openPreferredEditorShortcut={chrome.openPreferredEditorShortcut}
@@ -90,7 +88,6 @@ export function AppShell({
 			) : undefined,
 		[
 			selectedWorkspaceId,
-			selectedSessionId,
 			chrome.installedEditors,
 			chrome.preferredEditor,
 			chrome.openPreferredEditorShortcut,
@@ -114,7 +111,7 @@ export function AppShell({
 			onFeedbackOpenChange={s.setFeedbackOpen}
 			onOpenSettings={data.handleOpenSettings}
 			onSubmitFeedbackPrompt={data.submitFeedbackPrompt}
-			workspaceViewMode={sel.selection.viewMode}
+			workspaceViewMode={s.workspaceViewMode}
 			activeScreen={screen.activeScreen}
 			sidebar={{
 				activeScreen: screen.activeScreen,
@@ -131,14 +128,11 @@ export function AppShell({
 				leftSidebarToggleShortcut: chrome.leftSidebarToggleShortcut,
 				appUpdateStatus: s.appUpdateStatus,
 				appSettings: s.appSettings,
-				miniModePending: chrome.miniModePending,
-				miniModeToggleShortcut: chrome.miniModeToggleShortcut,
 				onSelectWorkspace: handleSelectWorkspace,
 				onOpenNewWorkspace: s.handleOpenWorkspaceStart,
 				onAddRepositoryNeedsStart:
 					sel.startSurfaceActions.addRepositoryNeedsStart,
 				onMoveLocalToWorktree: sel.startSurfaceActions.moveLocalToWorktree,
-				onToggleMiniMode: chrome.handleToggleMiniMode,
 				onCollapseSidebar: () => panels.setSidebarCollapsed(true),
 				onOpenFeedback: () => s.setFeedbackOpen(true),
 				onOpenSettings: data.handleOpenSettings,
@@ -147,54 +141,11 @@ export function AppShell({
 			sidebarCollapsed={panels.sidebarCollapsed}
 			isSidebarResizing={panels.isSidebarResizing}
 			sidebarWidth={panels.sidebarWidth}
-			workspacePane={{
-				workspaceViewMode: sel.selection.viewMode,
-				editorSession: data.editorSession,
-				workspaceRootPath: data.workspaceRootPath,
-				appShortcuts: s.appSettings.shortcuts,
-				sidebarCollapsed: panels.sidebarCollapsed,
-				contextPanelOpen: sel.contextPanel.contextPanelOpen,
-				handleEditorSessionChange: data.handleEditorSessionChange,
-				editorSessionActions: data.editorSessionActions,
-				repositories: s.repositories,
-				selectionActions: sel.selectionActions,
-				readStateActions: data.readStateActions,
-				pendingQueueActions: data.pendingQueueActions,
-				contextPanelActions: sel.contextPanelActions,
-				startSurfaceActions: sel.startSurfaceActions,
-				activeStreams: data.activeStreams,
-				effectiveBusySessionIds: data.effectiveBusySessionIds,
-				effectiveStoppableSessionIds: data.effectiveStoppableSessionIds,
-				interactionRequiredSessionIds: data.interactionRequiredSessionIds,
-				pendingComposerInserts: data.pendingComposerInserts,
-				onSelectSession: sel.handleSelectSession,
-				onRequestCloseSession: data.requestCloseSession,
-				handlePendingPromptConsumed: data.handlePendingPromptConsumed,
-				queuePendingPromptForSession: data.queuePendingPromptForSession,
-				startRepository: sel.startSurface.startRepository,
-				startSourceBranch: sel.startSurface.startSourceBranch,
-				startBranches: sel.startSurface.startBranches,
-				startBranchesLoading: sel.startSurface.startBranchesLoading,
-				startMode: sel.startSurface.startMode,
-				startBranchIntent: sel.startSurface.startBranchIntent,
-				startPreviewCard: sel.contextPanel.startPreviewCard,
-				startComposerInsertTarget: sel.startSurface.startComposerInsertTarget,
-				startComposerContextKey: sel.startSurface.startComposerContextKey,
-				startCreateContext: s.startCreateContext,
-				startLinkedDirectoriesController:
-					sel.startSurface.startLinkedDirectoriesController,
-				repoId: data.selectedWorkspaceDetailQuery.data?.repoId ?? null,
-				sessionSelectionHistory: s.sessionSelectionHistory,
-				workspaceChangeRequest: data.workspaceChangeRequest,
-				pendingPromptForSession: data.pendingPromptForSession,
-				pendingCreatedWorkspaceSubmit: sel.pendingCreatedWorkspaceSubmit,
-				handlePendingCreatedWorkspaceSubmitConsumed:
-					data.handlePendingCreatedWorkspaceSubmitConsumed,
-				contextPreviewCard: sel.contextPanel.workspacePreviewCard,
-				contextPreviewActive: sel.contextPanel.workspacePreviewActive,
+			workspacePane={buildWorkspacePaneProps({
+				s,
 				headerLeadingNode,
 				headerActionsNode,
-			}}
+			})}
 			rightSidebarAvailable={sel.contextPanel.rightSidebarAvailable}
 			selectedWorkspaceDetail={data.selectedWorkspaceDetail}
 			inspector={{
@@ -222,6 +173,10 @@ export function AppShell({
 				onOpenStartContextCard: sel.contextPanelActions.openStartContextCard,
 				onOpenWorkspaceContextCard:
 					sel.contextPanelActions.openWorkspaceContextCard,
+				// Settle-gated id for the inspector's git-diff. Matches the settled
+				// `selectedWorkspaceDetail` / `workspaceRootPath` below so the diff
+				// query key stays internally consistent during a rapid-switch burst.
+				workspaceId: s.settledWorkspaceId,
 				workspaceRootPath: data.workspaceRootPath,
 				selectedWorkspaceDetail: data.selectedWorkspaceDetailQuery.data ?? null,
 				activeEditor: data.activeEditorTarget,
@@ -229,14 +184,17 @@ export function AppShell({
 				onOpenEditorFile: data.editorSessionActions.openFile,
 				onOpenFileReference: data.editorSessionActions.openFileReference,
 				onCommitAction: data.handleCommitAction,
-				onReviewAction: () =>
-					data.handleInspectorReviewAction({
-						modelId:
-							s.appSettings.reviewModelId ?? s.appSettings.defaultModelId,
+				onReviewAction: () => {
+					const reviewModel =
+						s.appSettings.reviewModel ?? s.appSettings.defaultModel;
+					return data.handleInspectorReviewAction({
+						modelId: reviewModel?.modelId ?? null,
+						provider: reviewModel?.provider ?? null,
 						effort: s.appSettings.reviewEffort ?? s.appSettings.defaultEffort,
 						fastMode:
 							s.appSettings.reviewFastMode ?? s.appSettings.defaultFastMode,
-					}),
+					});
+				},
 				onQueuePendingPromptForSession: data.queuePendingPromptForSession,
 				commitButtonMode: data.commitButtonMode,
 				commitButtonState: data.commitButtonState,
@@ -258,6 +216,7 @@ export function AppShell({
 				quickSwitch: data.quickSwitch,
 				liveWorkspaceRowMap: data.liveWorkspaceRowMap,
 				closeConfirmDialog: data.closeConfirmDialog,
+				terminalResumeDialog: data.terminalResumeDialog,
 				editorDiscardConfirmDialog: data.editorDiscardConfirmDialog,
 				mergeConfirmDialogNode: data.mergeConfirmDialogNode,
 			}}

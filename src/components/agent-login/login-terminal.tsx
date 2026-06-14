@@ -16,6 +16,8 @@ export const providerLabels: Record<AgentLoginProvider, string> = {
 	cursor: "Cursor",
 	opencode: "OpenCode",
 	copilot: "GitHub Copilot",
+	kimi: "Kimi",
+	mimo: "MiMo Code",
 };
 
 export function LoginTerminalPreview({

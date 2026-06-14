@@ -5,8 +5,9 @@ import {
 	type ShortcutHandler,
 	useAppShortcuts,
 } from "@/features/shortcuts/use-app-shortcuts";
-import { closeMainWindow } from "@/lib/api";
+import { closeMainWindow, hideQuickPanel } from "@/lib/api";
 import type { AppSettings } from "@/lib/settings";
+import { isQuickPanelWindow } from "@/lib/window-role";
 import type { ContextPanelActions } from "@/shell/controllers/use-context-panel-controller";
 import { publishShellEvent } from "@/shell/event-bus";
 import { clampZoom, ZOOM_STEP } from "@/shell/use-zoom";
@@ -59,7 +60,7 @@ export function useGlobalShortcutHandlers({
 	getCloseableCurrentSession: () => unknown;
 	handleCloseSelectedSession: () => Promise<void>;
 	handleCopyWorkspacePath: () => void;
-	handleCreateSession: () => Promise<void>;
+	handleCreateSession: () => Promise<string | null | undefined>;
 	handleCommitAction: (mode: WorkspaceCommitButtonMode) => Promise<void>;
 	handleInspectorCommitAction: (
 		mode: WorkspaceCommitButtonMode,
@@ -128,28 +129,36 @@ export function useGlobalShortcutHandlers({
 			{
 				id: "workspace.previous" as const,
 				callback: () => handleNavigateWorkspaces(-1),
+				repeatable: true,
 			},
 			{
 				id: "workspace.next" as const,
 				callback: () => handleNavigateWorkspaces(1),
+				repeatable: true,
 			},
 			{
 				id: "workspace.quickSwitchNext" as const,
 				callback: () => quickSwitch.open("next"),
+				// The quick-switch overlay lives in AppOverlays, which the quick
+				// panel doesn't mount — opening it there would set invisible state.
+				enabled: !isQuickPanelWindow,
 			},
 			{
 				id: "workspace.quickSwitchPrevious" as const,
 				callback: () => quickSwitch.open("previous"),
+				enabled: !isQuickPanelWindow,
 			},
 			{
 				id: "session.previous" as const,
 				callback: () => handleNavigateSessions(-1),
 				enabled: workspaceViewMode === "conversation",
+				repeatable: true,
 			},
 			{
 				id: "session.next" as const,
 				callback: () => handleNavigateSessions(1),
 				enabled: workspaceViewMode === "conversation",
+				repeatable: true,
 			},
 			{
 				id: "session.close" as const,
@@ -172,18 +181,15 @@ export function useGlobalShortcutHandlers({
 				enabled: workspaceViewMode === "conversation",
 			},
 			{
-				id: "session.newTerminal" as const,
-				callback: () =>
-					publishShellEvent({ type: "open-new-session", tab: "terminal" }),
-				enabled: workspaceViewMode === "conversation",
-			},
-			{
 				id: "session.reopenClosed" as const,
 				callback: () => void handleReopenClosedSession(),
 			},
 			{
 				id: "window.close" as const,
-				callback: () => void closeMainWindow(),
+				// In the quick panel "close window" dismisses the panel itself —
+				// it must never close the (possibly hidden) main window.
+				callback: () =>
+					void (isQuickPanelWindow ? hideQuickPanel() : closeMainWindow()),
 			},
 			{
 				id: "script.run" as const,
@@ -196,6 +202,8 @@ export function useGlobalShortcutHandlers({
 			{
 				id: "window.miniMode.toggle" as const,
 				callback: handleToggleMiniMode,
+				// Mini mode resizes the INVOKING window; meaningless for the panel.
+				enabled: !isQuickPanelWindow,
 			},
 			{
 				id: "sidebar.left.toggle" as const,
@@ -242,6 +250,15 @@ export function useGlobalShortcutHandlers({
 					workspaceViewMode === "conversation" || workspaceViewMode === "start",
 			},
 			{
+				id: "composer.toggleTerminalMode" as const,
+				callback: () => publishShellEvent({ type: "toggle-terminal-mode" }),
+				// Composer is the final gate; this just limits to surfaces with one.
+				enabled:
+					appSettings.enableTerminalMode &&
+					(workspaceViewMode === "conversation" ||
+						workspaceViewMode === "start"),
+			},
+			{
 				id: "composer.openModelPicker" as const,
 				callback: handleOpenModelPicker,
 				enabled: workspaceViewMode === "conversation",
@@ -278,6 +295,7 @@ export function useGlobalShortcutHandlers({
 		],
 		[
 			appSettings.zoomLevel,
+			appSettings.enableTerminalMode,
 			getCloseableCurrentSession,
 			handleCloseSelectedSession,
 			handleCopyWorkspacePath,

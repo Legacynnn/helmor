@@ -193,9 +193,7 @@ export function GitSectionHeader({
 				className="flex shrink-0 items-center gap-1.5"
 			>
 				{!showChangeRequest ? (
-					<span className={cn(INSPECTOR_SECTION_TITLE_CLASS, "translate-y-px")}>
-						Git
-					</span>
+					<span className={INSPECTOR_SECTION_TITLE_CLASS}>Git</span>
 				) : (
 					<ChangeRequestPill
 						changeRequest={changeRequest}
@@ -223,7 +221,7 @@ export function GitSectionHeader({
 								size="xs"
 								aria-label="Continue workspace"
 								className={cn(
-									"shrink-0 justify-start overflow-hidden self-center rounded-md border-dashed border-[var(--workspace-pr-merged-accent)] bg-transparent px-0 font-normal text-[var(--workspace-pr-merged-accent)] transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out hover:bg-transparent hover:text-[var(--workspace-pr-merged-accent)] hover:opacity-80",
+									"shrink-0 justify-start overflow-hidden self-center rounded-md border-dashed border-[var(--workspace-pr-merged-accent)] bg-transparent px-0 font-medium text-[var(--workspace-pr-merged-accent)] transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out hover:bg-transparent hover:text-[var(--workspace-pr-merged-accent)] hover:opacity-80",
 								)}
 								style={{ width: continueWidth }}
 								disabled={isContinuingWorkspace}

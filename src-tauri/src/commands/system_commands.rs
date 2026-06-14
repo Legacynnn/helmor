@@ -82,6 +82,8 @@ pub struct AgentLoginStatus {
     pub cursor: bool,
     pub opencode: bool,
     pub copilot: bool,
+    pub mimo: bool,
+    pub kimi: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub codex_provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -95,6 +97,8 @@ pub struct AgentVersions {
     pub claude: Option<String>,
     pub codex: Option<String>,
     pub opencode: Option<String>,
+    pub mimo: Option<String>,
+    pub kimi: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -141,17 +145,20 @@ pub struct ComponentsUpdateCheck {
     pub skills_error: Option<String>,
 }
 
-/// Where Helmor installs its managed CLI entrypoint on macOS.
+/// Where Helmor installs its managed CLI entrypoint. The OS-specific target
+/// path lives behind the `platform::cli_install` seam.
 fn cli_install_target() -> std::path::PathBuf {
-    std::path::PathBuf::from(format!(
-        "/usr/local/bin/{}",
-        crate::cli::installed_cli_name()
-    ))
+    crate::platform::cli_install::install_target(crate::cli::installed_cli_name())
 }
 
 /// Name of the compiled CLI binary produced by `cargo build --bin helmor-cli`.
+/// Windows appends the `.exe` extension that cargo emits.
 fn cli_source_binary_name() -> &'static str {
-    "helmor-cli"
+    if cfg!(windows) {
+        "helmor-cli.exe"
+    } else {
+        "helmor-cli"
+    }
 }
 
 fn bundled_cli_binary(app_exe: &std::path::Path) -> anyhow::Result<std::path::PathBuf> {
@@ -181,37 +188,11 @@ fn classify_cli_install(
     install_path: &std::path::Path,
     bundled_cli: &std::path::Path,
 ) -> CliInstallState {
-    let metadata = match std::fs::symlink_metadata(install_path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return CliInstallState::Missing;
-        }
-        Err(_) => return CliInstallState::Stale,
-    };
-
-    if !metadata.file_type().is_symlink() {
-        return CliInstallState::Stale;
-    }
-
-    let target = match std::fs::read_link(install_path) {
-        Ok(target) => target,
-        Err(_) => return CliInstallState::Stale,
-    };
-    let resolved_target = if target.is_absolute() {
-        target
-    } else {
-        install_path
-            .parent()
-            .unwrap_or_else(|| std::path::Path::new("/"))
-            .join(target)
-    };
-
-    match (
-        std::fs::canonicalize(resolved_target),
-        std::fs::canonicalize(bundled_cli),
-    ) {
-        (Ok(installed), Ok(expected)) if installed == expected => CliInstallState::Managed,
-        _ => CliInstallState::Stale,
+    use crate::platform::cli_install::ManagedCliStatus;
+    match crate::platform::cli_install::classify(install_path, bundled_cli) {
+        ManagedCliStatus::Managed => CliInstallState::Managed,
+        ManagedCliStatus::Stale => CliInstallState::Stale,
+        ManagedCliStatus::Missing => CliInstallState::Missing,
     }
 }
 
@@ -226,6 +207,63 @@ fn cli_status_for_paths(
             .then(|| install_path.display().to_string()),
         build_mode: crate::data_dir::data_mode_label().to_string(),
         install_state,
+    }
+}
+
+/// Startup self-heal for the managed CLI launcher. If `/usr/local/bin/helmor`
+/// exists but resolves to a DIFFERENT Helmor install (pre-update app path,
+/// moved bundle), re-link it to this app's CLI so the launcher always matches
+/// the running app version. Conservative on purpose:
+/// - `Missing` is left alone — the user never opted into the CLI.
+/// - A stale entry is only adopted when it already points at a Helmor CLI
+///   binary; a user's own same-named tool is never clobbered.
+/// - Never elevates: a permission failure logs and leaves Settings → CLI
+///   install as the explicit (elevating) repair path.
+/// - No-op in dev builds, which must not steal the production link.
+pub fn ensure_cli_install_current() {
+    if cfg!(debug_assertions) {
+        return;
+    }
+    let Ok(app_exe) = std::env::current_exe() else {
+        return;
+    };
+    let Ok(bundled_cli) = bundled_cli_binary(&app_exe) else {
+        return;
+    };
+    if !bundled_cli.is_file() {
+        return;
+    }
+    let install_path = cli_install_target();
+    use crate::platform::cli_install::ManagedCliStatus;
+    if crate::platform::cli_install::classify(&install_path, &bundled_cli)
+        != ManagedCliStatus::Stale
+    {
+        return;
+    }
+    let points_at_helmor_cli = std::fs::read_link(&install_path)
+        .map(|target| {
+            target
+                .file_name()
+                .map(|name| name == std::ffi::OsStr::new(cli_source_binary_name()))
+                .unwrap_or(false)
+        })
+        .unwrap_or(false);
+    if !points_at_helmor_cli {
+        return;
+    }
+    match try_install_symlink_unprivileged(&bundled_cli, &install_path) {
+        Ok(()) => {
+            tracing::info!(
+                install_path = %install_path.display(),
+                "CLI launcher pointed at an old install; re-linked to this app"
+            );
+        }
+        Err(error) => {
+            tracing::warn!(
+                %error,
+                "CLI launcher is stale but auto-repair failed; reinstall from Settings"
+            );
+        }
     }
 }
 
@@ -303,18 +341,9 @@ fn try_install_symlink_unprivileged(
         }
     }
 
-    #[cfg(unix)]
-    {
-        std::os::unix::fs::symlink(bundled_cli, install_path)
-            .with_context(|| format!("Failed to install CLI at {}", install_path.display()))?;
-        Ok(())
-    }
-
-    #[cfg(not(unix))]
-    {
-        let _ = bundled_cli;
-        anyhow::bail!("CLI installation via symlink is only supported on Unix.")
-    }
+    crate::platform::cli_install::create_managed_link(bundled_cli, install_path)
+        .with_context(|| format!("Failed to install CLI at {}", install_path.display()))?;
+    Ok(())
 }
 
 fn is_permission_denied(error: &anyhow::Error) -> bool {
@@ -379,6 +408,7 @@ fn build_elevated_install_script(
 
 /// Quote a path so it survives both `do shell script "..."` (AppleScript string
 /// literal) and the shell that AppleScript hands the script to.
+#[cfg(target_os = "macos")]
 fn applescript_shell_arg(path: &std::path::Path) -> String {
     let raw = path.display().to_string();
     // 1. Single-quote for the shell, escaping embedded single quotes via `'\''`.
@@ -438,6 +468,17 @@ fn helmor_skills_install_args(agents: &[&str]) -> Vec<String> {
     args
 }
 
+/// A `Command` that runs `npx` cross-platform. `resolve_for_spawn` finds the
+/// real executable (on Windows `npx` is a `.cmd`/`.ps1` shim that
+/// `CreateProcess` can't resolve from the bare name), and
+/// `configure_background_cli` keeps it from flashing a console window — this
+/// runs during the silent startup check.
+fn npx_command() -> Command {
+    let mut cmd = Command::new(crate::platform::executable::resolve_for_spawn("npx"));
+    crate::platform::process::configure_background_cli(&mut cmd);
+    cmd
+}
+
 fn helmor_skills_install_command(agents: &[&str]) -> String {
     let command_agents = if agents.is_empty() {
         vec!["claude-code", "codex"]
@@ -457,9 +498,12 @@ fn helmor_skills_status() -> anyhow::Result<HelmorSkillsStatus> {
             claude: claude_login_ready(),
             codex: codex_auth_status().ready,
             cursor: cursor_login_ready(),
-            // opencode/copilot readiness comes from the login-status path, not here.
+            // opencode/copilot/mimo readiness comes from the login-status path, not here.
             opencode: false,
             copilot: false,
+            mimo: false,
+            // kimi has no Helmor-skills install path; irrelevant here.
+            kimi: false,
             codex_provider: None,
             codex_auth_method: None,
         },
@@ -599,9 +643,11 @@ pub async fn install_helmor_skills() -> CmdResult<HelmorSkillsStatus> {
             claude: claude_login_ready(),
             codex: codex_auth_status().ready,
             cursor: cursor_login_ready(),
-            // opencode/copilot readiness comes from the login-status path, not here.
+            // opencode/copilot/mimo readiness comes from the login-status path, not here.
             opencode: false,
             copilot: false,
+            mimo: false,
+            kimi: false,
             codex_provider: None,
             codex_auth_method: None,
         };
@@ -615,7 +661,7 @@ pub async fn install_helmor_skills() -> CmdResult<HelmorSkillsStatus> {
             );
         }
 
-        let output = Command::new(crate::platform::executable::resolve_for_spawn("npx"))
+        let output = npx_command()
             .args(helmor_skills_install_args(&agents))
             .output()
             .with_context(|| format!("Failed to start skills installer. Try:\n  {command}"))?;
@@ -809,6 +855,8 @@ fn run_components_check_inner(force: bool) -> ComponentsUpdateCheck {
         cursor: cursor_login_ready(),
         opencode: false,
         copilot: false,
+        mimo: false,
+        kimi: false,
         codex_provider: None,
         codex_auth_method: None,
     };
@@ -849,7 +897,7 @@ fn run_components_check_inner(force: bool) -> ComponentsUpdateCheck {
 
 fn install_skills_silent(agents: &[&str]) -> anyhow::Result<()> {
     let command = helmor_skills_install_command(agents);
-    let output = Command::new(crate::platform::executable::resolve_for_spawn("npx"))
+    let output = npx_command()
         .args(helmor_skills_install_args(agents))
         .output()
         .with_context(|| format!("Failed to start skills installer. Try:\n  {command}"))?;
@@ -1168,6 +1216,8 @@ pub async fn get_agent_login_status() -> CmdResult<AgentLoginStatus> {
             cursor: cursor_login_ready(),
             opencode: opencode_login_ready(),
             copilot: copilot_login_ready(),
+            mimo: mimo_login_ready(),
+            kimi: kimi_login_ready(),
             codex_provider: codex.provider,
             codex_auth_method: codex.auth_method.map(str::to_string),
         })
@@ -1182,6 +1232,8 @@ pub async fn get_agent_versions() -> CmdResult<AgentVersions> {
             claude: agent_cli_version("claude"),
             codex: agent_cli_version("codex"),
             opencode: agent_cli_version("opencode"),
+            mimo: agent_cli_version("mimo"),
+            kimi: agent_cli_version("kimi"),
         })
     })
     .await
@@ -1242,6 +1294,17 @@ fn cursor_login_ready() -> bool {
         .unwrap_or(false)
 }
 
+/// Kimi "ready" = a non-empty credentials store under the kimi-code home
+/// (`$KIMI_CODE_HOME`, else `~/.kimi-code`), which `kimi login` populates.
+fn kimi_login_ready() -> bool {
+    let Some(home) = crate::provider::kimi::kimi_code_home() else {
+        return false;
+    };
+    std::fs::read_dir(home.join("credentials"))
+        .map(|mut entries| entries.next().is_some())
+        .unwrap_or(false)
+}
+
 /// Resolve the binary to spawn for an agent CLI subcommand.
 ///
 /// Prefers the bundled binary under `Helmor.app/Contents/Resources/vendor/`
@@ -1254,6 +1317,8 @@ fn resolve_agent_binary(provider: &str) -> PathBuf {
         "claude" => bundled.claude_bin,
         "codex" => bundled.codex_bin,
         "opencode" => bundled.opencode_bin,
+        "mimo" => bundled.mimo_bin,
+        "kimi" => bundled.kimi_bin,
         _ => None,
     };
     bundled_path.unwrap_or_else(|| crate::platform::executable::resolve_for_spawn(provider))
@@ -1261,11 +1326,19 @@ fn resolve_agent_binary(provider: &str) -> PathBuf {
 
 // Read from the sidecar-computed settings row, NOT `auth.json` (which misses env/config/Zen providers).
 fn opencode_login_ready() -> bool {
-    let raw = match crate::models::settings::load_setting_value("app.opencode_provider") {
+    slug_login_ready("app.opencode_provider")
+}
+
+fn mimo_login_ready() -> bool {
+    slug_login_ready("app.mimo_provider")
+}
+
+fn slug_login_ready(setting_key: &str) -> bool {
+    let raw = match crate::models::settings::load_setting_value(setting_key) {
         Ok(Some(value)) => value,
         Ok(None) => return false,
         Err(error) => {
-            tracing::debug!("Failed to read app.opencode_provider: {error}");
+            tracing::debug!("Failed to read {setting_key}: {error}");
             return false;
         }
     };
@@ -1427,6 +1500,9 @@ fn agent_login_command(provider: &str) -> anyhow::Result<String> {
         // Copilot CLI has no non-interactive login subcommand; launch the
         // TUI and the user authenticates via `/login` inside it.
         "copilot" => "",
+        "mimo" => "auth login",
+        // `kimi login` runs the device-code OAuth flow in the PTY.
+        "kimi" => "login",
         _ => anyhow::bail!("Unknown agent provider: {provider}"),
     };
     // Quote the resolved binary path so spaces in `Helmor.app` survive
@@ -1493,7 +1569,8 @@ pub async fn spawn_agent_login_terminal(
             instance_id = %instance_id,
             "spawn_agent_login_terminal: entering run_terminal_session"
         );
-        // Auto-type the login command via the run_terminal_session boot
+        // Auto-type the login command via the run_terminal_session boot input,
+        // in the active shell's syntax (PowerShell needs the call operator).
         // input — written synchronously to the PTY master right after
         // the shell registers, so a frontend re-render-driven
         // cleanup→respawn can't drop the bytes.
@@ -1507,6 +1584,7 @@ pub async fn spawn_agent_login_terminal(
             &context,
             channel.clone(),
             Some(&boot_input),
+            None,
         ) {
             tracing::warn!(
                 provider = %provider,
@@ -1813,6 +1891,7 @@ fn copy_image_file_to_clipboard(_path: &std::path::Path) -> anyhow::Result<()> {
     anyhow::bail!("Copying images is only supported on macOS")
 }
 
+#[cfg(target_os = "macos")]
 fn applescript_escape(input: &str) -> String {
     input.replace('\\', "\\\\").replace('"', "\\\"")
 }
@@ -1834,7 +1913,13 @@ fn base64_decode(input: &str) -> anyhow::Result<Vec<u8>> {
 #[tauri::command]
 pub async fn request_quit(app: tauri::AppHandle, force: bool) {
     tracing::info!(force, "request_quit invoked from frontend");
+    cleanup_before_exit(&app, force);
 
+    // Done: terminate the process.
+    app.exit(0);
+}
+
+pub fn cleanup_before_exit(app: &tauri::AppHandle, force: bool) {
     // 1. Stop filesystem watchers so no new events arrive.
     app.state::<git_watcher::GitWatcherManager>().shutdown();
 
@@ -1856,29 +1941,47 @@ pub async fn request_quit(app: tauri::AppHandle, force: bool) {
     //    Helmor itself spawned. Each handle's owning `run_script` thread
     //    reaps its own `Child`, so we just need to deliver the signal.
     let scripts = app.state::<ScriptProcessManager>();
-    let signaled = scripts.kill_all();
+    let kill_attempts = scripts.kill_all();
+
+    // Belt-and-suspenders: stamp only rows for processes we just proved gone.
+    // The per-process `record_ended` calls in `run_script_with_shell` cover
+    // the common case; this catches handles that did not make it through their
+    // reaper before app exit. Prior maybe-alive stale rows must remain open so
+    // the next launch can keep reporting them.
+    let confirmed_gone: Vec<_> = kill_attempts
+        .iter()
+        .filter(|attempt| attempt.gone)
+        .map(
+            |attempt| crate::workspace::runtime_registry::RuntimeProcessIdentity {
+                repo_id: attempt.repo_id.clone(),
+                workspace_id: attempt.workspace_id.clone(),
+                script_type: attempt.script_type.clone(),
+                pid: attempt.pid,
+                pgid: attempt.pgid,
+            },
+        )
+        .collect();
+
+    let signaled = kill_attempts.len();
     if signaled > 0 {
+        let timed_out = signaled.saturating_sub(confirmed_gone.len());
         tracing::info!(
             signaled,
+            confirmed_gone = confirmed_gone.len(),
+            timed_out,
             "request_quit: signaled live script/terminal handles"
         );
     }
 
-    // Belt-and-suspenders: stamp every still-open runtime registry
-    // row as ended, so the next launch's classification sweep
-    // doesn't waste cycles probing PIDs we've already terminated.
-    // The per-process `record_ended` calls in `run_script_with_shell`
-    // cover the common case; this catches handles that didn't make
-    // it through their reaper before app exit.
-    match crate::workspace::runtime_registry::record_all_ended() {
+    match crate::workspace::runtime_registry::record_processes_ended(&confirmed_gone) {
         Ok(0) => {}
         Ok(stamped) => tracing::debug!(
             stamped,
-            "request_quit: stamped runtime registry rows as ended"
+            "request_quit: stamped confirmed runtime registry rows as ended"
         ),
         Err(error) => tracing::warn!(
             %error,
-            "request_quit: failed to stamp runtime registry rows ended; \
+            "request_quit: failed to stamp confirmed runtime registry rows ended; \
              next launch's sweep will reclassify"
         ),
     }
@@ -1897,9 +2000,6 @@ pub async fn request_quit(app: tauri::AppHandle, force: bool) {
         )
     };
     sidecar.shutdown(cooperative, escalation);
-
-    // 5. Done — terminate the process.
-    app.exit(0);
 }
 
 // ---------------------------------------------------------------------------
@@ -2055,6 +2155,28 @@ mod tests {
         );
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn classify_cli_install_reports_managed_for_matching_shim() {
+        let tmp = tempdir().unwrap();
+        let bundled_cli = tmp.path().join("Helmor/helmor-cli.exe");
+        let install_path = tmp.path().join("bin/helmor.cmd");
+        fs::create_dir_all(bundled_cli.parent().unwrap()).unwrap();
+        fs::create_dir_all(install_path.parent().unwrap()).unwrap();
+        fs::write(&bundled_cli, "").unwrap();
+        fs::write(
+            &install_path,
+            format!("@echo off\r\n\"{}\" %*\r\n", bundled_cli.display()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            classify_cli_install(&install_path, &bundled_cli),
+            CliInstallState::Managed
+        );
+    }
+
+    #[cfg(unix)]
     #[test]
     fn classify_cli_install_reports_managed_for_matching_symlink() {
         let tmp = tempdir().unwrap();
@@ -2087,6 +2209,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn install_cli_symlink_replaces_stale_copy_with_managed_symlink() {
         let tmp = tempdir().unwrap();
@@ -2105,6 +2228,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn check_and_heal_cli_symlink_repoints_a_stale_link() {
         let tmp = tempdir().unwrap();
@@ -2151,6 +2275,7 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn applescript_shell_arg_quotes_plain_path() {
         assert_eq!(
@@ -2159,6 +2284,7 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn applescript_shell_arg_escapes_single_quote_for_shell_then_applescript() {
         // Shell-quote turns `'` into `'\''`; the embedded backslash then needs
@@ -2169,6 +2295,7 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn applescript_shell_arg_escapes_double_quote_and_backslash() {
         assert_eq!(
@@ -2257,6 +2384,11 @@ mod tests {
         );
     }
 
+    // macOS-only: exercises the `/usr/local/bin` sudo-elevation install path and
+    // asserts the macOS "administrator access / Retry" message. Windows installs
+    // a `.cmd` shim under %LOCALAPPDATA% with no elevation flow, so this scenario
+    // doesn't apply there.
+    #[cfg(target_os = "macos")]
     #[test]
     fn try_install_cli_silent_at_bails_with_friendly_message_on_permission_denied() {
         // Pick a parent that almost certainly isn't writable to the test

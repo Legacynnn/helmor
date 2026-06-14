@@ -31,7 +31,10 @@ import {
 	steerAgentStream,
 	stopAgentStream,
 } from "@/lib/api";
-import type { ComposerCustomTag } from "@/lib/composer-insert";
+import {
+	type ComposerCustomTag,
+	locatePastedTextRanges,
+} from "@/lib/composer-insert";
 import { extractError, isRecoverableByPurge } from "@/lib/errors";
 import {
 	agentModelSectionsQueryOptions,
@@ -56,32 +59,18 @@ import {
 } from "@/lib/workspace-helpers";
 import { useWorkspaceToast } from "@/lib/workspace-toast-context";
 import {
+	buildSessionContextPrompt,
+	type SessionContextReference,
+} from "../session-context-prompt";
+import {
 	createStreamEventDispatcher,
 	createStreamFlushers,
 	type StreamAccumulator,
 } from "./dispatch-stream-event";
-import { seedSessionTitle } from "./seed-session-title";
+import { buildTitleSeed, seedSessionTitle } from "./seed-session-title";
 
 const EMPTY_IMAGES: string[] = [];
 const EMPTY_FILES: string[] = [];
-
-function buildTitleSeed(prompt: string): string {
-	const normalized = prompt
-		.trim()
-		.split(/\r?\n/g)[0]
-		?.trim()
-		.replace(/\s+/g, " ");
-
-	if (!normalized) {
-		return "Untitled";
-	}
-
-	if (normalized.length <= 36) {
-		return normalized;
-	}
-
-	return `${normalized.slice(0, 33).trimEnd()}...`;
-}
 
 /**
  * Re-export from the streaming store — kept here so existing import
@@ -123,6 +112,9 @@ type SubmitPayload = {
 	 *  `prepareChatWorkspace` / `prepareWorkspaceFromRepo` as
 	 *  `seedSessionId`; other paths ignore it. */
 	provisionalSessionId?: string;
+	/** Start composer only: once the created workspace finalizes, open the
+	 *  prompt in the agent's TUI instead of streaming a GUI turn. */
+	terminalMode?: boolean;
 };
 
 export type ComposerSubmitPayload = SubmitPayload;
@@ -146,6 +138,9 @@ type UseConversationStreamingArgs = {
 	 *  follow-up routing and the queue-drain trigger; survives this
 	 *  hook's unmount/remount. */
 	activeStreams: readonly ActiveStreamSummary[];
+	getSessionContextReferences?: (
+		sessionId: string,
+	) => readonly SessionContextReference[];
 	onInteractionSessionsChange?: (
 		sessionWorkspaceMap: Map<string, string>,
 		interactionCounts: Map<string, number>,
@@ -164,6 +159,7 @@ export function useConversationStreaming({
 	followUpBehavior,
 	submitQueue,
 	activeStreams,
+	getSessionContextReferences,
 	onInteractionSessionsChange,
 	onSessionCompleted,
 	onSessionAborted,
@@ -176,24 +172,26 @@ export function useConversationStreaming({
 	// selectors below; mutations go through `streamingStore.<action>()`.
 	const streamingStore = useStreamingStore;
 	// Cross-context slices the interaction-tracking effect / queue / steer
-	// fallback read off; `useShallow` keeps these stable for the deps lists.
-	const pendingPermissionsByContext = useStreamingStore(
-		(state) => state.pendingPermissionsByContext,
-	);
-	const pendingUserInputByContext = useStreamingStore(
-		(state) => state.pendingUserInputByContext,
-	);
-	const planReviewByContext = useStreamingStore(
-		(state) => state.planReviewByContext,
-	);
-	const interactionWorkspaceByContext = useStreamingStore(
-		(state) => state.interactionWorkspaceByContext,
-	);
-	const sendingContextKeys = useStreamingStore(
-		(state) => state.sendingContextKeys,
-	);
-	const activeFastPreludes = useStreamingStore(
-		(state) => state.activeFastPreludes,
+	// fallback read off. Coalesced into a single `useShallow` subscription
+	// (was 6 separate store subscriptions): each field is a stable map/set
+	// reference, so a shallow compare of the bundle is identity-equivalent
+	// to the per-field reads while cutting the subscription count 6 → 1.
+	const {
+		pendingPermissionsByContext,
+		pendingUserInputByContext,
+		planReviewByContext,
+		interactionWorkspaceByContext,
+		sendingContextKeys,
+		activeFastPreludes,
+	} = useStreamingStore(
+		useShallow((state) => ({
+			pendingPermissionsByContext: state.pendingPermissionsByContext,
+			pendingUserInputByContext: state.pendingUserInputByContext,
+			planReviewByContext: state.planReviewByContext,
+			interactionWorkspaceByContext: state.interactionWorkspaceByContext,
+			sendingContextKeys: state.sendingContextKeys,
+			activeFastPreludes: state.activeFastPreludes,
+		})),
 	);
 	const activeSendError = useStreamingStore(
 		(state) => state.sendErrorsByContext[composerContextKey] ?? null,
@@ -844,8 +842,20 @@ export function useConversationStreaming({
 			// side persists to `session_messages` as the user_prompt body.
 			const promptPrefix =
 				isFirstUserMessage && !isCompactCommand
-					? resolveGeneralPreferencePrefix(repoPreferences)
+					? [
+							buildSessionContextPrompt(
+								getSessionContextReferences?.(targetSessionId) ?? [],
+							),
+							resolveGeneralPreferencePrefix(repoPreferences),
+						]
+							.filter((prefix): prefix is string => Boolean(prefix?.trim()))
+							.join("\n\n") || null
 					: null;
+			// Pasted-tag spans inside the prompt — rendered as tag chips (the
+			// composer badge, post-send) instead of inlining the full paste.
+			// Computed against `trimmedPrompt`, which is byte-identical to what
+			// the Rust side persists as the user_prompt body.
+			const pastedTexts = locatePastedTextRanges(trimmedPrompt, customTags);
 			const now = new Date().toISOString();
 			const userMessageId = crypto.randomUUID();
 			const optimisticUserMessage = createLiveThreadMessage({
@@ -855,6 +865,7 @@ export function useConversationStreaming({
 				createdAt: now,
 				files: filePaths,
 				images: imagePaths,
+				pastedTexts,
 			});
 			let titleSeed: string | null = null;
 			if (isFirstUserMessage && !isCompactCommand) {
@@ -885,13 +896,15 @@ export function useConversationStreaming({
 				clearFastPrelude(contextKey);
 			}
 
+			// Hoisted so the catch below can run cleanup() on an RPC reject
+			// (the stream's terminal-event path never fires in that case).
+			let cleanup: (() => void) | undefined;
 			try {
 				if (targetSessionId) {
 					void generateSessionTitle(
 						targetSessionId,
 						trimmedPrompt,
 						titleSeed,
-						model.provider,
 					).then((result) => {
 						if (result?.title || result?.branchRenamed) {
 							requestSidebarReconcile(queryClient);
@@ -924,9 +937,15 @@ export function useConversationStreaming({
 					pendingPartial: null,
 					needsFlush: false,
 					frameId: null,
+					fallbackTimerId: null,
 				};
 
-				const changesRefreshInterval = window.setInterval(() => {
+				// Refresh the Changes diff WHILE streaming. 7s (was 3s) cuts the
+				// recurring full Changes-section re-render burst during a turn;
+				// `cleanup` fires one FINAL refresh on stream end (any terminal arm
+				// or the RPC-reject catch) so the post-turn diff is fresh despite the
+				// longer interval.
+				const refreshChanges = () => {
 					if (!workingDirectory) return;
 					void queryClient.invalidateQueries({
 						queryKey: helmorQueryKeys.workspaceChanges(
@@ -934,17 +953,24 @@ export function useConversationStreaming({
 							targetWorkspaceId,
 						),
 					});
-				}, 3_000);
+				};
 
-				const { flushStreamMessages, scheduleFlush, cleanup } =
-					createStreamFlushers({
-						accumulator,
-						queryClient,
-						cacheSessionId,
-						userMessageId,
-						optimisticUserMessage,
-						changesRefreshInterval,
-					});
+				const changesRefreshInterval = window.setInterval(
+					refreshChanges,
+					7_000,
+				);
+
+				const flushers = createStreamFlushers({
+					accumulator,
+					queryClient,
+					cacheSessionId,
+					userMessageId,
+					optimisticUserMessage,
+					changesRefreshInterval,
+					onFinalChangesRefresh: refreshChanges,
+				});
+				const { flushStreamMessages, scheduleFlush } = flushers;
+				cleanup = flushers.cleanup;
 
 				await startAgentMessageStream(
 					{
@@ -961,6 +987,7 @@ export function useConversationStreaming({
 						userMessageId,
 						files: filePaths,
 						images: imagePaths,
+						pastedTexts: pastedTexts.length > 0 ? pastedTexts : null,
 					},
 					createStreamEventDispatcher({
 						contextKey,
@@ -1003,6 +1030,15 @@ export function useConversationStreaming({
 					}),
 				);
 			} catch (error) {
+				// LEAK FIX: the stream RPC rejected before the dispatcher's
+				// terminal event (done/error) could run cleanup(). cleanup()
+				// is the only thing that clears `changesRefreshInterval` (the
+				// 3s setInterval started above) and cancels the pending flush
+				// frame — without this call each failed send orphans a forever
+				// interval. `cleanup` is hoisted above the try so it's reachable
+				// here; it's idempotent (a later terminal event calling it again
+				// is a no-op).
+				cleanup?.();
 				console.error("[conversation] invoke error:", error);
 				const { code, message: errorMsg } = extractError(
 					error,
@@ -1042,6 +1078,7 @@ export function useConversationStreaming({
 			composerContextKey,
 			displayedSessionId,
 			displayedWorkspaceId,
+			getSessionContextReferences,
 			invalidateConversationQueries,
 			markSendingState,
 			pushToast,

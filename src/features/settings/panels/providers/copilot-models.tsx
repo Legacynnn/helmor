@@ -101,6 +101,7 @@ export function CopilotModels({
 				enabledSet={enabledSet}
 				available={available}
 				onToggle={toggle}
+				onClear={() => void persist({ enabledModelIds: [] })}
 				loading={isSyncing}
 				triggerClassName="min-w-0 flex-1"
 			/>

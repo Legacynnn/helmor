@@ -8,7 +8,6 @@ export type SettingsSection =
 	| "appearance"
 	| "model"
 	| "providers"
-	| "terminal-agents"
 	| "experimental"
 	| "import"
 	| "developer"

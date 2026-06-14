@@ -7,6 +7,7 @@ import {
 	listenAppUpdateStatus,
 } from "@/lib/api";
 import { openUrl } from "@/lib/platform-bridge";
+import { isQuickPanelWindow } from "@/lib/window-role";
 
 function toastIdForUpdate(status: AppUpdateStatus): string | null {
 	return status.update ? `app-update-${status.update.version}` : null;
@@ -66,6 +67,9 @@ export function useAppUpdater(): AppUpdateStatus | null {
 	const [status, setStatus] = useState<AppUpdateStatus | null>(null);
 
 	useEffect(() => {
+		// Update checks, download toasts and install actions are app-wide
+		// singletons — the main window owns them.
+		if (isQuickPanelWindow) return;
 		let cleanup: (() => void) | undefined;
 		let mounted = true;
 
@@ -86,6 +90,14 @@ export function useAppUpdater(): AppUpdateStatus | null {
 			.catch(() => {});
 		void listenAppUpdateStatus(handleStatus)
 			.then((unlisten) => {
+				// If the component unmounted before listen() resolved, the
+				// cleanup below already ran (cleanup was still undefined), so it
+				// could never call this unlisten — detach it now to avoid a
+				// leaked backend listener. Mirrors use-ui-sync-bridge.ts.
+				if (!mounted) {
+					unlisten();
+					return;
+				}
 				cleanup = unlisten;
 			})
 			.catch(() => {});

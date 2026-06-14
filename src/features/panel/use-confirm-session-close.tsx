@@ -1,6 +1,5 @@
 import { type QueryClient, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
-import { terminalAgentLabel } from "@/features/terminals/agent-meta";
 import {
 	findProviderCapabilities,
 	stopAgentStream,
@@ -119,9 +118,6 @@ export function useConfirmSessionClose({
 	const agentLabel = useMemo(() => {
 		if (!pending) {
 			return "Claude";
-		}
-		if (pending.session.sessionKind === "terminal") {
-			return terminalAgentLabel(pending.session.agentType);
 		}
 		const provider = pending.provider ?? pending.session.agentType ?? "";
 		// Data-driven display name — single source of truth in

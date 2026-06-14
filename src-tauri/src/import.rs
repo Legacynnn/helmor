@@ -414,9 +414,11 @@ fn import_workspace_db_records(conn: &Connection, workspace_id: &str) -> Result<
     )
     .context("Failed to import sessions")?;
 
-    // 3b. Remap legacy "opus-1m" model ID (CLI no longer accepts it)
+    // 3b. Remap legacy "opus-1m" model ID to the pinned Opus 4.8 1M wire id
+    // (CLI no longer accepts "opus-1m"; claude no longer uses the "default"
+    // sentinel).
     conn.execute(
-        "UPDATE main.sessions SET model = 'default' WHERE model = 'opus-1m' AND workspace_id = ?1",
+        "UPDATE main.sessions SET model = 'claude-opus-4-8[1m]' WHERE model = 'opus-1m' AND workspace_id = ?1",
         [workspace_id],
     )
     .ok();
@@ -648,15 +650,16 @@ fn resolve_source_branch(
         let conductor_ws = root.join("workspaces").join(repo_name).join(directory_name);
 
         if conductor_ws.is_dir() {
-            if let Ok(output) = std::process::Command::new("git")
-                .args([
-                    "-C",
-                    &conductor_ws.display().to_string(),
-                    "rev-parse",
-                    "--abbrev-ref",
-                    "HEAD",
-                ])
-                .output()
+            let mut command = std::process::Command::new("git");
+            command.args([
+                "-C",
+                &conductor_ws.display().to_string(),
+                "rev-parse",
+                "--abbrev-ref",
+                "HEAD",
+            ]);
+            if let Ok(output) =
+                crate::platform::process::configure_background_cli(&mut command).output()
             {
                 let actual = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 if !actual.is_empty()
@@ -778,6 +781,15 @@ fn import_column_lists(conn: &Connection, table: &str) -> Result<(String, String
 
     for col in &main_cols {
         // Coalesce post-migration NOT NULL columns so pre-triage source DBs import cleanly.
+        if table == "sessions" && col == "session_kind" {
+            main_parts.push(col.clone());
+            source_parts.push(if source_set.contains("session_kind") {
+                "COALESCE(session_kind, 'gui') AS session_kind".to_string()
+            } else {
+                "'gui' AS session_kind".to_string()
+            });
+            continue;
+        }
         if table == "session_messages" && col == "is_ai_priming" {
             main_parts.push(col.clone());
             source_parts.push(if source_set.contains("is_ai_priming") {
@@ -1030,10 +1042,22 @@ mod tests {
         assert_eq!(ws_count, 1);
         assert_eq!(sess_count, 2);
         assert_eq!(msg_count, 2);
+
+        // session_kind is NOT NULL in main; source rows leave it NULL, so the
+        // import must coalesce to 'gui' (else INSERT OR IGNORE drops the rows).
+        let kind: String = conn
+            .query_row(
+                "SELECT session_kind FROM main.sessions WHERE id = 's1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(kind, "gui");
     }
 
     #[test]
     fn import_workspace_db_records_skips_existing() {
+        let _env = crate::testkit::TestEnv::new("import-workspace-db-records-skips-existi");
         let (conn, _dir) = setup_test_db();
 
         conn.execute_batch(

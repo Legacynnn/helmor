@@ -387,5 +387,7 @@ function actionPriority(status: ActionStatusKind): number {
 			return 2;
 		case "success":
 			return 3;
+		default:
+			return 4;
 	}
 }

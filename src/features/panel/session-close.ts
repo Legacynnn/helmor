@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { clearPersistedDraft } from "@/features/composer/draft-storage";
-import { closeSession as closeTerminalSessionBuffer } from "@/features/terminals/terminal-session-store";
+import { closeTerminal } from "@/features/terminal/terminal-session-store";
 import {
 	createSession,
 	deleteSession,
@@ -54,13 +54,6 @@ export async function closeWorkspaceSession({
 		sessions.find((session) => session.id === sessionId) ?? null;
 	if (!targetSession) {
 		return false;
-	}
-
-	// Terminal sessions: kill the PTY and drop the scrollback buffer before
-	// touching the row. The row itself is hidden (not deleted) so a History
-	// restore can relaunch with the agent's resume flag.
-	if (targetSession.sessionKind === "terminal") {
-		closeTerminalSessionBuffer(sessionId);
 	}
 
 	const isEmptySession = isNewSession(targetSession);
@@ -122,6 +115,12 @@ export async function closeWorkspaceSession({
 		} else {
 			await hideSession(sessionId);
 			onSessionHidden?.(sessionId, workspace.id);
+		}
+
+		// Terminal sessions own a live PTY in the module store; closing the
+		// session must SIGTERM it (tab switches only detach + keep it alive).
+		if (targetSession.sessionKind === "terminal") {
+			closeTerminal(sessionId);
 		}
 
 		if (adjacentSessionId) {

@@ -101,7 +101,7 @@ const SESSIONS: WorkspaceSessionSummary[] = [
 		isHidden: false,
 		actionKind: null,
 		active: true,
-		sessionKind: "chat",
+		sessionKind: "gui",
 	},
 ];
 
@@ -207,7 +207,12 @@ describe("WorkspacePanel", () => {
 		);
 	});
 
-	it("optimistically seeds the new session before switching selection", async () => {
+	// TODO(upstream-merge): the fork's "New session" launcher popover (Conversation/
+	// Terminal tabs) was removed in favor of upstream's direct-create header button
+	// (`sessionActions.createSession()`), so the "New conversation" popover step and
+	// the prop-based optimistic-seed assertions no longer apply. Rewrite against
+	// upstream's hook-based create flow.
+	it.skip("optimistically seeds the new session before switching selection", async () => {
 		const user = userEvent.setup();
 		const queryClient = createHelmorQueryClient();
 		const onSelectSession = vi.fn();
@@ -366,12 +371,67 @@ describe("WorkspacePanel", () => {
 			"px-8",
 		);
 		const heading = within(centeredContainer!).getByText("Nothing here yet");
+		expect(heading).toHaveClass("text-foreground/70");
 		expect(heading.parentElement).toHaveClass(
 			"flex",
 			"max-w-sm",
 			"flex-col",
 			"items-center",
 			"gap-2",
+		);
+	});
+
+	it("shows star collection progress on the workspace name text button", async () => {
+		const user = userEvent.setup();
+
+		render(
+			<TooltipProvider delayDuration={0}>
+				<QueryClientProvider client={createHelmorQueryClient()}>
+					<WorkspacePanel
+						workspace={{ ...WORKSPACE, directoryName: "himalia" }}
+						sessions={SESSIONS}
+						selectedSessionId="session-1"
+						sessionPanes={[
+							{
+								sessionId: "session-1",
+								messages: [],
+								sending: false,
+								hasLoaded: true,
+								presentationState: "presented",
+							},
+						]}
+						sending={false}
+					/>
+				</QueryClientProvider>
+			</TooltipProvider>,
+		);
+
+		const workspaceButton = screen.getByRole("button", { name: "himalia" });
+		const alignedText = screen.getByText("New session in").parentElement;
+
+		expect(workspaceButton.querySelector("svg")).toBeNull();
+		expect(alignedText).toHaveClass(
+			"inline-flex",
+			"items-center",
+			"whitespace-nowrap",
+		);
+
+		await user.hover(workspaceButton);
+
+		const tooltip = await screen.findByRole("tooltip");
+		const tooltipContent = document.querySelector(
+			'[data-slot="tooltip-content"]',
+		);
+
+		expect(tooltip).toHaveTextContent("You've collected 122/185 stars!");
+		expect(tooltip.querySelector("svg")).not.toBeNull();
+		expect(tooltipContent).toHaveClass(
+			"flex",
+			"h-[24px]",
+			"items-center",
+			"px-2",
+			"text-small",
+			"leading-none",
 		);
 	});
 

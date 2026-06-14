@@ -6,6 +6,8 @@ import {
 	ClaudeIcon,
 	CursorIcon,
 	GithubCopilotIcon,
+	KimiIcon,
+	MiMoCodeIcon,
 	OpenAIIcon,
 	OpenCodeIcon,
 } from "@/components/icons";
@@ -56,11 +58,33 @@ export function buildAgentLoginItems(
 			status: resolve(status?.copilot),
 		},
 		{
+			icon: MiMoCodeIcon,
+			provider: "mimo",
+			label: "MiMo Code",
+			description: checking
+				? CHECKING_COPY
+				: status?.mimo
+					? "Connected and ready to run MiMo Code models in Helmor."
+					: "Sign in with `mimo auth login` to use MiMo Code models in Helmor.",
+			status: resolve(status?.mimo),
+		},
+		{
 			icon: OpenAIIcon,
 			provider: "codex",
 			label: "Codex",
 			description: checking ? CHECKING_COPY : codexDescription(status),
 			status: resolve(status?.codex),
+		},
+		{
+			icon: KimiIcon,
+			provider: "kimi",
+			label: "Kimi Code",
+			description: checking
+				? CHECKING_COPY
+				: status?.kimi
+					? "Signed in and ready to run Kimi models in Helmor."
+					: "Sign in with `kimi login` to use Kimi models in Helmor.",
+			status: resolve(status?.kimi),
 		},
 		{
 			icon: CursorIcon,

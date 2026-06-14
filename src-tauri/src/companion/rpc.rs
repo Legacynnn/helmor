@@ -50,6 +50,7 @@ async fn dispatch(
         "backfill_forge_repo_bindings" => to_value(crate::commands::forge_commands::backfill_forge_repo_bindings(app.clone()).await?),
         "cache_forge_avatar" => to_value(crate::commands::forge_commands::cache_forge_avatar(arg_string(&args, "url")?).await?),
         "check_for_app_update" => to_value(crate::commands::updater_commands::check_for_app_update(app.clone(), arg_opt_bool(&args, "force")).await?),
+        "cleanup_archived_workspaces" => to_value(crate::commands::workspace_commands::cleanup_archived_workspaces(app.clone()).await?),
         "clone_repository_from_url" => to_value(crate::commands::repository_commands::clone_repository_from_url(arg_string(&args, "gitUrl")?, arg_string(&args, "cloneDirectory")?).await?),
         "close_workspace_change_request" => to_value(crate::commands::forge_commands::close_workspace_change_request(arg_string(&args, "workspaceId")?, app.clone()).await?),
         "complete_workspace_setup" => {
@@ -57,17 +58,17 @@ async fn dispatch(
             Ok(Value::Null)
         }
         "continue_workspace_from_target_branch" => to_value(crate::commands::workspace_commands::continue_workspace_from_target_branch(app.clone(), arg_string(&args, "workspaceId")?).await?),
+        "convert_session_to_terminal" => {
+            crate::commands::terminal_commands::convert_session_to_terminal(arg_string(&args, "sessionId")?, arg_string(&args, "agentType")?).await?;
+            Ok(Value::Null)
+        }
         "create_and_checkout_branch" => {
             crate::commands::workspace_commands::create_and_checkout_branch(arg_string(&args, "repoId")?, arg_string(&args, "branch")?).await?;
             Ok(Value::Null)
         }
         "create_repo_run_action" => to_value(crate::commands::script_commands::create_repo_run_action(app.clone(), arg_string(&args, "repoId")?, arg_string(&args, "name")?, arg_string(&args, "command")?, arg_string(&args, "mode")?, arg_opt_string(&args, "stopCommand")).await?),
-        "create_session" => to_value(crate::commands::session_commands::create_session(arg_string(&args, "workspaceId")?, arg_opt_json(&args, "actionKind")?, arg_opt_string(&args, "permissionMode"), arg_opt_string(&args, "model"), arg_opt_string(&args, "effortLevel"), arg_opt_bool(&args, "fastMode"), arg_opt_string(&args, "seedSessionId")).await?),
+        "create_session" => to_value(crate::commands::session_commands::create_session(arg_string(&args, "workspaceId")?, arg_opt_json(&args, "actionKind")?, arg_opt_string(&args, "permissionMode"), arg_opt_string(&args, "model"), arg_opt_string(&args, "effortLevel"), arg_opt_bool(&args, "fastMode"), arg_opt_string(&args, "seedSessionId"), arg_opt_string(&args, "sessionKind"), arg_opt_string(&args, "agentType")).await?),
         "create_workspace_from_repo" => to_value(crate::commands::workspace_commands::create_workspace_from_repo(app.clone(), arg_string(&args, "repoId")?).await?),
-        "delete_opencode_custom_provider" => {
-            crate::commands::opencode_config_commands::delete_opencode_custom_provider(arg_string(&args, "id")?).await?;
-            Ok(Value::Null)
-        }
         "delete_query_cache" => {
             crate::commands::system_commands::delete_query_cache(arg_string(&args, "key")?).await?;
             Ok(Value::Null)
@@ -103,8 +104,8 @@ async fn dispatch(
         "get_helmor_components_update_check" => to_value(crate::commands::system_commands::get_helmor_components_update_check().await?),
         "get_helmor_skills_status" => to_value(crate::commands::system_commands::get_helmor_skills_status().await?),
         "get_inbox_item_detail" => to_value(crate::commands::forge_commands::get_inbox_item_detail(arg_json(&args, "provider")?, arg_string(&args, "login")?, arg_opt_string(&args, "host"), arg_json(&args, "source")?, arg_string(&args, "externalId")?).await?),
+        "get_kimi_provider_config" => to_value(crate::commands::kimi_provider_commands::get_kimi_provider_config().await?),
         "get_live_context_usage" => to_value(crate::commands::session_commands::get_live_context_usage(app.state::<crate::sidecar::ManagedSidecar>(), arg_json(&args, "request")?).await?),
-        "get_opencode_custom_providers" => to_value(crate::commands::opencode_config_commands::get_opencode_custom_providers().await?),
         "get_repo_current_branch" => to_value(crate::commands::workspace_commands::get_repo_current_branch(arg_string(&args, "repoId")?).await?),
         "get_session_codex_goal" => to_value(crate::commands::session_commands::get_session_codex_goal(arg_string(&args, "sessionId")?).await?),
         "get_session_context_usage" => to_value(crate::commands::session_commands::get_session_context_usage(arg_string(&args, "sessionId")?).await?),
@@ -126,6 +127,38 @@ async fn dispatch(
         }
         "list_active_streams" => to_value(crate::agents::list_active_streams(app.state::<crate::agents::ActiveStreams>()).await?),
         "list_agent_model_sections" => to_value(crate::agents::list_agent_model_sections().await?),
+        "list_all_agent_model_sections" => {
+            to_value(crate::agents::list_all_agent_model_sections().await?)
+        }
+        "list_custom_providers" => to_value(
+            crate::commands::provider_commands::list_custom_providers(arg_string(&args, "family")?)
+                .await?,
+        ),
+        "upsert_custom_provider" => {
+            crate::commands::provider_commands::upsert_custom_provider(
+                arg_string(&args, "family")?,
+                arg_json(&args, "provider")?,
+            )
+            .await?;
+            Ok(Value::Null)
+        }
+        "remove_custom_provider" => {
+            crate::commands::provider_commands::remove_custom_provider(
+                arg_string(&args, "family")?,
+                arg_string(&args, "id")?,
+            )
+            .await?;
+            Ok(Value::Null)
+        }
+        "fetch_provider_models" => to_value(
+            crate::commands::provider_commands::fetch_provider_models(
+                arg_string(&args, "family")?,
+                arg_string(&args, "baseUrl")?,
+                arg_opt_string(&args, "apiKey").unwrap_or_default(),
+                arg_opt_string(&args, "apiStyle"),
+            )
+            .await?,
+        ),
         "list_archived_workspaces" => to_value(crate::commands::workspace_commands::list_archived_workspaces().await?),
         "list_branches_for_local_picker" => to_value(crate::commands::workspace_commands::list_branches_for_local_picker(arg_string(&args, "repoId")?).await?),
         "list_branches_for_workspace_picker" => to_value(crate::commands::workspace_commands::list_branches_for_workspace_picker(arg_string(&args, "repoId")?).await?),
@@ -133,12 +166,14 @@ async fn dispatch(
         "list_cursor_models" => to_value(crate::agents::list_cursor_models(app.state::<crate::sidecar::ManagedSidecar>(), arg_opt_string(&args, "apiKey")).await?),
         "list_editor_files" => to_value(crate::commands::editor_commands::list_editor_files(arg_string(&args, "workspaceRootPath")?).await?),
         "list_forge_accounts" => to_value(crate::commands::forge_commands::list_forge_accounts(arg_json(&args, "gitlabHosts")?).await?),
+        "check_workspace_forge_auth" => to_value(crate::commands::forge_commands::check_workspace_forge_auth(arg_string(&args, "workspaceId")?).await?),
         "list_forge_labels" => to_value(crate::commands::forge_commands::list_forge_labels(arg_json(&args, "provider")?, arg_string(&args, "login")?, arg_opt_string(&args, "host"), arg_json(&args, "repos")?).await?),
         "list_forge_logins" => to_value(crate::commands::forge_commands::list_forge_logins(arg_json(&args, "provider")?, arg_string(&args, "host")?, arg_opt_bool(&args, "forceRefresh")).await?),
         "list_hidden_sessions" => to_value(crate::commands::session_commands::list_hidden_sessions(arg_string(&args, "workspaceId")?).await?),
         "list_inbox_items" => to_value(crate::commands::forge_commands::list_inbox_items(arg_json(&args, "provider")?, arg_json(&args, "kind")?, arg_string(&args, "login")?, arg_opt_string(&args, "host"), arg_opt_string(&args, "cursor"), arg_opt_int(&args, "limit"), arg_opt_string(&args, "repo"), arg_opt_json(&args, "filters")?).await?),
         "list_inbox_kind_labels" => to_value(crate::commands::forge_commands::list_inbox_kind_labels(arg_json(&args, "provider")?).await?),
         "list_opencode_models" => to_value(crate::agents::list_opencode_models(app.state::<crate::sidecar::ManagedSidecar>(), None).await?),
+        "list_mimo_models" => to_value(crate::agents::list_mimo_models(app.state::<crate::sidecar::ManagedSidecar>(), None).await?),
         "list_provider_capabilities" => to_value(crate::agents::list_provider_capabilities().await?),
         "list_remote_branches" => to_value(crate::commands::workspace_commands::list_remote_branches(arg_opt_string(&args, "workspaceId"), arg_opt_string(&args, "repoId")).await?),
         "list_repo_remotes" => to_value(crate::commands::repository_commands::list_repo_remotes(arg_string(&args, "repoId")?).await?),
@@ -148,6 +183,7 @@ async fn dispatch(
         "list_slash_commands" => to_value(crate::agents::list_slash_commands(app.clone(), app.state::<crate::sidecar::ManagedSidecar>(), app.state::<crate::agents::SlashCommandCache>(), arg_json(&args, "request")?).await?),
         "list_workspace_candidate_directories" => to_value(crate::commands::workspace_commands::list_workspace_candidate_directories(arg_opt_string(&args, "excludeWorkspaceId")).await?),
         "list_workspace_changes" => to_value(crate::commands::editor_commands::list_workspace_changes(arg_string(&args, "workspaceRootPath")?, arg_opt_string(&args, "workspaceId")).await?),
+        "list_workspace_diff_stats" => to_value(crate::commands::editor_commands::list_workspace_diff_stats().await?),
         "list_workspace_files" => to_value(crate::commands::editor_commands::list_workspace_files(arg_string(&args, "workspaceRootPath")?).await?),
         "list_workspace_groups" => to_value(crate::commands::workspace_commands::list_workspace_groups().await?),
         "list_workspace_tree" => to_value(crate::commands::search_commands::list_workspace_tree(arg_string(&args, "workspaceRootPath")?).await?),
@@ -254,6 +290,17 @@ async fn dispatch(
             crate::commands::session_commands::set_session_draft(arg_string(&args, "sessionId")?, arg_opt_string(&args, "draftState")).await?;
             Ok(Value::Null)
         }
+        "set_terminal_session_busy" => {
+            crate::commands::terminal_commands::set_terminal_session_busy(
+                app.clone(),
+                arg_string(&args, "sessionId")?,
+                arg_string(&args, "workspaceId")?,
+                arg_opt_string(&args, "provider"),
+                arg_bool(&args, "busy")?,
+            )
+            .await?;
+            Ok(Value::Null)
+        }
         "set_workspace_active_run_action" => {
             crate::commands::script_commands::set_workspace_active_run_action(arg_string(&args, "workspaceId")?, arg_opt_string(&args, "actionId")).await?;
             Ok(Value::Null)
@@ -345,10 +392,6 @@ async fn dispatch(
         "update_repository_remote" => to_value(crate::commands::repository_commands::update_repository_remote(app.clone(), arg_string(&args, "repoId")?, arg_string(&args, "remote")?).await?),
         "update_session_settings" => {
             crate::commands::session_commands::update_session_settings(arg_string(&args, "sessionId")?, arg_opt_string(&args, "model"), arg_opt_string(&args, "effortLevel"), arg_opt_string(&args, "permissionMode"), arg_opt_bool(&args, "fastMode")).await?;
-            Ok(Value::Null)
-        }
-        "upsert_opencode_custom_provider" => {
-            crate::commands::opencode_config_commands::upsert_opencode_custom_provider(arg_json(&args, "provider")?, arg_bool(&args, "preset")?).await?;
             Ok(Value::Null)
         }
         "validate_archive_workspace" => to_value(crate::commands::workspace_commands::validate_archive_workspace(arg_string(&args, "workspaceId")?).await?),
@@ -454,6 +497,10 @@ async fn dispatch(
         // best-effort cleanup.
         |         "unsubscribe_ui_mutations"
         |         "copy_image_to_clipboard"
+        // macOS NSVisualEffectView blur (Vesper theme) is bound to the desktop
+        // NSWindow; a phone browser has no native window to vibrancy-coat.
+        |         "set_window_vibrancy"
+        |         "clear_window_vibrancy"
         |         "dev_reset_all_data"
         |         "enter_mini_window_mode"
         |         "enter_onboarding_window_mode"
@@ -471,6 +518,10 @@ async fn dispatch(
         |         "resize_repo_script"
         |         "reveal_path_in_finder"
         |         "show_image_in_finder"
+        // Quick-panel window management exists only on the desktop host.
+        |         "toggle_quick_panel"
+        |         "hide_quick_panel"
+        |         "reveal_workspace_in_main_window"
         |         "stop_agent_login_terminal"
         |         "stop_forge_cli_auth_terminal"
         |         "stop_repo_script"

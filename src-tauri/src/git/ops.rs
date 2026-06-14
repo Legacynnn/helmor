@@ -89,6 +89,7 @@ where
     if let Some(current_dir) = current_dir {
         command.current_dir(current_dir);
     }
+    crate::platform::process::configure_background_cli(&mut command);
 
     let output = command.output().context("Failed to run git")?;
     handle_git_output(output)
@@ -115,6 +116,7 @@ where
     if let Some(current_dir) = current_dir {
         command.current_dir(current_dir);
     }
+    crate::platform::process::configure_background_cli(&mut command);
 
     let output = command.output().context("Failed to run git")?;
     handle_git_output_raw(output)
@@ -1334,6 +1336,29 @@ pub fn verify_remote_ref_exists(workspace_dir: &Path, remote: &str, branch: &str
     }
 }
 
+/// Returns `true` when `<remote>` actually has a branch named `<branch>`.
+/// Network call (bounded by `GIT_NETWORK_TIMEOUT`). Used as a fallback when
+/// the local worktree has no remote-tracking ref but the branch may still be
+/// published — e.g. a push that never updated the local ref, or a pruned ref.
+pub fn remote_branch_exists(workspace_dir: &Path, remote: &str, branch: &str) -> bool {
+    let workspace_dir = workspace_dir.display().to_string();
+    run_git_with_timeout(
+        [
+            "-C",
+            workspace_dir.as_str(),
+            "ls-remote",
+            "--exit-code",
+            "--heads",
+            remote,
+            branch,
+        ],
+        None,
+        GIT_NETWORK_TIMEOUT,
+    )
+    .map(|output| !output.trim().is_empty())
+    .unwrap_or(false)
+}
+
 /// Resolve `refs/remotes/<remote>/<branch>` to its current commit SHA.
 pub fn remote_ref_sha(workspace_dir: &Path, remote: &str, branch: &str) -> Result<String> {
     let workspace_dir = workspace_dir.display().to_string();
@@ -1403,8 +1428,10 @@ pub fn stash_push_include_untracked(workspace_dir: &Path, message: &str) -> Resu
 /// entry intact (git's default), so the caller / agent can retry.
 pub fn stash_pop(workspace_dir: &Path) -> Result<StashPopOutcome> {
     let workspace_dir_arg = workspace_dir.display().to_string();
-    let output = Command::new("git")
-        .args(["-C", workspace_dir_arg.as_str(), "stash", "pop"])
+    let mut command = Command::new("git");
+    command.args(["-C", workspace_dir_arg.as_str(), "stash", "pop"]);
+    crate::platform::process::configure_background_cli(&mut command);
+    let output = command
         .output()
         .with_context(|| format!("Failed to git stash pop in {}", workspace_dir.display()))?;
     if output.status.success() {
@@ -1802,6 +1829,46 @@ mod tests {
         assert_eq!(
             resolve_remote_tracking_ref(wt_dir.path(), Some("origin")).as_deref(),
             Some("origin/feature/published"),
+        );
+    }
+
+    #[test]
+    fn remote_branch_exists_detects_published_branch_without_local_ref() {
+        // Branch is pushed to the remote, then the local remote-tracking ref
+        // + upstream are wiped (mirrors a push that never updated the local
+        // ref). `resolve_remote_tracking_ref` goes blind, but the remote
+        // lookup still finds the branch.
+        let (_origin, clone) = init_repo_with_remote();
+        let wt_dir = tempfile::tempdir().unwrap();
+        create_worktree_from_start_point(
+            clone.path(),
+            wt_dir.path(),
+            "feature/ghost-ref",
+            "origin/main",
+        )
+        .unwrap();
+        run(
+            wt_dir.path(),
+            &["push", "origin", "HEAD:refs/heads/feature/ghost-ref"],
+        );
+        // Wipe the local remote-tracking ref so only the remote knows.
+        run(
+            wt_dir.path(),
+            &["update-ref", "-d", "refs/remotes/origin/feature/ghost-ref"],
+        );
+
+        assert_eq!(
+            resolve_remote_tracking_ref(wt_dir.path(), Some("origin")),
+            None,
+            "local lookup should be blind once the tracking ref is gone",
+        );
+        assert!(
+            remote_branch_exists(wt_dir.path(), "origin", "feature/ghost-ref"),
+            "remote lookup should still find the published branch",
+        );
+        assert!(
+            !remote_branch_exists(wt_dir.path(), "origin", "feature/never-pushed"),
+            "remote lookup should not invent a branch that was never pushed",
         );
     }
 

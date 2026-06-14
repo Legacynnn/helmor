@@ -125,7 +125,7 @@ function makeSession(
 		updatedAt: new Date(0).toISOString(),
 		isHidden: false,
 		active: false,
-		sessionKind: "chat",
+		sessionKind: "gui",
 	};
 }
 

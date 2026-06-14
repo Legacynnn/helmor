@@ -22,7 +22,7 @@ impl ProcessTree {
 
     pub fn from_child_pid(pid: u32) -> Self {
         let pid = pid as Pid;
-        Self { pid, pgid: pid }
+        Self::new(pid, pid)
     }
 }
 
@@ -42,6 +42,18 @@ pub fn configure_background_cli(cmd: &mut Command) -> &mut Command {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
+/// [`configure_background_cli`] for `tokio::process::Command`.
+pub fn configure_background_cli_tokio(
+    cmd: &mut tokio::process::Command,
+) -> &mut tokio::process::Command {
+    #[cfg(windows)]
+    {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
@@ -99,10 +111,26 @@ pub fn pid_alive(pid: Pid) -> bool {
         }
     }
 
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::Foundation::{CloseHandle, STILL_ACTIVE};
+        use windows::Win32::System::Threading::{
+            GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+        };
+        match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+            Ok(handle) => {
+                let mut code = 0u32;
+                let ok = GetExitCodeProcess(handle, &mut code).is_ok();
+                let _ = CloseHandle(handle);
+                ok && code == STILL_ACTIVE.0 as u32
+            }
+            Err(_) => false,
+        }
+    }
+
+    #[cfg(not(any(unix, windows)))]
     {
-        // Future Windows adapter should use a real process query. Returning
-        // false keeps today's non-Unix fallback conservative and isolated.
+        // Other non-Unix targets keep the conservative stub.
         let _ = pid;
         false
     }
@@ -162,6 +190,46 @@ fn can_signal_group(pgid: Pid) -> bool {
         let _ = pgid;
         false
     }
+}
+
+/// System boot time as a Unix epoch (seconds), or `None` when it can't be
+/// determined. PIDs are unique only within a boot session, so a process
+/// recorded before the current boot can never still be the same process — the
+/// runtime registry uses this to refuse to signal a PID that may have been
+/// reused across a reboot.
+#[cfg(target_os = "macos")]
+pub fn boot_time_epoch() -> Option<i64> {
+    use std::ffi::CString;
+    let name = CString::new("kern.boottime").ok()?;
+    let mut tv = libc::timeval {
+        tv_sec: 0,
+        tv_usec: 0,
+    };
+    let mut size = std::mem::size_of::<libc::timeval>();
+    let ret = unsafe {
+        libc::sysctlbyname(
+            name.as_ptr(),
+            std::ptr::from_mut::<libc::timeval>(&mut tv).cast::<std::ffi::c_void>(),
+            &mut size,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    (ret == 0).then_some(tv.tv_sec)
+}
+
+/// `/proc/stat` carries a `btime <epoch-seconds>` line written at boot.
+#[cfg(target_os = "linux")]
+pub fn boot_time_epoch() -> Option<i64> {
+    let stat = std::fs::read_to_string("/proc/stat").ok()?;
+    stat.lines()
+        .find_map(|line| line.strip_prefix("btime "))
+        .and_then(|value| value.trim().parse::<i64>().ok())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+pub fn boot_time_epoch() -> Option<i64> {
+    None
 }
 
 #[cfg(windows)]

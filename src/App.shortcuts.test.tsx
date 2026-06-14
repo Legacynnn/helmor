@@ -66,9 +66,8 @@ vi.mock("./App.css", () => ({}));
 vi.mock("@tauri-apps/plugin-dialog", () => ({
 	open: vi.fn(),
 }));
-// Helmor is macOS-only; `./lib/platform` already returns `isMac: () => true`
-// unconditionally. No mock needed, but keep this vi.mock stub to document the
-// shortcut suite's dependency on that assumption.
+// This shortcut suite exercises the Mac shortcut mapping, so keep the platform
+// mock explicit even when the runtime helper changes.
 vi.mock("./lib/platform", () => ({
 	isMac: () => true,
 	isTauriRuntime: () => true,
@@ -114,6 +113,7 @@ vi.mock("./lib/api", async (importOriginal) => {
 });
 
 import App from "./App";
+import { router } from "./router";
 
 const WORKSPACE_IDS = {
 	done: "workspace-done",
@@ -439,6 +439,12 @@ async function renderAppReady(expectedSessionTitle = "Done session 1") {
 
 describe("App global navigation shortcuts", () => {
 	beforeEach(() => {
+		// Stage 3b: the router is a module-scope singleton that now OWNS the
+		// selected workspace/session. Each test renders a fresh <App/>, so reset
+		// the router to the boot index between tests (the previous App is already
+		// unmounted by afterEach(cleanup)) — otherwise a stale location from the
+		// prior test leaks in and breaks boot auto-select restore.
+		router.history.replace("/");
 		runtimeSessionFixtures = createRuntimeSessionFixtures();
 		apiMocks.createSession.mockReset();
 		apiMocks.deleteSession.mockReset();
@@ -676,7 +682,10 @@ describe("App global navigation shortcuts", () => {
 		pressCreateSessionShortcut();
 
 		await waitFor(() => {
-			expect(apiMocks.createSession).toHaveBeenCalledWith(WORKSPACE_IDS.done);
+			expect(apiMocks.createSession).toHaveBeenCalledWith(
+				WORKSPACE_IDS.done,
+				expect.objectContaining({ sessionKind: "gui" }),
+			);
 			expectSelectedSession("Untitled");
 		});
 	});
@@ -698,7 +707,11 @@ describe("App global navigation shortcuts", () => {
 		expect(await screen.findByText("New worktree")).toBeInTheDocument();
 	});
 
-	it("focuses the start composer on Command+L", async () => {
+	// TODO(upstream-merge): upstream bound Mod+L to focus the composer, but this
+	// fork reserves Mod+L for the right-sidebar toggle (`sidebar.right.toggle`)
+	// and ships `composer.focus` unbound by default. Re-enable (with a fork
+	// default focus key) if that decision is revisited.
+	it.skip("focuses the start composer on Command+L", async () => {
 		const user = userEvent.setup({ pointerEventsCheck: 0 });
 		await renderAppReady();
 
@@ -755,14 +768,14 @@ describe("App global navigation shortcuts", () => {
 		expect(await screen.findByText("New worktree")).toBeInTheDocument();
 	});
 
-	it("toggles the context panel on Option+Command+C", async () => {
+	it("toggles the context panel on Command+Shift+C", async () => {
 		await renderAppReady();
 
 		fireEvent.keyDown(window, {
 			key: "c",
 			code: "KeyC",
 			metaKey: true,
-			altKey: true,
+			shiftKey: true,
 		});
 
 		await screen.findByRole("heading", { name: "Contexts" });
@@ -821,6 +834,26 @@ describe("App global navigation shortcuts", () => {
 
 		await waitFor(() => {
 			expectSelectedWorkspace("Review workspace");
+			expectSelectedSession("Review session 1");
+		});
+	});
+
+	it("moves the sidebar highlight inside the keydown task while the displayed pane flips one frame later", async () => {
+		await renderAppReady();
+
+		pressGlobalShortcut("l");
+
+		// Highlight is synchronous: the keyboard path applies the imperative
+		// `workspace-row-selected` class (and the router commit re-renders the
+		// sidebar) inside the keydown task…
+		expectSelectedWorkspace("Review workspace");
+		// …while the displayed paint track still shows the previous workspace's
+		// tab strip for one frame (the flip is deferred via scheduleDisplayFlip):
+		// the old tab is still mounted, the new workspace's isn't yet.
+		getSessionTab("Done session 1");
+		expect(screen.queryByText("Review session 1")).toBeNull();
+
+		await waitFor(() => {
 			expectSelectedSession("Review session 1");
 		});
 	});
