@@ -1087,6 +1087,7 @@ export class CodexAppServerManager implements SessionManager {
 		options?: GenerateTitleOptions,
 	): Promise<void> {
 		const generateBranch = options?.generateBranch ?? true;
+		const semantic = options?.semantic ?? false;
 		const cwd = process.cwd();
 		const codexProvider = options?.codexProvider;
 		// pickFastestCodexModel only knows bundled names; custom uses its own.
@@ -1182,6 +1183,7 @@ export class CodexAppServerManager implements SessionManager {
 							userMessage,
 							branchRenamePrompt,
 							generateBranch,
+							semantic,
 						),
 						text_elements: [],
 					},
@@ -1207,6 +1209,7 @@ export class CodexAppServerManager implements SessionManager {
 				{
 					model,
 					generateBranch,
+					semantic,
 					logError: (message, meta) => logger.error(message, meta),
 				},
 			);

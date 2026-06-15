@@ -304,6 +304,7 @@ async function handleGenerateTitle(
 		// title and branch. Pass `false` to skip the branch slug entirely.
 		const generateBranch =
 			typeof params.generateBranch === "boolean" ? params.generateBranch : true;
+		const semantic = params.semantic === true;
 		// Rust builds the ordered attempt chain from the user's configured
 		// models (action → review → default, deduped); each claude/opencode
 		// step tries the custom model first, then the provider's fast default.
@@ -313,6 +314,7 @@ async function handleGenerateTitle(
 			userMessage: userMessage.slice(0, 100),
 			attempts: attempts.map((a) => `${a.provider}:${a.model ?? "(default)"}`),
 			generateBranch,
+			semantic,
 		});
 
 		let lastError: unknown = null;
@@ -333,6 +335,7 @@ async function handleGenerateTitle(
 						codexProvider: attempt.codexProvider,
 						agentProxy,
 						generateBranch,
+						semantic,
 					},
 				);
 				logger.debug(`[${id}] generateTitle completed (${attempt.provider})`);

@@ -379,10 +379,12 @@ export class CopilotSessionManager implements SessionManager {
 		options?: GenerateTitleOptions,
 	): Promise<void> {
 		const generateBranch = options?.generateBranch ?? true;
+		const semantic = options?.semantic ?? false;
 		const prompt = buildTitlePrompt(
 			userMessage,
 			branchRenamePrompt,
 			generateBranch,
+			semantic,
 		);
 		const timeout = timeoutMs ?? TITLE_GENERATION_TIMEOUT_MS;
 		const model = options?.model ?? TITLE_MODEL_ID;
@@ -417,6 +419,7 @@ export class CopilotSessionManager implements SessionManager {
 			{
 				model,
 				generateBranch,
+				semantic,
 				logError: (message, meta) => logger.error(message, meta),
 			},
 		);

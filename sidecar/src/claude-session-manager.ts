@@ -896,8 +896,14 @@ export class ClaudeSessionManager implements SessionManager {
 		const proxyEnv = buildAgentProxyEnv(options?.agentProxy);
 		const queryEnv = mergeQueryEnv(proxyEnv, claudeEnv);
 		const generateBranch = options?.generateBranch ?? true;
+		const semantic = options?.semantic ?? false;
 		const q = query({
-			prompt: buildTitlePrompt(userMessage, branchRenamePrompt, generateBranch),
+			prompt: buildTitlePrompt(
+				userMessage,
+				branchRenamePrompt,
+				generateBranch,
+				semantic,
+			),
 			options: {
 				abortController,
 				pathToClaudeCodeExecutable: CLAUDE_BIN_PATH,
@@ -924,6 +930,7 @@ export class ClaudeSessionManager implements SessionManager {
 				raw,
 				{
 					generateBranch,
+					semantic,
 					logError: (message, meta) => logger.error(message, meta),
 				},
 			);

@@ -337,10 +337,12 @@ export class CursorCore {
 			throw new Error("Cursor API key is not configured");
 		}
 		const generateBranch = options?.generateBranch ?? true;
+		const semantic = options?.semantic ?? false;
 		const prompt = buildTitlePrompt(
 			userMessage,
 			branchRenamePrompt,
 			generateBranch,
+			semantic,
 		);
 		const modelId = options?.model ?? TITLE_MODEL_ID;
 		const cwd = process.cwd();
@@ -372,6 +374,7 @@ export class CursorCore {
 			{
 				model: modelId,
 				generateBranch,
+				semantic,
 				logError: (message, meta) => logger.error(message, meta),
 			},
 		);
