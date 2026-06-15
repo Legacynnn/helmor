@@ -1642,4 +1642,23 @@ mod tests {
 
         std::env::remove_var("HELMOR_DATA_DIR");
     }
+
+    #[test]
+    fn branch_name_semantic_mode_uses_empty_prefix() {
+        use crate::settings::{BranchPrefixType, EffectiveBranchPrefixSettings};
+        let settings = EffectiveBranchPrefixSettings {
+            branch_prefix_type: Some(BranchPrefixType::Semantic),
+            branch_prefix_custom: None,
+            forge_provider: None,
+            remote_url: None,
+            forge_login: Some("alice".to_string()),
+        };
+        // Pre-prompt: bare celestial name, no guessed type.
+        assert_eq!(branch_name_for_directory("tokyo", &settings), "tokyo");
+        // Post-classification: type already in slug; prefix stays empty.
+        assert_eq!(
+            branch_name_for_directory("fix/auth-redirect", &settings),
+            "fix/auth-redirect"
+        );
+    }
 }

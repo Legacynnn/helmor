@@ -227,6 +227,10 @@ mod tests {
             BranchPrefixType::from_str("\tNone\n").unwrap(),
             BranchPrefixType::None
         );
+        assert_eq!(
+            BranchPrefixType::from_str("  SEMANTIC  ").unwrap(),
+            BranchPrefixType::Semantic
+        );
     }
 
     #[test]
