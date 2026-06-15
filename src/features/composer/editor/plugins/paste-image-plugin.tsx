@@ -20,7 +20,7 @@ import {
 	PASTE_COMMAND,
 } from "lexical";
 import { useEffect, useRef } from "react";
-import { savePastedImage } from "@/lib/api";
+import { readClipboardImage, savePastedImage } from "@/lib/api";
 import { buildComposerPreviewInsertItem } from "@/lib/composer-insert";
 import { isImagePath } from "@/lib/path-util";
 import { $createCustomTagBadgeNode } from "../custom-tag-badge-node";
@@ -130,7 +130,30 @@ export function PasteImagePlugin({
 
 				// --- Case 2: Clipboard contains text with image paths ---
 				const text = clipboardData.getData?.("text/plain") ?? "";
-				if (!text) return false;
+
+				// --- Case 2b: Clipboard holds a *resident* image (no file, no text) ---
+				// macOS WKWebView doesn't surface "Copy Image" / screenshot-to-
+				// clipboard data in `clipboardData.files`, so the DOM paste event
+				// looks empty. Fall back to the native pasteboard read. We only
+				// reach here with no image files; an empty text means there's
+				// nothing else to paste, so it's safe to claim the event and try.
+				if (!text) {
+					event.preventDefault();
+					readClipboardImage(sessionIdRef.current)
+						.then((savedPath) => {
+							if (!savedPath) return;
+							editor.update(() => {
+								$appendToEnd($createImageBadgeNode(savedPath));
+							});
+						})
+						.catch((err) => {
+							console.error(
+								"[PasteImagePlugin] Failed to read clipboard image:",
+								err,
+							);
+						});
+					return true;
+				}
 
 				const lines = text.split("\n");
 				const hasImages = lines.some((line) => isImagePath(line.trim()));

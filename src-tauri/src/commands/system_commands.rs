@@ -2491,6 +2491,94 @@ pub async fn copy_image_to_clipboard(path: String) -> CmdResult<()> {
     .await
 }
 
+/// Read an image residing on the system clipboard — e.g. "Copy Image" from a
+/// browser/Preview, or a Cmd+Ctrl+Shift+4 screenshot copied to the clipboard —
+/// and persist it into the session paste-cache, returning its absolute path.
+///
+/// macOS WKWebView does NOT surface clipboard-*resident* images in the DOM
+/// `paste` event (only real file pastes/drops populate `clipboardData.files`),
+/// so the composer falls back to this command when a paste yields no image file
+/// and no text. Returns `None` when the clipboard holds no image.
+///
+/// `session_id` is the composer's bound `sessions.id` or its provisional UUID —
+/// same paste-cache bucket key as [`save_pasted_image`].
+#[tauri::command]
+pub async fn read_clipboard_image(session_id: String) -> CmdResult<Option<String>> {
+    run_blocking(move || read_clipboard_image_impl(&session_id)).await
+}
+
+/// True when `clipboard info` output advertises an image flavor we can coerce
+/// to PNG. macOS reports flavors like `«class PNGf», 12345` or
+/// `«class TIFF», 9999, picture, …`.
+#[cfg(target_os = "macos")]
+fn clipboard_info_has_image(info: &str) -> bool {
+    let lower = info.to_ascii_lowercase();
+    ["pngf", "tiff", "jpeg", "giff", "public.png", "public.tiff"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+}
+
+#[cfg(target_os = "macos")]
+fn read_clipboard_image_impl(session_id: &str) -> anyhow::Result<Option<String>> {
+    use std::fs;
+    use uuid::Uuid;
+
+    // 1. Does the clipboard hold an image at all? Bail cheaply otherwise so a
+    //    plain-text paste with empty text/plain doesn't try to coerce nothing.
+    let info = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg("clipboard info")
+        .output()
+        .context("osascript (clipboard info) failed")?;
+    if !info.status.success() {
+        return Ok(None);
+    }
+    if !clipboard_info_has_image(&String::from_utf8_lossy(&info.stdout)) {
+        return Ok(None);
+    }
+
+    // 2. Destination inside the session paste-cache bucket (GC keys on it).
+    let paste_root = crate::data_dir::paste_cache_dir()?;
+    let paste_dir = crate::maintenance::paste_cache::destination_dir(&paste_root, session_id)?;
+    fs::create_dir_all(&paste_dir).context("Failed to create paste-cache directory")?;
+    let filepath = paste_dir.join(format!("paste-{}.png", Uuid::new_v4()));
+
+    // 3. Coerce the pasteboard image to PNG and write it to disk.
+    let escaped = applescript_escape(&filepath.to_string_lossy());
+    let output = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg("set theData to (the clipboard as «class PNGf»)")
+        .arg("-e")
+        .arg(format!(
+            "set theFile to open for access (POSIX file \"{escaped}\") with write permission"
+        ))
+        .arg("-e")
+        .arg("set eof theFile to 0")
+        .arg("-e")
+        .arg("write theData to theFile")
+        .arg("-e")
+        .arg("close access theFile")
+        .output()
+        .context("osascript (write clipboard png) failed")?;
+
+    let wrote_bytes = output.status.success()
+        && fs::metadata(&filepath)
+            .map(|m| m.len() > 0)
+            .unwrap_or(false);
+    if !wrote_bytes {
+        // Clean up any zero-byte/partial file so a stale path is never returned.
+        let _ = fs::remove_file(&filepath);
+        return Ok(None);
+    }
+
+    Ok(Some(filepath.to_string_lossy().to_string()))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn read_clipboard_image_impl(_session_id: &str) -> anyhow::Result<Option<String>> {
+    Ok(None)
+}
+
 #[cfg(target_os = "macos")]
 fn reveal_file_in_finder(path: &std::path::Path) -> anyhow::Result<()> {
     std::process::Command::new("open")
@@ -2785,6 +2873,21 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::tempdir;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn clipboard_info_detects_image_flavors() {
+        assert!(clipboard_info_has_image("«class PNGf», 12345"));
+        assert!(clipboard_info_has_image(
+            "«class TIFF», 99, picture, 99, «class PNGf», 88"
+        ));
+        assert!(clipboard_info_has_image("public.png, 4096"));
+        // Plain-text clipboard advertises string flavors only.
+        assert!(!clipboard_info_has_image(
+            "«class utf8», 12, «class ut16», 24, string, 12"
+        ));
+        assert!(!clipboard_info_has_image(""));
+    }
 
     #[test]
     fn parse_semver_extracts_version_from_varied_cli_output() {
