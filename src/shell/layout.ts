@@ -66,6 +66,55 @@ export function findAdjacentSessionId(
 }
 
 /**
+ * Resolve which session a Cmd+N shortcut should select, indexing the visible
+ * session tab bar by position (1-based). The caller passes the same
+ * `helmorQueryKeys.workspaceSessions` array the header renders as tabs, so
+ * position N always equals the Nth tab the user sees.
+ *
+ * Cmd+1..8 select absolute positions 1..8 (no-op if absent). Cmd+9 is an
+ * overflow stepper: it jumps to position 9, and pressing it again while the
+ * selection already sits at position >= 9 advances one position, wrapping back
+ * to position 9 after the last tab. Cmd+9 is a no-op when fewer than 9 sessions
+ * exist.
+ */
+export function resolveSessionIdByOrdinal(
+	workspaceSessions: WorkspaceSessionSummary[],
+	selectedSessionId: string | null,
+	ordinal: number,
+): string | null {
+	if (ordinal < 1 || ordinal > 9) {
+		return null;
+	}
+	if (workspaceSessions.length === 0) {
+		return null;
+	}
+
+	// Cmd+1..8 → absolute 1-based position.
+	if (ordinal < 9) {
+		return workspaceSessions[ordinal - 1]?.id ?? null;
+	}
+
+	// Cmd+9 → overflow stepper over positions >= 9 (zero-based index >= 8).
+	const OVERFLOW_START_INDEX = 8;
+	if (workspaceSessions.length <= OVERFLOW_START_INDEX) {
+		return null;
+	}
+	const currentIndex = workspaceSessions.findIndex(
+		(session) => session.id === selectedSessionId,
+	);
+	if (currentIndex < OVERFLOW_START_INDEX) {
+		// Below the overflow region (or nothing selected) → jump to position 9.
+		return workspaceSessions[OVERFLOW_START_INDEX]?.id ?? null;
+	}
+	// Already in the overflow region → advance one, wrapping to position 9.
+	const nextIndex =
+		currentIndex + 1 >= workspaceSessions.length
+			? OVERFLOW_START_INDEX
+			: currentIndex + 1;
+	return workspaceSessions[nextIndex]?.id ?? null;
+}
+
+/**
  * Flatten sidebar groups + archived rows into the same visual order the
  * sidebar actually renders them in. Powers keyboard up/down navigation
  * and the workspace prefetch warmup, so both have to mirror what the
