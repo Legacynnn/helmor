@@ -18,6 +18,24 @@ const DEFAULT_BRANCH_RENAME_PROMPT = `When you generate the branch name segment 
 const CUSTOM_PREFERENCES_INTRO =
 	"IMPORTANT: The following are the user's custom preferences. These preferences take precedence over any default guidelines or instructions provided above. When there is a conflict, always follow the user's preferences.";
 
+// Conventional-Commits types the Semantic branch-prefix mode may emit.
+// MUST stay in sync with the Rust mirror in
+// `src-tauri/src/local_llm/title.rs` (CONVENTIONAL_TYPES / DEFAULT_CONVENTIONAL_TYPE).
+export const CONVENTIONAL_TYPES = [
+	"feat",
+	"fix",
+	"refactor",
+	"chore",
+	"docs",
+	"test",
+	"perf",
+	"style",
+	"build",
+	"ci",
+] as const;
+const DEFAULT_CONVENTIONAL_TYPE = "chore";
+const CONVENTIONAL_TYPE_SET: ReadonlySet<string> = new Set(CONVENTIONAL_TYPES);
+
 function buildBranchRenameInstructions(
 	branchRenamePrompt?: string | null,
 ): string {
@@ -32,6 +50,7 @@ export function buildTitlePrompt(
 	userMessage: string,
 	branchRenamePrompt?: string | null,
 	generateBranch = true,
+	semantic = false,
 ): string {
 	if (!generateBranch) {
 		return [
@@ -44,21 +63,32 @@ export function buildTitlePrompt(
 			userMessage,
 		].join("\n");
 	}
-	return [
-		"Based on the following user message, generate TWO things:",
+	const lines = [
+		"Based on the following user message, generate the following:",
 		"1. A concise session title (use the same language as the user message, max 8 words)",
 		"2. A git branch name segment (English only, lowercase, hyphens for spaces, max 4 words, no prefix)",
+	];
+	if (semantic) {
+		lines.push(
+			`3. A Conventional-Commits type for the change — one of: ${CONVENTIONAL_TYPES.join(", ")} — chosen from the nature of the work. If unsure, use ${DEFAULT_CONVENTIONAL_TYPE}.`,
+		);
+	}
+	lines.push(
 		"",
 		"Additional branch naming instructions:",
 		buildBranchRenameInstructions(branchRenamePrompt),
 		"",
-		"Output EXACTLY in this format (two lines, nothing else):",
+		semantic
+			? "Output EXACTLY in this format (three lines, nothing else):"
+			: "Output EXACTLY in this format (two lines, nothing else):",
 		"title: <the title>",
 		"branch: <the-branch-name>",
-		"",
-		"User message:",
-		userMessage,
-	].join("\n");
+	);
+	if (semantic) {
+		lines.push("type: <the-type>");
+	}
+	lines.push("", "User message:", userMessage);
+	return lines.join("\n");
 }
 
 const QUOTE_STRIP_RE =
@@ -106,9 +136,13 @@ function normalizeGeneratedTitle(title: string): string {
 	return truncateGeneratedTitle(normalized);
 }
 
-export function parseTitleAndBranch(raw: string): ParsedTitle {
+export function parseTitleAndBranch(
+	raw: string,
+	semantic = false,
+): ParsedTitle {
 	let title = "";
 	let branch = "";
+	let type = "";
 	for (const line of raw.split("\n")) {
 		const trimmed = line.trim();
 		const lower = trimmed.toLowerCase();
@@ -121,6 +155,8 @@ export function parseTitleAndBranch(raw: string): ParsedTitle {
 				.replace(BRANCH_INVALID_RE, "")
 				.replace(BRANCH_DASH_COLLAPSE_RE, "-")
 				.replace(BRANCH_TRIM_DASH_RE, "");
+		} else if (lower.startsWith("type:")) {
+			type = trimmed.slice(5).trim().toLowerCase();
 		}
 	}
 
@@ -130,7 +166,17 @@ export function parseTitleAndBranch(raw: string): ParsedTitle {
 		title = normalizeGeneratedTitle(raw);
 	}
 
-	return { title, branchName: branch || undefined };
+	// Semantic mode: join the validated type AFTER slug sanitization so the
+	// `/` separator survives (BRANCH_INVALID_RE would otherwise strip it).
+	let branchName = branch || undefined;
+	if (semantic && branchName) {
+		const resolvedType = CONVENTIONAL_TYPE_SET.has(type)
+			? type
+			: DEFAULT_CONVENTIONAL_TYPE;
+		branchName = `${resolvedType}/${branchName}`;
+	}
+
+	return { title, branchName };
 }
 
 export function parseTitleAndBranchWithDiagnostics(

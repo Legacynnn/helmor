@@ -139,6 +139,56 @@ branch: tooltip-overflow`;
 	});
 });
 
+describe("buildTitlePrompt (semantic)", () => {
+	test("asks for a type: line from the conventional set when semantic", () => {
+		const prompt = buildTitlePrompt("fix the login redirect", null, true, true);
+		expect(prompt).toContain("type:");
+		expect(prompt).toContain(
+			"feat, fix, refactor, chore, docs, test, perf, style, build, ci",
+		);
+		expect(prompt).toContain("chore");
+	});
+
+	test("omits the type: line when not semantic", () => {
+		const prompt = buildTitlePrompt(
+			"fix the login redirect",
+			null,
+			true,
+			false,
+		);
+		expect(prompt).not.toContain("type:");
+	});
+});
+
+describe("parseTitleAndBranch (semantic)", () => {
+	test("joins a valid type with the slug after sanitization", () => {
+		const raw = "title: Fix login redirect\ntype: fix\nbranch: login-redirect";
+		expect(parseTitleAndBranch(raw, true).branchName).toBe(
+			"fix/login-redirect",
+		);
+	});
+
+	test("defaults to chore when type is unknown", () => {
+		const raw = "title: Tidy things\ntype: wibble\nbranch: tidy-things";
+		expect(parseTitleAndBranch(raw, true).branchName).toBe("chore/tidy-things");
+	});
+
+	test("defaults to chore when the type line is missing", () => {
+		const raw = "title: Tidy things\nbranch: tidy-things";
+		expect(parseTitleAndBranch(raw, true).branchName).toBe("chore/tidy-things");
+	});
+
+	test("ignores the type line when not semantic", () => {
+		const raw = "title: Fix login\ntype: fix\nbranch: login-redirect";
+		expect(parseTitleAndBranch(raw, false).branchName).toBe("login-redirect");
+	});
+
+	test("returns undefined branch when slug is empty even in semantic mode", () => {
+		const raw = "title: Just a title\ntype: fix";
+		expect(parseTitleAndBranch(raw, true).branchName).toBeUndefined();
+	});
+});
+
 describe("TITLE_GENERATION_TIMEOUT_MS", () => {
 	test("is a positive number of milliseconds", () => {
 		expect(TITLE_GENERATION_TIMEOUT_MS).toBeGreaterThan(0);
