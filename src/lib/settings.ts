@@ -381,6 +381,9 @@ export type AppSettings = {
 	sidebarRepoFilterIds: string[];
 	/** Sidebar view-only sort. `custom` preserves saved drag order. */
 	sidebarSort: SidebarSort;
+	/** Verbose sidebar: expand each row to preview its running sessions.
+	 *  Persisted to localStorage for flash-free first paint. */
+	sidebarVerbose: boolean;
 };
 
 export const DEFAULT_START_SURFACE_PREFERENCES: StartSurfacePreferences = {
@@ -505,6 +508,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 	sidebarGrouping: "status",
 	sidebarRepoFilterIds: [],
 	sidebarSort: "custom",
+	sidebarVerbose: false,
 };
 
 export const THEME_STORAGE_KEY = "helmor-theme";
@@ -513,6 +517,7 @@ export const DARK_THEME_STORAGE_KEY = "helmor-dark-theme";
 export const SIDEBAR_GROUPING_STORAGE_KEY = "helmor-sidebar-grouping";
 export const SIDEBAR_REPO_FILTER_STORAGE_KEY = "helmor-sidebar-repo-filter";
 export const SIDEBAR_SORT_STORAGE_KEY = "helmor-sidebar-sort";
+export const SIDEBAR_VERBOSE_STORAGE_KEY = "helmor-sidebar-verbose";
 export const UI_FONT_FAMILY_STORAGE_KEY = "helmor-ui-font-family";
 export const CODE_FONT_FAMILY_STORAGE_KEY = "helmor-code-font-family";
 export const TERMINAL_FONT_FAMILY_STORAGE_KEY = "helmor-terminal-font-family";
@@ -527,6 +532,7 @@ const LOCALSTORAGE_KEYS = {
 	sidebarGrouping: SIDEBAR_GROUPING_STORAGE_KEY,
 	sidebarRepoFilterIds: SIDEBAR_REPO_FILTER_STORAGE_KEY,
 	sidebarSort: SIDEBAR_SORT_STORAGE_KEY,
+	sidebarVerbose: SIDEBAR_VERBOSE_STORAGE_KEY,
 	uiFontFamily: UI_FONT_FAMILY_STORAGE_KEY,
 	codeFontFamily: CODE_FONT_FAMILY_STORAGE_KEY,
 	terminalFontFamily: TERMINAL_FONT_FAMILY_STORAGE_KEY,
@@ -601,6 +607,8 @@ export function getPreloadedSettings(): AppSettings {
 			? (raw as SidebarSort)
 			: DEFAULT_SETTINGS.sidebarSort;
 	})();
+	const sidebarVerbose =
+		readLocalStorageString(SIDEBAR_VERBOSE_STORAGE_KEY) === "true";
 	return {
 		...DEFAULT_SETTINGS,
 		theme: getPreloadedTheme(),
@@ -611,6 +619,7 @@ export function getPreloadedSettings(): AppSettings {
 			readLocalStorageString(SIDEBAR_REPO_FILTER_STORAGE_KEY) ?? undefined,
 		),
 		sidebarSort,
+		sidebarVerbose,
 		uiFontFamily: readLocalStorageString(UI_FONT_FAMILY_STORAGE_KEY),
 		codeFontFamily: readLocalStorageString(CODE_FONT_FAMILY_STORAGE_KEY),
 		terminalFontFamily: readLocalStorageString(
@@ -1362,6 +1371,8 @@ export async function loadSettings(): Promise<AppSettings> {
 					? (raw as SidebarSort)
 					: DEFAULT_SETTINGS.sidebarSort;
 			})(),
+			sidebarVerbose:
+				localStorage.getItem(SIDEBAR_VERBOSE_STORAGE_KEY) === "true",
 			notifications:
 				raw[SETTINGS_KEY_MAP.notifications] !== undefined
 					? raw[SETTINGS_KEY_MAP.notifications] === "true"
