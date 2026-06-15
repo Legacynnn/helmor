@@ -3,6 +3,7 @@ import {
 	findShortcutConflict,
 	getShortcut,
 	getShortcutConflicts,
+	SHORTCUT_DEFINITION_BY_ID,
 	SHORTCUT_DEFINITIONS,
 	scopesOverlap,
 	updateShortcutOverride,
@@ -139,6 +140,15 @@ describe("shortcut registry", () => {
 		expect(toggleTerminalMode?.defaultHotkey).toBeNull();
 
 		// No internal conflicts after the move.
+		expect(getShortcutConflicts({}).disabledIds.size).toBe(0);
+	});
+
+	it("registers Cmd+1..9 session selectors with no conflicts", () => {
+		for (let ordinal = 1; ordinal <= 9; ordinal++) {
+			const id = `session.select${ordinal}` as ShortcutId;
+			expect(getShortcut({}, id)).toBe(`Mod+${ordinal}`);
+			expect(SHORTCUT_DEFINITION_BY_ID.get(id)?.scopes).toEqual(["chat"]);
+		}
 		expect(getShortcutConflicts({}).disabledIds.size).toBe(0);
 	});
 
