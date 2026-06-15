@@ -4,14 +4,27 @@ import { memo, useMemo } from "react";
 import type { WorkspaceSessionSummary } from "@/lib/api";
 import { workspaceSessionsQueryOptions } from "@/lib/query-client";
 import { useBusySessionIds } from "@/lib/session-run-state-context";
-import { readSessionThread } from "@/lib/session-thread-cache";
+import {
+	readSessionThread,
+	sessionThreadCacheKey,
+} from "@/lib/session-thread-cache";
 import { cn } from "@/lib/utils";
 import { extractLiveActivity } from "./workspace-hover-card";
 
 /** First non-empty text/reasoning block of the latest assistant message, single line. */
 function useLivePreviewText(sessionId: string): string | null {
 	const queryClient = useQueryClient();
-	const thread = readSessionThread(queryClient, sessionId);
+	// Subscribe to the same cache key `use-streaming` writes deltas into so the
+	// preview re-renders on every streaming tick (a plain `getQueryData` read
+	// never subscribes, leaving the text frozen mid-stream).
+	const { data: thread } = useQuery({
+		queryKey: sessionThreadCacheKey(sessionId || "__none__"),
+		queryFn: () =>
+			sessionId ? (readSessionThread(queryClient, sessionId) ?? []) : [],
+		enabled: Boolean(sessionId),
+		staleTime: Number.POSITIVE_INFINITY,
+		gcTime: 30_000,
+	});
 	const blocks = extractLiveActivity(thread);
 	for (const block of blocks) {
 		if (block.kind === "markdown" && block.text.trim()) {

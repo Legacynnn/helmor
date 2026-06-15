@@ -7,6 +7,7 @@ vi.mock("@/lib/session-run-state-context", () => ({
 	useBusySessionIds: () => new Set(["s-gui", "s-term"]),
 }));
 vi.mock("@/lib/session-thread-cache", () => ({
+	sessionThreadCacheKey: (sessionId: string) => ["sessionThread", sessionId],
 	readSessionThread: () => [
 		{
 			role: "assistant",
@@ -70,6 +71,8 @@ describe("WorkspaceRowSessionsPreview", () => {
 		expect(screen.getByText("Agent run")).toBeInTheDocument();
 		expect(screen.getByText("npm test")).toBeInTheDocument();
 		expect(screen.getByText(/Refactoring the parser/)).toBeInTheDocument();
+		// The terminal row must NOT also render the preview (empty-id subscription).
+		expect(screen.queryAllByText(/Refactoring the parser/)).toHaveLength(1);
 	});
 
 	it("excludes hidden, action, and non-running sessions", () => {
