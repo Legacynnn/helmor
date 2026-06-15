@@ -17,6 +17,14 @@ const TITLE_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_GENERATED_TITLE_CHARS: usize = 80;
 const TITLE_ELLIPSIS: &str = "...";
 
+// Conventional-Commits types the Semantic branch-prefix mode may emit.
+// MUST stay in sync with the sidecar mirror in `sidecar/src/title.ts`
+// (CONVENTIONAL_TYPES / DEFAULT_CONVENTIONAL_TYPE).
+const CONVENTIONAL_TYPES: [&str; 10] = [
+    "feat", "fix", "refactor", "chore", "docs", "test", "perf", "style", "build", "ci",
+];
+const DEFAULT_CONVENTIONAL_TYPE: &str = "chore";
+
 const DEFAULT_BRANCH_RENAME_PROMPT: &str =
     "When you generate the branch name segment for a new chat:
 
@@ -41,6 +49,7 @@ impl Manager {
         user_message: &str,
         branch_rename_prompt: Option<&str>,
         generate_branch: bool,
+        semantic: bool,
     ) -> Result<(String, Option<String>)> {
         if !self.is_ready() {
             anyhow::bail!("Local LLM not ready");
@@ -53,9 +62,14 @@ impl Manager {
         let trimmed_user_message =
             self.fit_user_message_to_context(TITLE_SYSTEM_PROMPT, user_message);
 
-        let user = build_title_prompt(&trimmed_user_message, branch_rename_prompt, generate_branch);
+        let user = build_title_prompt(
+            &trimmed_user_message,
+            branch_rename_prompt,
+            generate_branch,
+            semantic,
+        );
         let raw = self.chat(TITLE_SYSTEM_PROMPT, &user, TITLE_TIMEOUT)?;
-        let (title, branch_name) = parse_title_response(&raw);
+        let (title, branch_name) = parse_title_response(&raw, semantic);
 
         if title.is_empty() {
             anyhow::bail!("Local LLM returned empty title (raw={raw:?})");
@@ -91,6 +105,7 @@ fn build_title_prompt(
     user_message: &str,
     branch_rename_prompt: Option<&str>,
     generate_branch: bool,
+    semantic: bool,
 ) -> String {
     if !generate_branch {
         return format!(
@@ -100,23 +115,33 @@ fn build_title_prompt(
              User message:\n{user_message}"
         );
     }
+    let type_instruction = if semantic {
+        format!(
+            "\n3. A Conventional-Commits type for the change — one of: {} — chosen from the nature of the work. If unsure, use {DEFAULT_CONVENTIONAL_TYPE}.",
+            CONVENTIONAL_TYPES.join(", "),
+        )
+    } else {
+        String::new()
+    };
+    let type_output_line = if semantic { "\ntype: <the-type>" } else { "" };
     format!(
-        "Based on the following user message, generate TWO things:\n\
+        "Based on the following user message, generate the following:\n\
          1. A concise session title (use the same language as the user message, max 8 words)\n\
-         2. A git branch name segment (English only, lowercase, hyphens for spaces, max 4 words, no prefix)\n\n\
+         2. A git branch name segment (English only, lowercase, hyphens for spaces, max 4 words, no prefix){type_instruction}\n\n\
          Additional branch naming instructions:\n\
          {branch_instructions}\n\n\
-         Output EXACTLY in this format (two lines, nothing else):\n\
+         Output EXACTLY in this format:\n\
          title: <the title>\n\
-         branch: <the-branch-name>\n\n\
+         branch: <the-branch-name>{type_output_line}\n\n\
          User message:\n{user_message}",
         branch_instructions = build_branch_rename_instructions(branch_rename_prompt),
     )
 }
 
-fn parse_title_response(raw: &str) -> (String, Option<String>) {
+fn parse_title_response(raw: &str, semantic: bool) -> (String, Option<String>) {
     let mut title = String::new();
     let mut branch = String::new();
+    let mut type_segment = String::new();
     for line in raw.lines() {
         let trimmed = line.trim();
         let lower = trimmed.to_ascii_lowercase();
@@ -124,6 +149,8 @@ fn parse_title_response(raw: &str) -> (String, Option<String>) {
             title = normalize_generated_title(&trimmed[6..]);
         } else if lower.starts_with("branch:") {
             branch = sanitize_branch(trimmed[7..].trim());
+        } else if lower.starts_with("type:") {
+            type_segment = trimmed[5..].trim().to_ascii_lowercase();
         }
     }
     // Same fallback as the sidecar's `parseTitleAndBranch`: if structured
@@ -137,6 +164,14 @@ fn parse_title_response(raw: &str) -> (String, Option<String>) {
     }
     let branch_opt = if branch.is_empty() {
         None
+    } else if semantic {
+        // Join the validated type AFTER sanitization so the `/` survives.
+        let resolved = if CONVENTIONAL_TYPES.contains(&type_segment.as_str()) {
+            type_segment.as_str()
+        } else {
+            DEFAULT_CONVENTIONAL_TYPE
+        };
+        Some(format!("{resolved}/{branch}"))
     } else {
         Some(branch)
     };
@@ -214,7 +249,7 @@ mod tests {
     #[test]
     fn parses_canonical_two_line_output() {
         let raw = "title: Fix the failing test\nbranch: fix-failing-test";
-        let (title, branch) = parse_title_response(raw);
+        let (title, branch) = parse_title_response(raw, false);
         assert_eq!(title, "Fix the failing test");
         assert_eq!(branch.as_deref(), Some("fix-failing-test"));
     }
@@ -222,7 +257,7 @@ mod tests {
     #[test]
     fn parses_title_only_when_branch_missing() {
         let raw = "title: Just a title";
-        let (title, branch) = parse_title_response(raw);
+        let (title, branch) = parse_title_response(raw, false);
         assert_eq!(title, "Just a title");
         assert!(branch.is_none());
     }
@@ -230,8 +265,42 @@ mod tests {
     #[test]
     fn strips_smart_quotes_around_title() {
         let raw = "title: \u{201c}Hello world\u{201d}";
-        let (title, _) = parse_title_response(raw);
+        let (title, _) = parse_title_response(raw, false);
         assert_eq!(title, "Hello world");
+    }
+
+    #[test]
+    fn parse_semantic_joins_valid_type() {
+        let (_title, branch) =
+            parse_title_response("title: Fix login\ntype: fix\nbranch: login-redirect", true);
+        assert_eq!(branch.as_deref(), Some("fix/login-redirect"));
+    }
+
+    #[test]
+    fn parse_semantic_defaults_to_chore_on_unknown() {
+        let (_title, branch) =
+            parse_title_response("title: Tidy\ntype: wibble\nbranch: tidy-up", true);
+        assert_eq!(branch.as_deref(), Some("chore/tidy-up"));
+    }
+
+    #[test]
+    fn parse_semantic_defaults_to_chore_when_missing() {
+        let (_title, branch) = parse_title_response("title: Tidy\nbranch: tidy-up", true);
+        assert_eq!(branch.as_deref(), Some("chore/tidy-up"));
+    }
+
+    #[test]
+    fn parse_non_semantic_ignores_type_line() {
+        let (_title, branch) =
+            parse_title_response("title: Fix login\ntype: fix\nbranch: login-redirect", false);
+        assert_eq!(branch.as_deref(), Some("login-redirect"));
+    }
+
+    #[test]
+    fn build_prompt_semantic_requests_type_line() {
+        let prompt = build_title_prompt("fix login", None, true, true);
+        assert!(prompt.contains("type:"));
+        assert!(prompt.contains("chore"));
     }
 
     #[test]
@@ -241,14 +310,14 @@ mod tests {
         // disappear without case-folding), then collapses runs of dashes
         // and trims leading/trailing ones.
         let raw = "title: Cleanup\nbranch: --fix_the-bug!! --";
-        let (_, branch) = parse_title_response(raw);
+        let (_, branch) = parse_title_response(raw, false);
         assert_eq!(branch.as_deref(), Some("fixthe-bug"));
     }
 
     #[test]
     fn falls_back_to_raw_body_when_no_title_prefix() {
         let raw = "Just a free-form title without label";
-        let (title, _) = parse_title_response(raw);
+        let (title, _) = parse_title_response(raw, false);
         assert_eq!(title, "Just a free-form title without label");
     }
 
@@ -258,7 +327,7 @@ mod tests {
             "{}\nthat keeps going after a newline",
             "This is a very long unstructured title ".repeat(8)
         );
-        let (title, _) = parse_title_response(&raw);
+        let (title, _) = parse_title_response(&raw, false);
         assert!(title.chars().count() <= MAX_GENERATED_TITLE_CHARS);
         assert!(title.ends_with(TITLE_ELLIPSIS));
     }
@@ -269,7 +338,7 @@ mod tests {
             "title: {}\nbranch: tooltip-overflow",
             "Repair tooltip overflow for extremely long session tab names ".repeat(4)
         );
-        let (title, branch) = parse_title_response(&raw);
+        let (title, branch) = parse_title_response(&raw, false);
         assert!(title.chars().count() <= MAX_GENERATED_TITLE_CHARS);
         assert!(title.ends_with(TITLE_ELLIPSIS));
         assert_eq!(branch.as_deref(), Some("tooltip-overflow"));
@@ -277,14 +346,19 @@ mod tests {
 
     #[test]
     fn build_prompt_omits_branch_instructions_when_not_generating_branch() {
-        let prompt = build_title_prompt("fix the test", None, false);
+        let prompt = build_title_prompt("fix the test", None, false, false);
         assert!(prompt.contains("title: <the title>"));
         assert!(!prompt.contains("branch:"));
     }
 
     #[test]
     fn build_prompt_includes_custom_branch_preferences() {
-        let prompt = build_title_prompt("fix the test", Some("Always prefix with chore-"), true);
+        let prompt = build_title_prompt(
+            "fix the test",
+            Some("Always prefix with chore-"),
+            true,
+            false,
+        );
         assert!(prompt.contains("User Preferences"));
         assert!(prompt.contains("Always prefix with chore-"));
     }

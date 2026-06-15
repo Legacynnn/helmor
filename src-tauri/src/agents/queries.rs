@@ -239,6 +239,11 @@ pub async fn generate_session_title(
             forge_login: None,
         });
 
+    let is_semantic = matches!(
+        branch_settings.branch_prefix_type,
+        Some(crate::settings::BranchPrefixType::Semantic)
+    );
+
     let should_generate_branch =
         workspace_info
             .as_ref()
@@ -297,9 +302,12 @@ pub async fn generate_session_title(
         let session_id_for_log = request.session_id.clone();
         match tauri::async_runtime::spawn_blocking(move || {
             let manager = app_for_local.state::<crate::local_llm::Manager>();
-            manager
-                .inner()
-                .generate_title(&user_message, branch_prompt.as_deref(), generate_branch)
+            manager.inner().generate_title(
+                &user_message,
+                branch_prompt.as_deref(),
+                generate_branch,
+                is_semantic,
+            )
         })
         .await
         {
@@ -372,6 +380,7 @@ pub async fn generate_session_title(
                 "userMessage": request.user_message,
                 "branchRenamePrompt": branch_rename_prompt,
                 "generateBranch": should_generate_branch,
+                "semantic": is_semantic,
                 "attempts": attempts,
             });
             if let Some(agent_proxy) = super::streaming::load_agent_proxy_setting() {
