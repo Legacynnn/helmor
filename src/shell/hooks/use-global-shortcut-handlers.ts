@@ -1,6 +1,7 @@
 import { type Dispatch, type SetStateAction, useMemo } from "react";
 import type { WorkspaceCommitButtonMode } from "@/features/commit/button";
 import type { QuickSwitchControls } from "@/features/quick-switch";
+import type { ShortcutId } from "@/features/shortcuts/types";
 import {
 	type ShortcutHandler,
 	useAppShortcuts,
@@ -11,6 +12,18 @@ import { isQuickPanelWindow } from "@/lib/window-role";
 import type { ContextPanelActions } from "@/shell/controllers/use-context-panel-controller";
 import { publishShellEvent } from "@/shell/event-bus";
 import { clampZoom, ZOOM_STEP } from "@/shell/use-zoom";
+
+const SESSION_ORDINAL_SHORTCUTS: { id: ShortcutId; ordinal: number }[] = [
+	{ id: "session.select1", ordinal: 1 },
+	{ id: "session.select2", ordinal: 2 },
+	{ id: "session.select3", ordinal: 3 },
+	{ id: "session.select4", ordinal: 4 },
+	{ id: "session.select5", ordinal: 5 },
+	{ id: "session.select6", ordinal: 6 },
+	{ id: "session.select7", ordinal: 7 },
+	{ id: "session.select8", ordinal: 8 },
+	{ id: "session.select9", ordinal: 9 },
+];
 
 /**
  * Assembles the full `ShortcutHandler[]` table AppShell feeds to
@@ -31,6 +44,7 @@ export function useGlobalShortcutHandlers({
 	handleCommitAction,
 	handleInspectorCommitAction,
 	handleNavigateSessions,
+	handleSelectSessionByOrdinal,
 	handleNavigateWorkspaces,
 	handleOpenModelPicker,
 	handleOpenPreferredEditor,
@@ -71,6 +85,7 @@ export function useGlobalShortcutHandlers({
 		},
 	) => Promise<void>;
 	handleNavigateSessions: (offset: -1 | 1) => void;
+	handleSelectSessionByOrdinal: (ordinal: number) => void;
 	handleNavigateWorkspaces: (offset: -1 | 1) => void;
 	handleOpenModelPicker: () => void;
 	handleOpenPreferredEditor: () => void;
@@ -160,6 +175,11 @@ export function useGlobalShortcutHandlers({
 				enabled: workspaceViewMode === "conversation",
 				repeatable: true,
 			},
+			...SESSION_ORDINAL_SHORTCUTS.map(({ id, ordinal }) => ({
+				id,
+				callback: () => handleSelectSessionByOrdinal(ordinal),
+				enabled: workspaceViewMode === "conversation",
+			})),
 			{
 				id: "session.close" as const,
 				callback: () => {
@@ -308,6 +328,7 @@ export function useGlobalShortcutHandlers({
 			handleCommitAction,
 			handleInspectorCommitAction,
 			handleNavigateSessions,
+			handleSelectSessionByOrdinal,
 			handleNavigateWorkspaces,
 			handleOpenModelPicker,
 			handleOpenPreferredEditor,
