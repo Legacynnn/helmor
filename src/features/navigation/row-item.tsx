@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 import { getWorkspaceBranchTone } from "@/lib/workspace-helpers";
 import { WorkspaceAvatar } from "./avatar";
 import { MoveToWorktreeDialog } from "./move-to-worktree-dialog";
+import { WorkspaceRowSessionsPreview } from "./row-sessions-preview";
 import {
 	branchToneClasses,
 	GroupIcon,
@@ -108,6 +109,8 @@ export type WorkspaceRowItemProps = {
 		title: string;
 	}) => void;
 	disableHoverCard?: boolean;
+	/** Verbose mode: render the running-session preview under the row. */
+	verbose?: boolean;
 	dragPreview?: boolean;
 	archivingWorkspaceIds?: Set<string>;
 	markingUnreadWorkspaceId?: string | null;
@@ -165,6 +168,7 @@ export const WorkspaceRowItem = memo(
 		groupId,
 		onDragPointerDown,
 		disableHoverCard,
+		verbose,
 		dragPreview,
 		archivingWorkspaceIds,
 		markingUnreadWorkspaceId,
@@ -698,6 +702,7 @@ export const WorkspaceRowItem = memo(
 						)}
 					</ContextMenuContent>
 				</ContextMenu>
+				{verbose ? <WorkspaceRowSessionsPreview workspaceId={row.id} /> : null}
 				{onMoveLocalToWorktree ? (
 					<MoveToWorktreeDialog
 						open={moveDialogOpen}
@@ -724,6 +729,7 @@ export const WorkspaceRowItem = memo(
 			previous.restoringWorkspaceId === next.restoringWorkspaceId &&
 			previous.workspaceActionsDisabled === next.workspaceActionsDisabled &&
 			previous.disableHoverCard === next.disableHoverCard &&
+			previous.verbose === next.verbose &&
 			previous.dragPreview === next.dragPreview &&
 			// pinned/backlog rows keep their key across grouping flips —
 			// without these two compares they'd hold a stale policy closure.
