@@ -6,6 +6,7 @@ import htmlWorker from "monaco-editor/esm/vs/language/html/html.worker?worker";
 import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
 import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
 import { resolveCssColor } from "@/lib/css-color";
+import { installTailwindSupport } from "@/lib/monaco/tailwind";
 
 type MonacoModule = typeof Monaco;
 type StandaloneEditor = Monaco.editor.IStandaloneCodeEditor;
@@ -183,14 +184,17 @@ export async function createFileEditor(options: {
 		occurrencesHighlight: "off",
 		padding: { top: 14, bottom: 24 },
 		parameterHints: { enabled: false },
-		quickSuggestions: false,
+		// Enable suggestions inside strings so Tailwind class completions surface
+		// in `class=`/`className=` values. The Tailwind provider self-gates to
+		// class/`@apply` contexts, so plain editing stays quiet.
+		quickSuggestions: { other: false, comments: false, strings: true },
 		readOnly: Boolean(options.readOnly),
 		readOnlyMessage: { value: "Click Edit to modify this file." },
 		renderValidationDecorations: "off",
 		scrollBeyondLastLine: false,
 		selectionHighlight: false,
 		smoothScrolling: true,
-		suggestOnTriggerCharacters: false,
+		suggestOnTriggerCharacters: true,
 		tabSize: 2,
 		theme: themeId(desiredTheme),
 		wordWrap: "on",
@@ -440,6 +444,18 @@ async function ensureRuntime(): Promise<MonacoRuntime> {
 	}
 
 	return runtimePromise;
+}
+
+/**
+ * Ensure Tailwind class completions are available in the editor, with the
+ * catalog refreshed for the given workspace. Idempotent; safe to call whenever
+ * the active workspace changes. Never throws.
+ */
+export async function ensureTailwindSupport(
+	workspaceRootPath: string | null,
+): Promise<void> {
+	const { monaco } = await ensureRuntime();
+	await installTailwindSupport(monaco, workspaceRootPath);
 }
 
 // Sync Monaco with `<html>` appearance changes. Re-defines both themes on

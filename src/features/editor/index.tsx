@@ -793,7 +793,12 @@ export function WorkspaceEditorSurface({
 		if (editorSession.kind === "file") {
 			void (async () => {
 				try {
-					const { createFileEditor } = await import("@/lib/monaco-runtime");
+					const { createFileEditor, ensureTailwindSupport } = await import(
+						"@/lib/monaco-runtime"
+					);
+					// Register Tailwind completions + refresh the catalog for this
+					// workspace. Best-effort and idempotent — don't block editor setup.
+					void ensureTailwindSupport(workspaceRootPath ?? null);
 					const controller = await createFileEditor({
 						container: host,
 						path: editorSession.path,
