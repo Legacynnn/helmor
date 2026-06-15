@@ -1759,7 +1759,6 @@ export function useWorkspacesSidebarController({
 		sidebarGrouping: settings.sidebarGrouping,
 		sidebarRepoFilterIds: settings.sidebarRepoFilterIds,
 		sidebarSort: settings.sidebarSort,
-		sidebarVerbose: settings.sidebarVerbose,
 		updateSettings,
 		handleAddRepository,
 		handleArchiveWorkspace,

@@ -128,11 +128,9 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 	sidebarGrouping = "status",
 	sidebarRepoFilterIds = [],
 	sidebarSort = "custom",
-	sidebarVerbose = false,
 	onSidebarGroupingChange,
 	onSidebarRepoFilterChange,
 	onSidebarSortChange,
-	onSidebarVerboseChange,
 	addingRepository,
 	selectedWorkspaceId,
 	busyWorkspaceIds,
@@ -171,11 +169,9 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 	sidebarGrouping?: SidebarGrouping;
 	sidebarRepoFilterIds?: string[];
 	sidebarSort?: SidebarSort;
-	sidebarVerbose?: boolean;
 	onSidebarGroupingChange?: (grouping: SidebarGrouping) => void;
 	onSidebarRepoFilterChange?: (repoIds: string[]) => void;
 	onSidebarSortChange?: (sort: SidebarSort) => void;
-	onSidebarVerboseChange?: (verbose: boolean) => void;
 	addingRepository?: boolean;
 	selectedWorkspaceId?: string | null;
 	busyWorkspaceIds?: Set<string>;
@@ -728,19 +724,6 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 		virtualizer.scrollToIndex(targetIndex, { align: "auto" });
 	}, [selectedWorkspaceId, sectionOpenState, flatItems, virtualizer]);
 
-	// When verbose mode turns OFF, the virtualizer's measurement cache still
-	// holds the taller (measured) heights of previously-expanded rows, which
-	// would leave blank gaps between fixed-height rows. Clearing the cache via
-	// measure() resets every row back to estimateSize (ROW_HEIGHT). Only fire
-	// on the true→false edge so the normal verbose-on measuring path is undisturbed.
-	const prevVerboseRef = useRef(sidebarVerbose);
-	useEffect(() => {
-		if (prevVerboseRef.current && !sidebarVerbose) {
-			virtualizer.measure();
-		}
-		prevVerboseRef.current = sidebarVerbose;
-	}, [sidebarVerbose, virtualizer]);
-
 	const workspaceActionsBusy = Boolean(
 		addingRepository || markingUnreadWorkspaceId || restoringWorkspaceId,
 	);
@@ -1078,7 +1061,6 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 						// Hide per-row avatar inside a real repo bucket — header
 						// already shows it. Pinned/backlog/archived keep theirs.
 						hideRepoAvatar={repoIdFromGroupId(item.groupId) !== null}
-						verbose={sidebarVerbose}
 						onSelect={handleSelectWorkspace}
 						onPreviewSelect={handlePreviewSelectWorkspace}
 						onPrefetch={onPrefetchWorkspace}
@@ -1130,7 +1112,6 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 			onArchiveWorkspace,
 			onMoveLocalToWorktree,
 			onMarkWorkspaceUnread,
-			onOpenInFinder,
 			onRestoreWorkspace,
 			onDeleteWorkspace,
 			onTogglePin,
@@ -1139,9 +1120,7 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 			onSetWorkspaceStatus,
 			startDragGesture,
 			startRepoDragGesture,
-			dragReorderEnabled,
 			isAnyDragging,
-			sidebarVerbose,
 			archivingWorkspaceIds,
 			markingUnreadWorkspaceId,
 			restoringWorkspaceId,
@@ -1173,14 +1152,12 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 						grouping={sidebarGrouping}
 						selectedRepoIds={sidebarRepoFilterIds}
 						sort={sidebarSort}
-						verbose={sidebarVerbose}
 						open={isSidebarViewPopoverOpen}
 						onOpenChange={setIsSidebarViewPopoverOpen}
 						shortcut={sidebarFilterShortcut}
 						onGroupingChange={onSidebarGroupingChange}
 						onRepoFilterChange={onSidebarRepoFilterChange}
 						onSortChange={onSidebarSortChange}
-						onVerboseChange={onSidebarVerboseChange}
 					/>
 
 					<DropdownMenu
@@ -1313,22 +1290,12 @@ export const WorkspacesSidebar = memo(function WorkspacesSidebar({
 						return (
 							<div
 								key={vItem.key}
-								data-index={vItem.index}
-								ref={
-									sidebarVerbose && item.kind === "row"
-										? virtualizer.measureElement
-										: undefined
-								}
 								style={{
 									position: "absolute",
 									top: 0,
 									left: 0,
 									width: "100%",
-									// Verbose rows start at the row-height estimate and grow to
-									// their measured height once ResizeObserver fires (one frame).
-									...(sidebarVerbose && item.kind === "row"
-										? { minHeight: `${vItem.size}px` }
-										: { height: `${vItem.size}px` }),
+									height: `${vItem.size}px`,
 									// `translate3d` forces a compositor layer in WebKit
 									// (Tauri's webview) so transitions during the drag
 									// stay smooth in both directions.
