@@ -1024,8 +1024,8 @@ html.vesper-fullscreen.theme-vesper.dark {
 	   body alpha than the shared pane, and translucent section headers (they'd
 	   otherwise inherit the opaque --bg-elevated and punch solid blocks into the
 	   glass). */
-	--inspector-bg: oklch(0.205 0.008 66 / 0.3);
-	--inspector-section-header-bg: oklch(0.225 0.008 66 / 0.42);
+	--inspector-bg: oklch(0.205 0.008 66 / 0.2);
+	--inspector-section-header-bg: oklch(0.225 0.008 66 / 0.3);
 }
 
 html.vesper-fullscreen.theme-vesper.dark body::before {
@@ -1063,7 +1063,12 @@ html.vesper-fullscreen.theme-vesper.dark [aria-label="Top-level screen"] {
 }
 
 html.vesper-fullscreen.theme-vesper.dark [data-shell-pane-inner="sidebar"] {
-	background-color: var(--vesper-fullscreen-pane-bg);
+	/* Sidebar reads cooler + denser than the shared warm pane material: drop most
+	   of the warm chroma (0.008 → 0.002) and thicken it (alpha 0.4 → 0.9) so the
+	   left rail sits as a quiet near-opaque panel rather than picking up the warm
+	   glassy wash the viewport/inspector still use. Lightness sits a touch above
+	   the shared pane (0.205) so the dense panel doesn't read as flat black. */
+	background-color: oklch(0.215 0.002 65 / 0.9);
 }
 
 /* Center remains denser than the chrome so chat/editor text still wins over the
