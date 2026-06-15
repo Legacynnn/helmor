@@ -13,11 +13,21 @@ import {
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const PREFIX_TYPES: BranchPrefixType[] = ["username", "custom", "none"];
+const PREFIX_TYPES: BranchPrefixType[] = [
+	"username",
+	"custom",
+	"none",
+	"semantic",
+];
 
 function effectivePrefixType(repo: RepositoryCreateOption): BranchPrefixType {
 	const stored = repo.branchPrefixType;
-	if (stored === "username" || stored === "custom" || stored === "none") {
+	if (
+		stored === "username" ||
+		stored === "custom" ||
+		stored === "none" ||
+		stored === "semantic"
+	) {
 		return stored;
 	}
 	// NULL is treated as "username" by the backend resolver — mirror here so
@@ -102,7 +112,9 @@ export function BranchPrefixSection({
 				? githubLogin
 					? `${githubLogin}/`
 					: ""
-				: "";
+				: prefixType === "semantic"
+					? "feat/"
+					: "";
 
 	const customId = `repo-${repo.id}-branch-prefix-custom`;
 	const customActive = prefixType === "custom";
@@ -170,6 +182,28 @@ export function BranchPrefixSection({
 					/>
 				</Field>
 				<PrefixRadioOption repoId={repo.id} value="none" label="None" />
+				<Field
+					orientation="horizontal"
+					className="items-start gap-3 rounded-lg px-1 py-0.5"
+				>
+					<RadioGroupItem
+						value="semantic"
+						id={`repo-${repo.id}-branch-prefix-semantic`}
+						className="mt-0.5"
+					/>
+					<FieldContent>
+						<FieldLabel
+							htmlFor={`repo-${repo.id}-branch-prefix-semantic`}
+							className="text-foreground"
+						>
+							Semantic (Conventional Commits)
+						</FieldLabel>
+						<div className="text-small leading-snug text-muted-foreground">
+							feat / fix / refactor / chore … detected automatically from your
+							first prompt. No prefix until then.
+						</div>
+					</FieldContent>
+				</Field>
 			</RadioGroup>
 		</div>
 	);
@@ -205,6 +239,11 @@ function BranchPrefixPreview({
 			{prefixType === "username" && !previewPrefix ? (
 				<span className="ml-1 text-muted-foreground/70">
 					(connect an account)
+				</span>
+			) : null}
+			{prefixType === "semantic" ? (
+				<span className="ml-1 text-muted-foreground/70">
+					(type detected from your first prompt)
 				</span>
 			) : null}
 		</div>

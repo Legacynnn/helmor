@@ -310,7 +310,7 @@ export type WorkspaceSummary = {
 	lastUserMessageAt?: string | null;
 };
 
-export type BranchPrefixType = "username" | "custom" | "none";
+export type BranchPrefixType = "username" | "custom" | "none" | "semantic";
 
 export type RepositoryCreateOption = {
 	id: string;
