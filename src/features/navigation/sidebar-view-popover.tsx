@@ -4,6 +4,7 @@ import {
 	Check,
 	ChevronsUpDown,
 	Clock3,
+	Eye,
 	Folder,
 	FolderGit2,
 	GripVertical,
@@ -52,12 +53,14 @@ interface SidebarViewPopoverProps {
 	grouping: SidebarGrouping;
 	selectedRepoIds: string[];
 	sort: SidebarSort;
+	verbose: boolean;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	shortcut?: string | null;
 	onGroupingChange?: (grouping: SidebarGrouping) => void;
 	onRepoFilterChange?: (repoIds: string[]) => void;
 	onSortChange?: (sort: SidebarSort) => void;
+	onVerboseChange?: (verbose: boolean) => void;
 }
 
 const SIDEBAR_SORT_OPTIONS: SidebarSortOption[] = [
@@ -171,12 +174,14 @@ export function SidebarViewPopover({
 	grouping,
 	selectedRepoIds,
 	sort,
+	verbose,
 	open,
 	onOpenChange,
 	shortcut,
 	onGroupingChange,
 	onRepoFilterChange,
 	onSortChange,
+	onVerboseChange,
 }: SidebarViewPopoverProps) {
 	return (
 		<Popover open={open} onOpenChange={onOpenChange}>
@@ -276,6 +281,20 @@ export function SidebarViewPopover({
 						);
 					})}
 				</div>
+				<div className="h-px bg-border/60" />
+				<button
+					type="button"
+					role="switch"
+					aria-checked={verbose}
+					className="flex w-full cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-ui leading-4 hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50"
+					onClick={() => onVerboseChange?.(!verbose)}
+				>
+					<Eye className="size-3.5 shrink-0 text-muted-foreground" />
+					<span className="min-w-0 flex-1 truncate">
+						Verbose — preview running sessions
+					</span>
+					{verbose ? <Check className="size-3.5" strokeWidth={2.2} /> : null}
+				</button>
 			</PopoverContent>
 		</Popover>
 	);
