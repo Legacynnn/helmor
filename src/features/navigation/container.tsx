@@ -55,6 +55,7 @@ export const WorkspacesSidebarContainer = memo(
 			sidebarGrouping,
 			sidebarRepoFilterIds,
 			sidebarSort,
+			sidebarVerbose,
 			updateSettings,
 			handleAddRepository,
 			handleArchiveWorkspace,
@@ -87,6 +88,7 @@ export const WorkspacesSidebarContainer = memo(
 				sidebarGrouping={sidebarGrouping}
 				sidebarRepoFilterIds={sidebarRepoFilterIds}
 				sidebarSort={sidebarSort}
+				sidebarVerbose={sidebarVerbose}
 				onSidebarGroupingChange={(sidebarGrouping) => {
 					void updateSettings({ sidebarGrouping });
 				}}
@@ -95,6 +97,9 @@ export const WorkspacesSidebarContainer = memo(
 				}}
 				onSidebarSortChange={(sidebarSort) => {
 					void updateSettings({ sidebarSort });
+				}}
+				onSidebarVerboseChange={(sidebarVerbose) => {
+					void updateSettings({ sidebarVerbose });
 				}}
 				addingRepository={addingRepository}
 				archivingWorkspaceIds={archivingWorkspaceIds}
