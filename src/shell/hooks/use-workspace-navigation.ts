@@ -12,7 +12,11 @@ import {
 	scheduleAfterNextPaint,
 } from "@/lib/schedule-after-paint";
 import type { SelectionActions } from "@/shell/controllers/use-selection-controller";
-import { findAdjacentSessionId, findAdjacentWorkspaceId } from "@/shell/layout";
+import {
+	findAdjacentSessionId,
+	findAdjacentWorkspaceId,
+	resolveSessionIdByOrdinal,
+} from "@/shell/layout";
 
 type PendingWorkspaceNavigation = {
 	/** Where the chain will land once the deferred commit runs. */
@@ -66,6 +70,26 @@ export function useWorkspaceNavigation({
 				workspaceSessions,
 				snapshot.sessionId,
 				offset,
+			);
+			if (!nextSessionId) return;
+			handleSelectSession(nextSessionId);
+		},
+		[handleSelectSession, queryClient, selectionActions],
+	);
+
+	const handleSelectSessionByOrdinal = useCallback(
+		(ordinal: number) => {
+			const snapshot = selectionActions.getSnapshot();
+			const workspaceId = snapshot.workspaceId;
+			if (!workspaceId) return;
+			const workspaceSessions =
+				queryClient.getQueryData<WorkspaceSessionSummary[]>(
+					helmorQueryKeys.workspaceSessions(workspaceId),
+				) ?? [];
+			const nextSessionId = resolveSessionIdByOrdinal(
+				workspaceSessions,
+				snapshot.sessionId,
+				ordinal,
 			);
 			if (!nextSessionId) return;
 			handleSelectSession(nextSessionId);
@@ -128,5 +152,9 @@ export function useWorkspaceNavigation({
 		[archivedRows, handleSelectWorkspace, selectionActions, workspaceGroups],
 	);
 
-	return { handleNavigateSessions, handleNavigateWorkspaces };
+	return {
+		handleNavigateSessions,
+		handleNavigateWorkspaces,
+		handleSelectSessionByOrdinal,
+	};
 }
