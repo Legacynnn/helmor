@@ -183,15 +183,18 @@ export function useWorkspaceActionControllers({
 		workspaceViewMode,
 	});
 
-	const { handleNavigateSessions, handleNavigateWorkspaces } =
-		useWorkspaceNavigation({
-			queryClient,
-			selectionActions,
-			workspaceGroups,
-			archivedRows,
-			handleSelectWorkspace,
-			handleSelectSession,
-		});
+	const {
+		handleNavigateSessions,
+		handleNavigateWorkspaces,
+		handleSelectSessionByOrdinal,
+	} = useWorkspaceNavigation({
+		queryClient,
+		selectionActions,
+		workspaceGroups,
+		archivedRows,
+		handleSelectWorkspace,
+		handleSelectSession,
+	});
 
 	const { quickSwitch, liveWorkspaceRowMap } = useWorkspaceQuickSwitch({
 		workspaceGroups,
@@ -241,6 +244,7 @@ export function useWorkspaceActionControllers({
 		handleCloseSelectedSession,
 		handleCreateSession,
 		handleNavigateSessions,
+		handleSelectSessionByOrdinal,
 		handleNavigateWorkspaces,
 		quickSwitch,
 		liveWorkspaceRowMap,

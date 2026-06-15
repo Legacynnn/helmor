@@ -215,6 +215,7 @@ export function useAppShellState({
 		handleCommitAction: data.handleCommitAction,
 		handleInspectorCommitAction: data.handleInspectorCommitAction,
 		handleNavigateSessions: data.handleNavigateSessions,
+		handleSelectSessionByOrdinal: data.handleSelectSessionByOrdinal,
 		handleNavigateWorkspaces: data.handleNavigateWorkspaces,
 		handleOpenModelPicker: chrome.handleOpenModelPicker,
 		handleOpenPreferredEditor: chrome.handleOpenPreferredEditor,
