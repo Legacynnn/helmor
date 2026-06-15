@@ -378,24 +378,19 @@ export function WorkspaceInspectorSidebar({
 		[terminalInstances, activeTab, setActiveTab],
 	);
 	const { settings: appSettings } = useSettings();
-	// App-scoped Cmd+Shift+J: toggle the terminal panel's zoom-expand (the
-	// same 2x enlargement as hovering the body). Before flipping the zoom we
-	// make sure there's something zoomable on screen — a terminal tab, in an
-	// open panel — so the keypress always has an effect:
-	//   - No terminals yet → spawn one (and open the panel). The new terminal
-	//     mounts; the zoom toggle then runs on the next frame.
-	//   - Panel collapsed → open it and activate the target terminal, then
-	//     toggle zoom once the panel is actually open.
-	//   - Panel open on Setup/Run → switch to the target terminal, then zoom.
-	//   - Panel open on a terminal → toggle the zoom directly (second press
-	//     collapses; `useHoverZoom` owns that state).
-	// Target selection mirrors the old focus shortcut: keep the current
-	// terminal if one is active, else fall back to the rightmost.
-	const handleToggleTerminalZoom = useCallback(() => {
+	// App-scoped Cmd+Shift+E: toggle the inspector tabs panel's zoom-expand
+	// (the same 2x enlargement as hovering the body) for whichever tab the
+	// user is already on — the Run output or a terminal. We deliberately do
+	// NOT switch tabs or spawn anything: the expand acts on wherever the user
+	// last was, so it stays out of their way.
+	//   - Panel collapsed → open it, then toggle zoom once it's actually open.
+	//   - Panel open → toggle the zoom on the active tab directly (second
+	//     press collapses; `useHoverZoom` owns that state).
+	const handleToggleTabZoom = useCallback(() => {
 		const dispatchZoomToggle = (deferred: boolean) => {
 			if (deferred) {
-				// Wait one frame so the panel-open / tab-switch state has
-				// propagated to `useHoverZoom` (which requires `open === true`).
+				// Wait one frame so the panel-open state has propagated to
+				// `useHoverZoom` (which requires `open === true`).
 				requestAnimationFrame(() =>
 					window.dispatchEvent(new Event(TOGGLE_TERMINAL_ZOOM_EVENT)),
 				);
@@ -404,38 +399,13 @@ export function WorkspaceInspectorSidebar({
 			}
 		};
 
-		// Empty state — bootstrap a terminal, then zoom once it has mounted.
-		if (terminalInstances.length === 0) {
-			if (!canSpawnTerminal) return;
-			if (!tabsOpen) handleToggleTabs();
-			handleAddTerminal();
-			dispatchZoomToggle(true);
-			return;
-		}
-
-		const currentTerminal = terminalInstances.find((t) => t.id === activeTab);
-		const target =
-			currentTerminal ?? terminalInstances[terminalInstances.length - 1];
-
 		let deferred = false;
 		if (!tabsOpen) {
 			handleToggleTabs();
 			deferred = true;
 		}
-		if (activeTab !== target.id) {
-			setActiveTab(target.id);
-			deferred = true;
-		}
 		dispatchZoomToggle(deferred);
-	}, [
-		terminalInstances,
-		canSpawnTerminal,
-		tabsOpen,
-		handleToggleTabs,
-		handleAddTerminal,
-		activeTab,
-		setActiveTab,
-	]);
+	}, [tabsOpen, handleToggleTabs]);
 
 	const terminalShortcutHandlers = useMemo<ShortcutHandler[]>(
 		() => [
@@ -468,11 +438,10 @@ export function WorkspaceInspectorSidebar({
 			},
 			{
 				id: "inspector.focusTerminal",
-				callback: handleToggleTerminalZoom,
-				// Always enabled — handler bootstraps a terminal if none
-				// exist, opens the panel when collapsed, switches to a
-				// terminal tab, then toggles the zoom-expand.
-				enabled: canSpawnTerminal || terminalInstances.length > 0,
+				callback: handleToggleTabZoom,
+				// Always enabled — opens the panel when collapsed, then toggles
+				// the zoom-expand on whichever tab (Run / terminal) is active.
+				enabled: true,
 			},
 		],
 		[
@@ -480,7 +449,7 @@ export function WorkspaceInspectorSidebar({
 			canSpawnTerminal,
 			handleAddTerminal,
 			handleCloseTerminal,
-			handleToggleTerminalZoom,
+			handleToggleTabZoom,
 			handleToggleTabs,
 			isTerminalTabActive,
 			navigateTerminal,
