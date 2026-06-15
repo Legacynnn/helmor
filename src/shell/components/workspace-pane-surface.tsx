@@ -239,6 +239,7 @@ export function WorkspacePaneSurface({
 							onRequestCloseSession={onRequestCloseSession}
 							workspaceRootPath={workspaceRootPath}
 							onOpenFileReference={editorSessionActions.openFileReference}
+							onOpenFileDiff={editorSessionActions.openFile}
 							contextPanelOpen={contextPanelOpen}
 							onToggleContextPanel={contextPanelActions.toggleContextPanel}
 							contextPreviewCard={contextPreviewCard}

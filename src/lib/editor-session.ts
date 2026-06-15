@@ -211,6 +211,26 @@ function joinPath(root: string, relativePath: string): string {
 	return `${root.replace(/\/+$/, "")}/${relativePath.replace(/^\/+/, "")}`;
 }
 
+/** Resolve a tool-call file path (which may be absolute or workspace-relative)
+ * into the absolute path the in-app editor expects. Returns null when there is
+ * nothing usable to open (no path, or no workspace root for a relative path). */
+export function resolveWorkspacePath(
+	workspaceRootPath: string | null | undefined,
+	path: string | null | undefined,
+): string | null {
+	if (!path) {
+		return null;
+	}
+	const normalizedPath = normalizePath(path);
+	if (normalizedPath.startsWith("/")) {
+		return normalizedPath;
+	}
+	if (!workspaceRootPath) {
+		return null;
+	}
+	return joinPath(normalizePath(workspaceRootPath), normalizedPath);
+}
+
 function normalizePath(path: string): string {
 	return path.replace(/\\/g, "/");
 }

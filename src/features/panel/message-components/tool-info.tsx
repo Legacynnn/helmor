@@ -50,6 +50,7 @@ export function getToolInfo(
 		return {
 			action: "Edit",
 			file: filePath ? basename(filePath) : undefined,
+			path: filePath ?? undefined,
 			icon: <Pencil className={neutralToolIconClassName} strokeWidth={1.8} />,
 			diffAdd,
 			diffDel: diffDelete,
@@ -69,6 +70,7 @@ export function getToolInfo(
 			}
 			return {
 				name: path ? basename(path) : "unknown",
+				path: path ?? undefined,
 				diffAdd: add || undefined,
 				diffDel: del || undefined,
 				rawDiff: diff || undefined,
@@ -84,6 +86,7 @@ export function getToolInfo(
 			return {
 				action: "Edit",
 				file: parsed[0]?.name,
+				path: parsed[0]?.path,
 				icon,
 				diffAdd: totalAdd || undefined,
 				diffDel: totalDel || undefined,

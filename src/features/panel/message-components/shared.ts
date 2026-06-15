@@ -18,6 +18,9 @@ export type StreamdownMode = "static" | "streaming";
 
 export type FileChangeInfo = {
 	name: string;
+	/** Full file path (absolute or workspace-relative) for opening the diff.
+	 * `name` is the basename used for display. */
+	path?: string;
 	diffAdd?: number;
 	diffDel?: number;
 	rawDiff?: string;
@@ -26,6 +29,9 @@ export type FileChangeInfo = {
 export type ToolInfo = {
 	action: string;
 	file?: string;
+	/** Full file path (absolute or workspace-relative) for opening the diff.
+	 * `file` is the basename used for display. */
+	path?: string;
 	detail?: string;
 	command?: string;
 	fullCommand?: string;

@@ -70,6 +70,7 @@ describe("getToolInfo — apply_patch", () => {
 		});
 		expect(info.action).toBe("Edit");
 		expect(info.file).toBe("utils.ts");
+		expect(info.path).toBe("/src/lib/utils.ts");
 		expect(info.diffAdd).toBe(2);
 		expect(info.diffDel).toBe(1);
 		expect(info.rawDiff).toContain("@@ -1,3 +1,4 @@");
@@ -98,12 +99,14 @@ describe("getToolInfo — apply_patch", () => {
 		expect(info.files).toHaveLength(2);
 		expect(info.files![0]).toEqual({
 			name: "a.ts",
+			path: "/src/a.ts",
 			diffAdd: 2,
 			diffDel: 1,
 			rawDiff: "-removed\n+added1\n+added2",
 		});
 		expect(info.files![1]).toEqual({
 			name: "b.ts",
+			path: "/src/b.ts",
 			diffAdd: 3,
 			diffDel: undefined,
 			rawDiff: "+new file line 1\n+new file line 2\n+new file line 3",

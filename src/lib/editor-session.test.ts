@@ -3,7 +3,40 @@ import {
 	INDEX_REF,
 	isActiveEditorTarget,
 	isMarkdownPath,
+	resolveWorkspacePath,
 } from "./editor-session";
+
+describe("resolveWorkspacePath", () => {
+	it("returns absolute paths unchanged", () => {
+		expect(resolveWorkspacePath("/ws", "/abs/foo.ts")).toBe("/abs/foo.ts");
+	});
+
+	it("joins a relative path onto the workspace root", () => {
+		expect(resolveWorkspacePath("/ws", "src/foo.ts")).toBe("/ws/src/foo.ts");
+		expect(resolveWorkspacePath("/ws/", "/src/foo.ts".replace(/^\//, ""))).toBe(
+			"/ws/src/foo.ts",
+		);
+	});
+
+	it("normalizes backslashes before joining", () => {
+		expect(resolveWorkspacePath("/ws", "src\\foo.ts")).toBe("/ws/src/foo.ts");
+	});
+
+	it("returns null when the path is missing", () => {
+		expect(resolveWorkspacePath("/ws", null)).toBeNull();
+		expect(resolveWorkspacePath("/ws", undefined)).toBeNull();
+		expect(resolveWorkspacePath("/ws", "")).toBeNull();
+	});
+
+	it("returns null for a relative path with no workspace root", () => {
+		expect(resolveWorkspacePath(null, "src/foo.ts")).toBeNull();
+		expect(resolveWorkspacePath(undefined, "src/foo.ts")).toBeNull();
+	});
+
+	it("still resolves absolute paths without a workspace root", () => {
+		expect(resolveWorkspacePath(null, "/abs/foo.ts")).toBe("/abs/foo.ts");
+	});
+});
 
 describe("isMarkdownPath", () => {
 	it("matches common markdown extensions", () => {

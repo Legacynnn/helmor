@@ -23,6 +23,7 @@ import {
 } from "@/lib/api";
 import type { ResolvedComposerInsertRequest } from "@/lib/composer-insert";
 import { insertRequestMatchesComposer } from "@/lib/composer-insert";
+import type { DiffOpenOptions } from "@/lib/editor-session";
 import { hasUnresolvedPlanReview } from "@/lib/plan-review";
 import {
 	agentModelSectionsQueryOptions,
@@ -157,6 +158,7 @@ export type WorkspaceConversationContainerProps = {
 	onRequestCloseSession?: (request: SessionCloseRequest) => void;
 	workspaceRootPath?: string | null;
 	onOpenFileReference?: (path: string, line?: number, column?: number) => void;
+	onOpenFileDiff?: (path: string, options?: DiffOpenOptions) => void;
 	composerOnly?: boolean;
 	composerWrapperClassName?: string;
 	/** Override placeholder text for the composer's editor. */
@@ -231,6 +233,7 @@ export const WorkspaceConversationContainer = memo(
 		onRequestCloseSession,
 		workspaceRootPath,
 		onOpenFileReference,
+		onOpenFileDiff,
 		composerOnly = false,
 		composerWrapperClassName,
 		composerPlaceholder,
@@ -262,8 +265,12 @@ export const WorkspaceConversationContainer = memo(
 		// the context identity on every render of this container and cascade to
 		// every file-link consumer in the thread. Memoize by hand.
 		const fileLinkValue = useMemo(
-			() => ({ openInEditor: onOpenFileReference, workspaceRootPath }),
-			[onOpenFileReference, workspaceRootPath],
+			() => ({
+				openInEditor: onOpenFileReference,
+				openDiff: onOpenFileDiff,
+				workspaceRootPath,
+			}),
+			[onOpenFileReference, onOpenFileDiff, workspaceRootPath],
 		);
 		const composerContextKey =
 			composerContextKeyOverride ??

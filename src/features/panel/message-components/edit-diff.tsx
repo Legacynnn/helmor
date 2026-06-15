@@ -1,7 +1,15 @@
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import {
+	type KeyboardEvent as ReactKeyboardEvent,
+	type ReactNode,
+	useCallback,
+	useRef,
+	useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { Separator } from "@/components/ui/separator";
+import { resolveWorkspacePath } from "@/lib/editor-session";
 import { cn } from "@/lib/utils";
+import { useFileLinkContext } from "./file-link-context";
 
 const TRIGGER_GAP = 4;
 const VIEWPORT_PADDING = 16;
@@ -20,6 +28,7 @@ type PopoverPos = {
 
 export function EditDiffTrigger({
 	file,
+	path,
 	diffAdd,
 	diffDel,
 	oldStr,
@@ -29,6 +38,8 @@ export function EditDiffTrigger({
 	variant = "pill",
 }: {
 	file: string;
+	/** Full file path (absolute or workspace-relative) used to open the diff. */
+	path?: string | null;
 	diffAdd?: number;
 	diffDel?: number;
 	oldStr: string | null;
@@ -40,6 +51,32 @@ export function EditDiffTrigger({
 	const triggerRef = useRef<HTMLSpanElement>(null);
 	const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [pos, setPos] = useState<PopoverPos | null>(null);
+	const { openDiff, workspaceRootPath } = useFileLinkContext();
+	const target = resolveWorkspacePath(workspaceRootPath, path);
+	const canOpen = Boolean(openDiff && target);
+
+	const openFileDiff = useCallback(
+		(event: { preventDefault(): void; stopPropagation(): void }) => {
+			if (!openDiff || !target) {
+				return;
+			}
+			// The pill variant lives inside a <summary>; a bare click would toggle
+			// the parent <details>. Suppress that and open the diff instead.
+			event.preventDefault();
+			event.stopPropagation();
+			openDiff(target, { fileStatus: "M", preview: true });
+		},
+		[openDiff, target],
+	);
+
+	const onTriggerKeyDown = useCallback(
+		(event: ReactKeyboardEvent) => {
+			if (event.key === "Enter" || event.key === " ") {
+				openFileDiff(event);
+			}
+		},
+		[openFileDiff],
+	);
 
 	const show = useCallback(() => {
 		if (hideTimer.current) {
@@ -74,8 +111,14 @@ export function EditDiffTrigger({
 				ref={triggerRef}
 				onMouseEnter={show}
 				onMouseLeave={hideDelayed}
+				onClick={canOpen ? openFileDiff : undefined}
+				onKeyDown={canOpen ? onTriggerKeyDown : undefined}
+				role={canOpen ? "button" : undefined}
+				tabIndex={canOpen ? 0 : undefined}
+				title={canOpen ? "Open diff" : undefined}
 				className={cn(
 					"items-center gap-1.5 text-small leading-4 text-muted-foreground transition-colors",
+					canOpen ? "cursor-pointer" : "",
 					variant === "row"
 						? "flex w-full cursor-interactive rounded-md px-2 py-1 hover:bg-accent/60"
 						: "inline-flex self-start rounded-md border border-border/60 px-1.5 py-0.5 hover:border-muted-foreground/40 hover:bg-accent/40",
@@ -112,9 +155,22 @@ export function EditDiffTrigger({
 								maxHeight: pos.maxHeight,
 							}}
 						>
-							<div className="shrink-0 border-b border-border/50 px-3 py-1.5 text-mini text-muted-foreground">
-								{file}
-							</div>
+							{canOpen ? (
+								<button
+									type="button"
+									onClick={openFileDiff}
+									title="Open diff"
+									className="flex shrink-0 cursor-pointer items-center gap-1 border-b border-border/50 px-3 py-1.5 text-left text-mini text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+								>
+									<span className="truncate underline-offset-2 hover:underline">
+										{file}
+									</span>
+								</button>
+							) : (
+								<div className="shrink-0 border-b border-border/50 px-3 py-1.5 text-mini text-muted-foreground">
+									{file}
+								</div>
+							)}
 							<div className="min-h-0 max-h-[24rem] flex-1 overflow-auto font-mono text-mini leading-5">
 								{oldStr
 									? oldStr.split("\n").map((line, index) => (

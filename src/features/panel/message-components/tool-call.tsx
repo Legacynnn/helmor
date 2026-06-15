@@ -143,6 +143,7 @@ export const AssistantToolCall = memo(function AssistantToolCall({
 				hasDiff ? (
 					<EditDiffTrigger
 						file={info.file}
+						path={info.path}
 						diffAdd={info.diffAdd}
 						diffDel={info.diffDel}
 						oldStr={oldStr}
@@ -276,6 +277,7 @@ export const AssistantToolCall = memo(function AssistantToolCall({
 										<EditDiffTrigger
 											key={`${f.name}-${i}`}
 											file={f.name}
+											path={f.path}
 											diffAdd={f.diffAdd}
 											diffDel={f.diffDel}
 											oldStr={null}

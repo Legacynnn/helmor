@@ -146,6 +146,7 @@ export function StartSurfacePane({
 				onRequestCloseSession={onRequestCloseSession}
 				workspaceRootPath={null}
 				onOpenFileReference={editorSessionActions.openFileReference}
+				onOpenFileDiff={editorSessionActions.openFile}
 				composerOnly
 				composerWrapperClassName="w-full"
 				composerForceAvailable={
