@@ -620,7 +620,7 @@ pub fn branch_name_for_directory(
             .filter(|value| !value.is_empty())
             .unwrap_or("")
             .to_string(),
-        BranchPrefixType::None => String::new(),
+        BranchPrefixType::None | BranchPrefixType::Semantic => String::new(),
         BranchPrefixType::Username => {
             if let Ok(Some(login)) = resolve_forge_login(settings) {
                 format!("{login}/")

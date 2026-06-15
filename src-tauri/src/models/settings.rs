@@ -19,6 +19,11 @@ pub enum BranchPrefixType {
     Custom,
     /// `<dir>` — no prefix at all.
     None,
+    /// `<type>/<dir>` — Conventional-Commits type chosen automatically by
+    /// the title LLM (feat/fix/refactor/...). The type is baked into the
+    /// branch slug by the title pipeline; the prefix resolver treats this
+    /// like `None` (empty prefix).
+    Semantic,
 }
 
 impl BranchPrefixType {
@@ -27,6 +32,7 @@ impl BranchPrefixType {
             BranchPrefixType::Username => "username",
             BranchPrefixType::Custom => "custom",
             BranchPrefixType::None => "none",
+            BranchPrefixType::Semantic => "semantic",
         }
     }
 }
@@ -39,6 +45,7 @@ impl FromStr for BranchPrefixType {
             "username" => Ok(BranchPrefixType::Username),
             "custom" => Ok(BranchPrefixType::Custom),
             "none" => Ok(BranchPrefixType::None),
+            "semantic" => Ok(BranchPrefixType::Semantic),
             _ => Err(()),
         }
     }
@@ -200,6 +207,10 @@ mod tests {
             BranchPrefixType::from_str("none").unwrap(),
             BranchPrefixType::None
         );
+        assert_eq!(
+            BranchPrefixType::from_str("semantic").unwrap(),
+            BranchPrefixType::Semantic
+        );
     }
 
     #[test]
@@ -233,6 +244,7 @@ mod tests {
             BranchPrefixType::Username,
             BranchPrefixType::Custom,
             BranchPrefixType::None,
+            BranchPrefixType::Semantic,
         ] {
             let stored = variant.as_storage_str();
             assert_eq!(
