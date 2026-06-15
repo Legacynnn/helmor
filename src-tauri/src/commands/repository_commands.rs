@@ -119,6 +119,33 @@ pub async fn update_repo_preferences(
 }
 
 #[tauri::command]
+pub async fn load_repo_copy_settings(repo_id: String) -> CmdResult<repos::RepoCopySettings> {
+    run_blocking(move || repos::load_repo_copy_settings(&repo_id)).await
+}
+
+#[tauri::command]
+pub async fn update_repo_copy_settings(
+    repo_id: String,
+    settings: repos::RepoCopySettings,
+) -> CmdResult<()> {
+    run_blocking(move || repos::update_repo_copy_settings(&repo_id, &settings)).await
+}
+
+/// Scan the repo working tree for secret-like untracked files (`.env`,
+/// keys, `secrets/`, ...) so the settings UI can offer them as copy
+/// candidates. Pure read — no DB writes.
+#[tauri::command]
+pub async fn detect_repo_copy_candidates(repo_id: String) -> CmdResult<Vec<String>> {
+    run_blocking(move || {
+        let repo = repos::load_repository_by_id(&repo_id)?
+            .ok_or_else(|| anyhow::anyhow!("Repository not found: {repo_id}"))?;
+        let root = std::path::PathBuf::from(&repo.root_path);
+        crate::workspace::copy_files::detect_copy_candidates(&root)
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn delete_repository(repo_id: String) -> CmdResult<()> {
     let _lock = db::WORKSPACE_FS_MUTATION_LOCK.lock().await;
     run_blocking(move || repos::delete_repository_cascade(&repo_id)).await

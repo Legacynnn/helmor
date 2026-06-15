@@ -807,6 +807,94 @@ pub fn update_repository_branch_prefix(
     Ok(())
 }
 
+/// Per-repo configuration for copying essential files (`.env`, keys,
+/// local config) into newly created worktree workspaces.
+///
+/// `copy_files` — explicit relative paths (files or folders) the user
+/// added. `copy_exclude` — auto-detected paths the user opted out of.
+/// `auto_copy_untracked` — whether secret-like untracked files are
+/// auto-detected and copied (default `true`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepoCopySettings {
+    pub auto_copy_untracked: bool,
+    pub copy_files: Vec<String>,
+    pub copy_exclude: Vec<String>,
+}
+
+impl Default for RepoCopySettings {
+    fn default() -> Self {
+        Self {
+            auto_copy_untracked: true,
+            copy_files: Vec::new(),
+            copy_exclude: Vec::new(),
+        }
+    }
+}
+
+fn parse_path_list(raw: Option<String>) -> Vec<String> {
+    raw.as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .and_then(|value| serde_json::from_str::<Vec<String>>(value).ok())
+        .unwrap_or_default()
+}
+
+pub fn load_repo_copy_settings(repo_id: &str) -> Result<RepoCopySettings> {
+    let connection = db::read_conn()?;
+    let mut statement = connection
+        .prepare("SELECT copy_files, copy_exclude, auto_copy_untracked FROM repos WHERE id = ?1")
+        .with_context(|| format!("Failed to prepare copy-settings lookup for {repo_id}"))?;
+
+    statement
+        .query_row([repo_id], |row| {
+            let copy_files_raw: Option<String> = row.get(0)?;
+            let copy_exclude_raw: Option<String> = row.get(1)?;
+            // NULL defaults to enabled (matches the column default of 1).
+            let auto_copy_untracked: bool = row.get::<_, Option<i64>>(2)?.unwrap_or(1) != 0;
+            Ok(RepoCopySettings {
+                auto_copy_untracked,
+                copy_files: parse_path_list(copy_files_raw),
+                copy_exclude: parse_path_list(copy_exclude_raw),
+            })
+        })
+        .with_context(|| format!("Repository not found: {repo_id}"))
+}
+
+pub fn update_repo_copy_settings(repo_id: &str, settings: &RepoCopySettings) -> Result<()> {
+    // Trim + drop empties so the stored JSON stays clean.
+    let normalize = |paths: &[String]| -> Vec<String> {
+        paths
+            .iter()
+            .map(|path| path.trim().to_string())
+            .filter(|path| !path.is_empty())
+            .collect::<Vec<_>>()
+    };
+    let copy_files = serde_json::to_string(&normalize(&settings.copy_files))
+        .context("Failed to serialize copy_files")?;
+    let copy_exclude = serde_json::to_string(&normalize(&settings.copy_exclude))
+        .context("Failed to serialize copy_exclude")?;
+
+    let connection = db::write_conn()?;
+    let updated = connection
+        .execute(
+            "UPDATE repos SET copy_files = ?1, copy_exclude = ?2, auto_copy_untracked = ?3, \
+             updated_at = datetime('now') WHERE id = ?4",
+            rusqlite::params![
+                copy_files,
+                copy_exclude,
+                i64::from(settings.auto_copy_untracked),
+                repo_id
+            ],
+        )
+        .with_context(|| format!("Failed to update copy settings for {repo_id}"))?;
+
+    if updated != 1 {
+        bail!("Repository not found: {repo_id}");
+    }
+
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunAction {
@@ -1869,6 +1957,50 @@ mod tests {
         let cleared = load_repo_branch_prefix_settings(&repo_id).unwrap();
         assert_eq!(cleared.branch_prefix_type, None);
         assert_eq!(cleared.branch_prefix_custom, None);
+    }
+
+    #[test]
+    fn repository_copy_settings_round_trip() {
+        let env = crate::testkit::TestEnv::new("repos-copy-settings");
+
+        let repo = ResolvedRepositoryInput {
+            name: "copy-repo".to_string(),
+            normalized_root_path: env.root.join("copy").display().to_string(),
+            remote: Some("origin".to_string()),
+            remote_url: Some("git@github.com:acme/copy-repo.git".to_string()),
+            default_branch: "main".to_string(),
+            forge_provider: Some("github".to_string()),
+        };
+        let repo_id = insert_repository(&repo).unwrap();
+
+        // Fresh row: auto-copy on, empty lists.
+        let defaults = load_repo_copy_settings(&repo_id).unwrap();
+        assert!(defaults.auto_copy_untracked);
+        assert!(defaults.copy_files.is_empty());
+        assert!(defaults.copy_exclude.is_empty());
+
+        update_repo_copy_settings(
+            &repo_id,
+            &RepoCopySettings {
+                auto_copy_untracked: false,
+                // Whitespace-only entries are dropped, real ones trimmed.
+                copy_files: vec![
+                    "config/local.yaml".to_string(),
+                    "  .env.local  ".to_string(),
+                    "   ".to_string(),
+                ],
+                copy_exclude: vec![".env".to_string()],
+            },
+        )
+        .unwrap();
+
+        let loaded = load_repo_copy_settings(&repo_id).unwrap();
+        assert!(!loaded.auto_copy_untracked);
+        assert_eq!(
+            loaded.copy_files,
+            vec!["config/local.yaml".to_string(), ".env.local".to_string()]
+        );
+        assert_eq!(loaded.copy_exclude, vec![".env".to_string()]);
     }
 
     #[test]

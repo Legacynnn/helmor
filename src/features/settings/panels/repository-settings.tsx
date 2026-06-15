@@ -35,6 +35,7 @@ import { RepositoryPreferencesSection } from "./repository-preferences-section";
 import { BranchPrefixSection } from "./repository-settings/branch-prefix-section";
 import { DeleteRepoSection } from "./repository-settings/delete-repo-section";
 import { ScriptsSection } from "./repository-settings/scripts-section";
+import { WorkspaceFilesSection } from "./repository-settings/workspace-files-section";
 
 export function RepositorySettingsPanel({
 	repo,
@@ -248,6 +249,7 @@ export function RepositorySettingsPanel({
 			<div ref={scriptsAnchorRef}>
 				<ScriptsSection repoId={repo.id} workspaceId={workspaceId} />
 			</div>
+			<WorkspaceFilesSection repoId={repo.id} />
 			<RepositoryPreferencesSection repoId={repo.id} />
 
 			<DeleteRepoSection repo={repo} onDeleted={onRepoDeleted} />

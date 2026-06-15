@@ -623,6 +623,12 @@ pub fn finalize_workspace_from_repo_impl(workspace_id: &str) -> Result<FinalizeW
 
         ensure_agent_contexts_best_effort(workspace_id, &workspace_dir);
 
+        // Copy essential, git-ignored files (.env, keys, local config) from
+        // the source repo into the fresh worktree. Runs before setup so the
+        // script sees them. Best-effort — a copy failure never blocks
+        // workspace creation.
+        copy_essential_files_best_effort(&record.repo_id, &repo_root, &workspace_dir);
+
         // Defer setup to the frontend inspector: if a script is configured AND
         // the user opted into auto-run, the workspace starts in "setup_pending"
         // and the UI auto-triggers it. Otherwise we go straight to Ready and
@@ -867,6 +873,56 @@ fn ensure_agent_contexts_best_effort(workspace_id: &str, workspace_dir: &Path) {
             error = %format!("{error:#}"),
             "Failed to provision .agent-contexts/ — workspace still usable",
         );
+    }
+}
+
+/// Copy the repo's configured "essential files" into a freshly created
+/// worktree. Resolves the effective set (auto-detected secret-like
+/// untracked files ∪ explicit paths − exclusions) and copies them
+/// skip-if-exists. Best-effort: every failure mode (missing settings,
+/// detection error, copy error) is logged and swallowed so it can never
+/// block workspace creation.
+fn copy_essential_files_best_effort(repo_id: &str, repo_root: &Path, workspace_dir: &Path) {
+    use crate::workspace::copy_files;
+
+    let settings = match repos::load_repo_copy_settings(repo_id) {
+        Ok(settings) => settings,
+        Err(error) => {
+            tracing::warn!(
+                repo_id = %repo_id,
+                error = %format!("{error:#}"),
+                "Failed to load copy settings — skipping essential-file copy",
+            );
+            return;
+        }
+    };
+
+    let paths = copy_files::effective_copy_set(
+        repo_root,
+        settings.auto_copy_untracked,
+        &settings.copy_files,
+        &settings.copy_exclude,
+    );
+    if paths.is_empty() {
+        return;
+    }
+
+    match copy_files::copy_paths(repo_root, workspace_dir, &paths) {
+        Ok(copied) if !copied.is_empty() => {
+            tracing::info!(
+                repo_id = %repo_id,
+                count = copied.len(),
+                "Copied essential files into new workspace",
+            );
+        }
+        Ok(_) => {}
+        Err(error) => {
+            tracing::warn!(
+                repo_id = %repo_id,
+                error = %format!("{error:#}"),
+                "Failed to copy essential files — workspace still usable",
+            );
+        }
     }
 }
 

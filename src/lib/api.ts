@@ -1216,6 +1216,38 @@ export async function updateRepositoryBranchPrefix(
 	});
 }
 
+/// Per-repo "essential files to copy into new workspaces" configuration.
+/// Mirrors `repos::RepoCopySettings` in the Rust backend.
+export type RepoCopySettings = {
+	/// Auto-detect + auto-copy secret-like untracked files (.env, keys, ...).
+	autoCopyUntracked: boolean;
+	/// Explicit relative paths (files or folders) the user added.
+	copyFiles: string[];
+	/// Auto-detected paths the user opted out of.
+	copyExclude: string[];
+};
+
+export async function loadRepoCopySettings(
+	repoId: string,
+): Promise<RepoCopySettings> {
+	return invoke<RepoCopySettings>("load_repo_copy_settings", { repoId });
+}
+
+export async function updateRepoCopySettings(
+	repoId: string,
+	settings: RepoCopySettings,
+): Promise<void> {
+	await invoke<void>("update_repo_copy_settings", { repoId, settings });
+}
+
+/// Scan the repo working tree for secret-like untracked files to offer as
+/// copy candidates in settings.
+export async function detectRepoCopyCandidates(
+	repoId: string,
+): Promise<string[]> {
+	return invoke<string[]>("detect_repo_copy_candidates", { repoId });
+}
+
 export async function loadAddRepositoryDefaults(): Promise<AddRepositoryDefaults> {
 	try {
 		return await invoke<AddRepositoryDefaults>("get_add_repository_defaults");
@@ -3112,12 +3144,14 @@ export async function listWorkspaceFiles(
 	}
 }
 
-/** One entry of the gitignore-aware workspace tree (inspector Files tab). */
+/** One entry of the workspace tree (inspector Files tab). */
 export type WorkspaceTreeEntry = {
 	/** Relative to the workspace root, forward slashes. */
 	path: string;
 	name: string;
 	isDir: boolean;
+	/** True when git-ignored — rendered dimmed, directories not expanded. */
+	ignored: boolean;
 };
 
 export type WorkspaceTreeResponse = {
@@ -4104,6 +4138,20 @@ export async function savePastedImage(
 	sessionId: string,
 ): Promise<string> {
 	return invoke<string>("save_pasted_image", { data, mediaType, sessionId });
+}
+
+/**
+ * Pull an image that lives *only* on the system clipboard (e.g. "Copy Image"
+ * from a browser/Preview, or a Cmd+Ctrl+Shift+4 screenshot) into the session
+ * paste-cache and return its absolute path. macOS WKWebView does not expose
+ * clipboard-resident images in the DOM `paste` event, so the composer falls
+ * back to this when a paste yields no image file and no text. Resolves to
+ * `null` when the clipboard holds no image.
+ */
+export async function readClipboardImage(
+	sessionId: string,
+): Promise<string | null> {
+	return invoke<string | null>("read_clipboard_image", { sessionId });
 }
 
 /**

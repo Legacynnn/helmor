@@ -1,6 +1,7 @@
 pub(crate) mod agent_contexts;
 pub(crate) mod archive;
 pub(crate) mod branching;
+pub mod copy_files;
 pub mod files;
 pub mod helpers;
 pub(crate) mod lifecycle;

@@ -495,6 +495,28 @@ fn run_migrations(connection: &Connection) -> Result<()> {
             .context("Failed to add branch_prefix_type column")?;
     }
 
+    // Migration: per-repo "essential files to copy into new workspaces".
+    // `copy_files` is a JSON array of user-added relative paths (files or
+    // folders); `copy_exclude` is a JSON array of auto-detected paths the
+    // user opted out of; `auto_copy_untracked` toggles the secret-like
+    // untracked-file auto-detection (default on). All nullable / defaulted
+    // so existing repos keep working with no back-fill.
+    if has_table(connection, "repos") && !has_column(connection, "repos", "copy_files") {
+        connection
+            .execute_batch("ALTER TABLE repos ADD COLUMN copy_files TEXT")
+            .context("Failed to add repos.copy_files column")?;
+    }
+    if has_table(connection, "repos") && !has_column(connection, "repos", "copy_exclude") {
+        connection
+            .execute_batch("ALTER TABLE repos ADD COLUMN copy_exclude TEXT")
+            .context("Failed to add repos.copy_exclude column")?;
+    }
+    if has_table(connection, "repos") && !has_column(connection, "repos", "auto_copy_untracked") {
+        connection
+            .execute_batch("ALTER TABLE repos ADD COLUMN auto_copy_untracked INTEGER DEFAULT 1")
+            .context("Failed to add repos.auto_copy_untracked column")?;
+    }
+
     if has_table(connection, "workspaces") && !has_column(connection, "workspaces", "pr_sync_state")
     {
         connection
@@ -1100,6 +1122,9 @@ CREATE TABLE IF NOT EXISTS repos (
     forge_login TEXT,
     branch_prefix_type TEXT,
     branch_prefix_custom TEXT,
+    copy_files TEXT,
+    copy_exclude TEXT,
+    auto_copy_untracked INTEGER DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
