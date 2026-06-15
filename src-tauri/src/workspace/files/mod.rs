@@ -18,7 +18,9 @@ pub use editor::{
 };
 pub use replace::{replace_in_workspace, WorkspaceReplaceRequest, WorkspaceReplaceResponse};
 pub use search::{search_workspace, WorkspaceSearchRequest, WorkspaceSearchResponse};
-pub use tree::{list_workspace_tree, WorkspaceTreeResponse};
+pub use tree::{
+    list_workspace_dir, list_workspace_tree, WorkspaceTreeEntry, WorkspaceTreeResponse,
+};
 pub use types::{
     EditorFileListItem, EditorFileReadResponse, EditorFileStatResponse, EditorFileWriteResponse,
 };

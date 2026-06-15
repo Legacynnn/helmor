@@ -9,6 +9,7 @@ import { ShinyFlash, StageActionSlot } from "./row-actions";
 import {
 	type ChangeRow,
 	DIFF_ROW_RENDER_STYLE,
+	FOLDER_ICON_CLASS,
 	getCachedFileIcon,
 	getCachedFolderIcon,
 	type StageActionKind,
@@ -211,9 +212,9 @@ function TreeNodeList({
 									strokeWidth={1.8}
 								/>
 								<img
-									src={getCachedFolderIcon(node.name, isOpen)}
+									src={getCachedFolderIcon(isOpen)}
 									alt=""
-									className="size-4 shrink-0"
+									className={FOLDER_ICON_CLASS}
 								/>
 								<span className="truncate">{node.name}</span>
 							</div>

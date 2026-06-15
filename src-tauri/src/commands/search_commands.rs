@@ -12,6 +12,18 @@ pub async fn list_workspace_tree(
     run_blocking(move || editor_files::list_workspace_tree(&workspace_root_path)).await
 }
 
+/// Lazily list the immediate children of an (ignored) directory in the Files
+/// tab. `list_workspace_tree` lists ignored dirs without descending into them;
+/// this fetches a single level on demand when the user expands one.
+#[tauri::command]
+pub async fn list_workspace_dir(
+    workspace_root_path: String,
+    relative_dir: String,
+) -> CmdResult<Vec<editor_files::WorkspaceTreeEntry>> {
+    run_blocking(move || editor_files::list_workspace_dir(&workspace_root_path, &relative_dir))
+        .await
+}
+
 #[tauri::command]
 pub async fn search_workspace(
     request: editor_files::WorkspaceSearchRequest,

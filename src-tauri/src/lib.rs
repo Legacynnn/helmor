@@ -766,6 +766,7 @@ pub fn run() {
             commands::editor_commands::list_workspace_files,
             commands::editor_commands::list_workspace_changes,
             commands::search_commands::list_workspace_tree,
+            commands::search_commands::list_workspace_dir,
             commands::search_commands::search_workspace,
             commands::search_commands::replace_in_workspace,
             commands::editor_commands::list_workspace_diff_stats,

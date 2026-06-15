@@ -14,6 +14,12 @@ export const STATUS_COLORS: Record<InspectorFileItem["status"], string> = {
 
 const fileIconCache = new Map<string, string>();
 const folderIconCache = new Map<string, string>();
+
+// Folder icons are desaturated to a consistent set (no per-name color, no blue)
+// and darkened toward black in light themes; in dark themes we keep them bright
+// enough to stay legible against the dark tree background.
+export const FOLDER_ICON_CLASS =
+	"size-4 shrink-0 grayscale brightness-[0.35] dark:brightness-100";
 export const DIFF_ROW_RENDER_STYLE = {
 	contentVisibility: "auto",
 	containIntrinsicSize: "auto 20px",
@@ -27,11 +33,14 @@ export function getCachedFileIcon(name: string): string {
 	return icon;
 }
 
-export function getCachedFolderIcon(name: string, open: boolean): string {
-	const key = `${name}\0${open ? "1" : "0"}`;
+export function getCachedFolderIcon(open: boolean): string {
+	const key = open ? "1" : "0";
 	const cached = folderIconCache.get(key);
 	if (cached) return cached;
-	const icon = getMaterialFolderIcon(name, open || undefined);
+	// Always use the generic "folder" icon (empty name → no special mapping) so
+	// every folder renders identically. Per-name Material icons (src/, .github/,
+	// etc.) ship different base colors, which read as inconsistent once tinted.
+	const icon = getMaterialFolderIcon("", open || undefined);
 	folderIconCache.set(key, icon);
 	return icon;
 }

@@ -26,11 +26,21 @@ function changeItem(
 describe("buildFileTree", () => {
 	it("nests flat entries and sorts directories first", () => {
 		const roots = buildFileTree([
-			{ path: "README.md", name: "README.md", isDir: false },
-			{ path: "src", name: "src", isDir: true },
-			{ path: "src/app.ts", name: "app.ts", isDir: false },
-			{ path: "src/components", name: "components", isDir: true },
-			{ path: "src/components/button.tsx", name: "button.tsx", isDir: false },
+			{ path: "README.md", name: "README.md", isDir: false, ignored: false },
+			{ path: "src", name: "src", isDir: true, ignored: false },
+			{ path: "src/app.ts", name: "app.ts", isDir: false, ignored: false },
+			{
+				path: "src/components",
+				name: "components",
+				isDir: true,
+				ignored: false,
+			},
+			{
+				path: "src/components/button.tsx",
+				name: "button.tsx",
+				isDir: false,
+				ignored: false,
+			},
 		]);
 
 		expect(roots.map((node) => node.name)).toEqual(["src", "README.md"]);
@@ -44,10 +54,61 @@ describe("buildFileTree", () => {
 
 	it("keeps orphaned children as roots instead of dropping them", () => {
 		const roots = buildFileTree([
-			{ path: "deep/file.ts", name: "file.ts", isDir: false },
+			{ path: "deep/file.ts", name: "file.ts", isDir: false, ignored: false },
 		]);
 		expect(roots).toHaveLength(1);
 		expect(roots[0].path).toBe("deep/file.ts");
+	});
+
+	it("nests entries even when a parent arrives after its children", () => {
+		// Lazily-loaded ignored children are appended out of order; buildFileTree
+		// must sort by path so parents are processed before their descendants.
+		const roots = buildFileTree([
+			{
+				path: "node_modules/pkg/index.js",
+				name: "index.js",
+				isDir: false,
+				ignored: true,
+			},
+			{
+				path: "node_modules",
+				name: "node_modules",
+				isDir: true,
+				ignored: true,
+			},
+			{
+				path: "node_modules/pkg",
+				name: "pkg",
+				isDir: true,
+				ignored: true,
+			},
+		]);
+
+		expect(roots).toHaveLength(1);
+		const nodeModules = roots[0];
+		expect(nodeModules.path).toBe("node_modules");
+		expect(nodeModules.children.map((node) => node.name)).toEqual(["pkg"]);
+		expect(nodeModules.children[0].children[0].path).toBe(
+			"node_modules/pkg/index.js",
+		);
+	});
+
+	it("carries the git-ignored flag through to tree nodes", () => {
+		const roots = buildFileTree([
+			{ path: "src", name: "src", isDir: true, ignored: false },
+			{
+				path: "node_modules",
+				name: "node_modules",
+				isDir: true,
+				ignored: true,
+			},
+			{ path: ".env", name: ".env", isDir: false, ignored: true },
+		]);
+
+		const byName = new Map(roots.map((node) => [node.name, node]));
+		expect(byName.get("src")?.ignored).toBe(false);
+		expect(byName.get("node_modules")?.ignored).toBe(true);
+		expect(byName.get(".env")?.ignored).toBe(true);
 	});
 });
 

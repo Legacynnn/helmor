@@ -189,6 +189,7 @@ async fn dispatch(
         "list_workspace_files" => to_value(crate::commands::editor_commands::list_workspace_files(arg_string(&args, "workspaceRootPath")?).await?),
         "list_workspace_groups" => to_value(crate::commands::workspace_commands::list_workspace_groups().await?),
         "list_workspace_tree" => to_value(crate::commands::search_commands::list_workspace_tree(arg_string(&args, "workspaceRootPath")?).await?),
+        "list_workspace_dir" => to_value(crate::commands::search_commands::list_workspace_dir(arg_string(&args, "workspaceRootPath")?, arg_string(&args, "relativeDir")?).await?),
         "list_workspace_linked_directories" => to_value(crate::commands::workspace_commands::list_workspace_linked_directories(arg_string(&args, "workspaceId")?).await?),
         "list_workspace_sessions" => to_value(crate::commands::session_commands::list_workspace_sessions(arg_string(&args, "workspaceId")?).await?),
         "load_auto_close_action_kinds" => to_value(crate::commands::settings_commands::load_auto_close_action_kinds().await?),
@@ -499,6 +500,7 @@ async fn dispatch(
         // best-effort cleanup.
         |         "unsubscribe_ui_mutations"
         |         "copy_image_to_clipboard"
+        |         "read_clipboard_image"
         // macOS NSVisualEffectView blur (Vesper theme) is bound to the desktop
         // NSWindow; a phone browser has no native window to vibrancy-coat.
         |         "set_window_vibrancy"

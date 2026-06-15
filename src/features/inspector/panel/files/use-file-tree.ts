@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
-import type { WorkspaceTreeEntry } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { listWorkspaceDir, type WorkspaceTreeEntry } from "@/lib/api";
 import type { InspectorFileItem } from "@/lib/editor-session";
 import { workspaceTreeQueryOptions } from "@/lib/query-client";
 
@@ -9,6 +9,8 @@ export type FileTreeNode = {
 	/** Relative path, forward slashes. */
 	path: string;
 	isDir: boolean;
+	/** True when git-ignored — rendered dimmed. */
+	ignored: boolean;
 	children: FileTreeNode[];
 };
 
@@ -17,13 +19,24 @@ export function buildFileTree(entries: WorkspaceTreeEntry[]): FileTreeNode[] {
 	const nodesByPath = new Map<string, FileTreeNode>();
 	const roots: FileTreeNode[] = [];
 
-	// Entries arrive sorted by path, so a parent directory always precedes
-	// its children.
-	for (const entry of entries) {
+	// Sort by path so a parent directory always precedes its children — the
+	// base query is already path-sorted, but lazily-loaded ignored children are
+	// appended out of order, so we re-sort defensively. A path is always a
+	// proper prefix of its descendants, so byte-order sorting keeps parents
+	// first.
+	const sorted =
+		entries.length > 1
+			? [...entries].sort((a, b) =>
+					a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+				)
+			: entries;
+
+	for (const entry of sorted) {
 		const node: FileTreeNode = {
 			name: entry.name,
 			path: entry.path,
 			isDir: entry.isDir,
+			ignored: entry.ignored,
 			children: [],
 		};
 		nodesByPath.set(entry.path, node);
@@ -75,16 +88,62 @@ export function buildEditedPaths(changes: InspectorFileItem[]): Set<string> {
 export function useFileTree(
 	workspaceRootPath: string | null,
 	changes: InspectorFileItem[],
+	showIgnored: boolean,
 ) {
 	const treeQuery = useQuery({
 		...workspaceTreeQueryOptions(workspaceRootPath ?? ""),
 		enabled: !!workspaceRootPath,
 	});
 
-	const roots = useMemo(
-		() => buildFileTree(treeQuery.data?.entries ?? []),
-		[treeQuery.data],
+	// Children of ignored directories, fetched on demand when the user expands
+	// them (the base tree lists ignored dirs without descending). Keyed by the
+	// directory's relative path.
+	const [lazyChildren, setLazyChildren] = useState<
+		Map<string, WorkspaceTreeEntry[]>
+	>(() => new Map());
+
+	// Drop all lazily-loaded children when the workspace changes — their paths
+	// belong to the previous root.
+	useEffect(() => {
+		setLazyChildren(new Map());
+	}, [workspaceRootPath]);
+
+	const loadDir = useCallback(
+		(relativePath: string) => {
+			if (!workspaceRootPath) return;
+			// Already loaded (or loading) → don't refetch.
+			setLazyChildren((previous) => {
+				if (previous.has(relativePath)) return previous;
+				// Mark as loading with an empty list so repeat toggles are no-ops.
+				const next = new Map(previous);
+				next.set(relativePath, []);
+				return next;
+			});
+			void listWorkspaceDir(workspaceRootPath, relativePath)
+				.then((entries) => {
+					setLazyChildren((previous) => {
+						const next = new Map(previous);
+						next.set(relativePath, entries);
+						return next;
+					});
+				})
+				.catch(() => {
+					// Leave the empty placeholder so the dir simply shows no children
+					// rather than retrying on every re-render.
+				});
+		},
+		[workspaceRootPath],
 	);
+
+	const roots = useMemo(() => {
+		const base = treeQuery.data?.entries ?? [];
+		const lazy =
+			lazyChildren.size > 0 ? Array.from(lazyChildren.values()).flat() : [];
+		let entries = lazy.length > 0 ? base.concat(lazy) : base;
+		if (!showIgnored) entries = entries.filter((entry) => !entry.ignored);
+		return buildFileTree(entries);
+	}, [treeQuery.data, lazyChildren, showIgnored]);
+
 	const editedPaths = useMemo(() => buildEditedPaths(changes), [changes]);
 
 	return {
@@ -92,5 +151,6 @@ export function useFileTree(
 		editedPaths,
 		truncated: treeQuery.data?.truncated ?? false,
 		isLoading: treeQuery.isLoading,
+		loadDir,
 	};
 }

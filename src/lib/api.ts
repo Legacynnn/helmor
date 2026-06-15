@@ -3177,6 +3177,29 @@ export async function listWorkspaceTree(
 	}
 }
 
+/**
+ * Lazily list the immediate children of an ignored directory in the Files
+ * tab. `listWorkspaceTree` lists git-ignored directories but does not descend
+ * into them (so a huge `node_modules/` is a single entry); this fetches one
+ * level on demand when the user expands such a directory. Every returned entry
+ * is flagged `ignored: true`.
+ */
+export async function listWorkspaceDir(
+	workspaceRootPath: string,
+	relativeDir: string,
+): Promise<WorkspaceTreeEntry[]> {
+	try {
+		return await invoke<WorkspaceTreeEntry[]>("list_workspace_dir", {
+			workspaceRootPath,
+			relativeDir,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to list the directory contents."),
+		);
+	}
+}
+
 export type WorkspaceSearchRequest = {
 	workspaceRootPath: string;
 	query: string;

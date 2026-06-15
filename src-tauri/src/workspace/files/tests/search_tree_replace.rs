@@ -3,8 +3,8 @@ use std::{fs, path::Path, process::Command};
 use crate::data_dir::TEST_ENV_LOCK as TEST_LOCK;
 
 use super::{
-    list_workspace_tree, replace_in_workspace, search_workspace, support::EditorFilesHarness,
-    WorkspaceReplaceRequest, WorkspaceSearchRequest,
+    list_workspace_dir, list_workspace_tree, replace_in_workspace, search_workspace,
+    support::EditorFilesHarness, WorkspaceReplaceRequest, WorkspaceSearchRequest,
 };
 
 fn git_init(dir: &Path) {
@@ -43,7 +43,7 @@ fn replace_request(root: &Path, query: &str, replacement: &str) -> WorkspaceRepl
 }
 
 #[test]
-fn tree_hides_gitignored_and_git_dir() {
+fn tree_flags_gitignored_entries_and_hides_git_dir() {
     let _lock = TEST_LOCK.lock().unwrap_or_else(|error| error.into_inner());
     let harness = EditorFilesHarness::new();
     let root = &harness.workspace_dir;
@@ -56,33 +56,77 @@ fn tree_hides_gitignored_and_git_dir() {
     fs::write(root.join("secret.txt"), "nope\n").unwrap();
 
     let response = list_workspace_tree(root.to_str().unwrap()).unwrap();
-    let paths: Vec<&str> = response
-        .entries
-        .iter()
-        .map(|entry| entry.path.as_str())
-        .collect();
+    let entry = |path: &str| response.entries.iter().find(|entry| entry.path == path);
 
-    assert!(paths.contains(&"src"));
-    assert!(paths.contains(&"src/app.ts"));
-    assert!(paths.contains(&".gitignore"));
-    assert!(!paths.iter().any(|path| path.starts_with("ignored-dir")));
-    assert!(!paths.contains(&"secret.txt"));
-    assert!(!paths.iter().any(|path| path.starts_with(".git/")));
-    assert!(!response.truncated);
-
-    let src = response
-        .entries
-        .iter()
-        .find(|entry| entry.path == "src")
-        .unwrap();
+    // Tracked files are present and not flagged ignored.
+    let src = entry("src").expect("src present");
     assert!(src.is_dir);
-    let app = response
+    assert!(!src.ignored);
+    let app = entry("src/app.ts").expect("src/app.ts present");
+    assert!(!app.is_dir);
+    assert!(!app.ignored);
+    assert_eq!(app.name, "app.ts");
+    assert!(!entry(".gitignore").expect(".gitignore present").ignored);
+
+    // Git-ignored entries are now surfaced but flagged.
+    let secret = entry("secret.txt").expect("secret.txt present");
+    assert!(secret.ignored);
+    let ignored_dir = entry("ignored-dir").expect("ignored-dir present");
+    assert!(ignored_dir.ignored);
+    assert!(ignored_dir.is_dir);
+
+    // Ignored directories are not descended into — only the dir itself shows.
+    assert!(entry("ignored-dir/hidden.ts").is_none());
+
+    // The .git directory is never surfaced.
+    assert!(!response
         .entries
         .iter()
-        .find(|entry| entry.path == "src/app.ts")
-        .unwrap();
-    assert!(!app.is_dir);
-    assert_eq!(app.name, "app.ts");
+        .any(|entry| entry.path == ".git" || entry.path.starts_with(".git/")));
+    assert!(!response.truncated);
+}
+
+#[test]
+fn list_dir_lazily_expands_ignored_directory_contents() {
+    let _lock = TEST_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+    let harness = EditorFilesHarness::new();
+    let root = &harness.workspace_dir;
+    git_init(root);
+    fs::write(root.join(".gitignore"), "ignored-dir/\n").unwrap();
+    fs::create_dir_all(root.join("ignored-dir/nested")).unwrap();
+    fs::write(root.join("ignored-dir/hidden.ts"), "nope\n").unwrap();
+    fs::write(root.join("ignored-dir/nested/deep.ts"), "nope\n").unwrap();
+
+    // The top-level tree lists the ignored dir but not its contents.
+    let tree = list_workspace_tree(root.to_str().unwrap()).unwrap();
+    assert!(tree
+        .entries
+        .iter()
+        .any(|entry| entry.path == "ignored-dir" && entry.is_dir && entry.ignored));
+    assert!(!tree
+        .entries
+        .iter()
+        .any(|entry| entry.path == "ignored-dir/hidden.ts"));
+
+    // Lazily expanding the ignored dir surfaces its immediate children only,
+    // every one flagged ignored. Nested dirs appear but are not descended into.
+    let children = list_workspace_dir(root.to_str().unwrap(), "ignored-dir").unwrap();
+    let child = |path: &str| children.iter().find(|entry| entry.path == path);
+    let hidden = child("ignored-dir/hidden.ts").expect("hidden.ts present");
+    assert!(hidden.ignored);
+    assert!(!hidden.is_dir);
+    assert_eq!(hidden.name, "hidden.ts");
+    let nested = child("ignored-dir/nested").expect("nested dir present");
+    assert!(nested.ignored);
+    assert!(nested.is_dir);
+    // Only one level deep — the deep file is not included here.
+    assert!(child("ignored-dir/nested/deep.ts").is_none());
+
+    // Expanding the nested dir in turn surfaces the deep file.
+    let nested_children = list_workspace_dir(root.to_str().unwrap(), "ignored-dir/nested").unwrap();
+    assert!(nested_children
+        .iter()
+        .any(|entry| entry.path == "ignored-dir/nested/deep.ts" && entry.ignored));
 }
 
 #[test]
