@@ -455,7 +455,7 @@ export const WorkspaceRowItem = memo(
 						row.mode === "local" ? (
 							<Badge
 								variant="secondary"
-								className="h-[15px] shrink-0 rounded px-1 text-mini font-medium leading-none"
+								className="h-[15px] shrink-0 px-1.5 text-mini font-medium"
 							>
 								Primary
 							</Badge>

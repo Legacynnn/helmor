@@ -35,4 +35,16 @@ describe("WorkspaceRowItem primary pill", () => {
 		);
 		expect(screen.queryByText("Primary")).not.toBeInTheDocument();
 	});
+
+	it("shows the Primary pill on the hideRepoAvatar render branch", () => {
+		render(
+			<WorkspaceRowItem
+				row={{ ...baseRow, mode: "local" }}
+				selected={false}
+				hideRepoAvatar
+				disableHoverCard
+			/>,
+		);
+		expect(screen.getByText("Primary")).toBeInTheDocument();
+	});
 });
