@@ -181,6 +181,11 @@ export function useGlobalShortcutHandlers({
 				enabled: workspaceViewMode === "conversation",
 			},
 			{
+				id: "session.newPicker" as const,
+				callback: () => publishShellEvent({ type: "open-new-session-menu" }),
+				enabled: workspaceViewMode === "conversation",
+			},
+			{
 				id: "session.reopenClosed" as const,
 				callback: () => void handleReopenClosedSession(),
 			},

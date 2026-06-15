@@ -31,8 +31,8 @@ import XiaomiMiMoMono from "@lobehub/icons/es/XiaomiMiMo/components/Mono";
 import ZAIMono from "@lobehub/icons/es/ZAI/components/Mono";
 import ZenMuxMono from "@lobehub/icons/es/ZenMux/components/Mono";
 import ZhipuColor from "@lobehub/icons/es/Zhipu/components/Color";
-import { Box } from "lucide-react";
-import type { SVGProps } from "react";
+import { Box, Terminal } from "lucide-react";
+import type { ComponentType, SVGProps } from "react";
 import { cn } from "@/lib/utils";
 
 export function ClaudeIcon(props: SVGProps<SVGSVGElement>) {
@@ -296,5 +296,49 @@ export function ProviderBrandIcon({
 		return <Box className={cn("text-muted-foreground", className)} />;
 	}
 	const Icon = PROVIDER_BRAND_ICONS[icon];
+	return <Icon className={className} />;
+}
+
+/// Maps a session-provider catalog key (claude, codex, gemini, …) to its real
+/// brand icon. Providers without a dedicated brand mark fall back to a generic
+/// terminal glyph. Codex variants (`codex:*`) resolve via `isCodexProvider`.
+const AGENT_PROVIDER_ICONS: Record<
+	string,
+	ComponentType<SVGProps<SVGSVGElement>>
+> = {
+	claude: ClaudeIcon,
+	codex: OpenAIIcon,
+	opencode: OpenCodeIcon,
+	mimo: MiMoCodeIcon,
+	cursor: CursorIcon,
+	copilot: GithubCopilotIcon,
+	kimi: KimiIcon,
+	pi: PiIcon,
+	amp: AmpIcon,
+	gemini: GeminiCliIcon,
+	qwen: QwenIcon,
+	goose: GooseIcon,
+};
+
+/// Brand icon for a session agent/provider, keyed by its catalog key.
+/// `fallback` is used for providers without a dedicated brand mark
+/// (e.g. aider, crush, plandex) — defaults to a generic terminal glyph.
+export function AgentProviderIcon({
+	agentType,
+	className,
+	fallback: Fallback = Terminal,
+}: {
+	agentType?: string | null;
+	className?: string;
+	fallback?: ComponentType<SVGProps<SVGSVGElement>>;
+}) {
+	const key = agentType ?? "";
+	const Icon =
+		key === "codex" || key.startsWith("codex:")
+			? AGENT_PROVIDER_ICONS.codex
+			: AGENT_PROVIDER_ICONS[key];
+	if (!Icon) {
+		return <Fallback className={className} />;
+	}
 	return <Icon className={className} />;
 }

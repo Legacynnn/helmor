@@ -893,7 +893,7 @@
 	   (allowTransparency, see terminal-output.tsx); this is the single tint, a
 	   touch darker than the pane glass so the terminal still reads as a distinct
 	   surface. */
-	--terminal-chrome-bg: oklch(0.16 0.004 65 / 0.45);
+	--terminal-chrome-bg: oklch(0.2 0.005 65 / 0.42);
 
 	/* Fullscreen-only CSS material. Native vibrancy cannot sample the desktop in
 	   its own Space, so these provide the in-window backdrop for backdrop-filter
@@ -941,6 +941,16 @@ html.theme-vesper.dark [data-shell-pane-inner="inspector"] {
 	background-color: transparent;
 }
 
+/* The inspector tabs area (Setup/Run/Terminal) stacks TWO `bg-inspector`
+   (--bg-surface) layers — the zoom container and the inner section — which
+   multiply toward opaque and make the embedded terminals read as flat black
+   despite the translucent terminal wrapper. Zero the inner section so a single
+   glass layer (the zoom container) remains over the native blur, matching the
+   single-layer treatment the sidebars already get above. */
+html.theme-vesper.dark section[aria-label="Inspector section Tabs"] {
+	background-color: transparent;
+}
+
 /* Left sidebar — quiet dark frosted glass (windowed Vesper only).
    The rule above zeroes the outer aside, and the inner pane carries no desktop
    background, so without a tint the left sidebar would be pure native blur —
@@ -983,6 +993,23 @@ html.theme-vesper.dark [aria-label="Workspace viewport"] {
 	background-color: oklch(0.16 0.004 65 / 0.9);
 }
 
+/* Center CLI-agent terminal (Terminal Mode). The viewport above is deliberately
+   ~0.9 opaque to protect chat/editor reading text, which also blocks the native
+   blur from ever reaching a terminal session rendered inside it. When a terminal
+   IS the visible center surface, open a transparent tunnel so the blur reaches it
+   — scoped via :has() so chat/editor keep their opaque viewport. */
+html.theme-vesper.dark
+[aria-label="Workspace viewport"]:has([data-center-surface="terminal"]) {
+	background-color: transparent;
+}
+
+/* Denser glass for the center terminal than the inspector terminals (0.42) so
+   agent output stays readable while still reading as frosted glass. The token
+   cascades into TerminalOutput's wrapper (it reads var(--terminal-background)). */
+html.theme-vesper.dark [data-center-surface="terminal"] {
+	--terminal-background: oklch(0.2 0.005 65 / 0.45);
+}
+
 /* Fullscreen material: in a fullscreen Space the NSVisualEffectView cannot blur
    wallpaper behind the window, so use-vesper-window.ts clears native vibrancy.
    Keep Base transparent and provide an in-window material behind the webview
@@ -992,7 +1019,7 @@ html.vesper-fullscreen.theme-vesper.dark {
 	--bg-surface: var(--vesper-fullscreen-pane-bg);
 	--bg-elevated: oklch(0.255 0.005 65);
 	--bg-overlay: oklch(0.18 0.005 65);
-	--terminal-chrome-bg: oklch(0.145 0.004 65 / 0.62);
+	--terminal-chrome-bg: oklch(0.19 0.004 65 / 0.5);
 	/* Right sidebar (inspector) reads a touch glassier than the left: a lower
 	   body alpha than the shared pane, and translucent section headers (they'd
 	   otherwise inherit the opaque --bg-elevated and punch solid blocks into the
@@ -1049,6 +1076,14 @@ html.vesper-fullscreen.theme-vesper.dark
 html.vesper-fullscreen.theme-vesper.dark [aria-label="Workspace viewport"],
 html.vesper-fullscreen.theme-vesper.dark [aria-label="Top-level screen"] {
 	background-color: var(--vesper-fullscreen-viewport-bg);
+}
+
+/* Fullscreen counterpart of the center-terminal tunnel: the viewport already
+   carries the backdrop-filter material, so just lower its density when a terminal
+   session is visible so the in-window glass shows through the terminal. */
+html.vesper-fullscreen.theme-vesper.dark
+[aria-label="Workspace viewport"]:has([data-center-surface="terminal"]) {
+	background-color: oklch(0.165 0.005 65 / 0.4);
 }
 
 /* Top-level screens (dashboard, etc.) are mostly open canvas, so the warm

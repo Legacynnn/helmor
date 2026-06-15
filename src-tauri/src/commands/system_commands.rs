@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{LazyLock, Mutex};
@@ -99,6 +99,68 @@ pub struct AgentVersions {
     pub opencode: Option<String>,
     pub mimo: Option<String>,
     pub kimi: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AgentCliSource {
+    Bundled,
+    External,
+    Missing,
+    ApiKeyOnly,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentCliStatus {
+    pub provider: String,
+    pub label: String,
+    pub binary: Option<String>,
+    pub installed: bool,
+    pub source: AgentCliSource,
+    pub path: Option<String>,
+    pub version: Option<String>,
+    pub install_url: Option<String>,
+    pub install_commands: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderConfigInspection {
+    pub provider: String,
+    pub label: String,
+    pub roots: Vec<ProviderConfigRoot>,
+    pub files: Vec<ProviderConfigFile>,
+    pub skills: Vec<ProviderConfigEntry>,
+    pub hooks: Vec<ProviderConfigEntry>,
+    pub mcp_servers: Vec<ProviderConfigEntry>,
+    pub extensions: Vec<ProviderConfigEntry>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderConfigRoot {
+    pub label: String,
+    pub path: String,
+    pub exists: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderConfigFile {
+    pub label: String,
+    pub path: String,
+    pub exists: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderConfigEntry {
+    pub name: String,
+    pub source: String,
+    pub path: Option<String>,
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1239,8 +1301,18 @@ pub async fn get_agent_versions() -> CmdResult<AgentVersions> {
     .await
 }
 
+#[tauri::command]
+pub async fn get_agent_cli_status() -> CmdResult<Vec<AgentCliStatus>> {
+    run_blocking(|| Ok(agent_cli_statuses())).await
+}
+
+#[tauri::command]
+pub async fn inspect_provider_configs() -> CmdResult<Vec<ProviderConfigInspection>> {
+    run_blocking(|| Ok(inspect_all_provider_configs())).await
+}
+
 fn agent_cli_version(provider: &str) -> Option<String> {
-    let mut command = std::process::Command::new(resolve_agent_binary(provider));
+    let mut command = std::process::Command::new(resolve_agent_binary(provider).0);
     crate::platform::process::configure_background_cli(&mut command);
     let output = command.arg("--version").output().ok()?;
     if !output.status.success() {
@@ -1271,6 +1343,562 @@ pub(crate) fn parse_semver(text: &str) -> Option<String> {
         }
     }
     None
+}
+
+fn inspect_all_provider_configs() -> Vec<ProviderConfigInspection> {
+    AGENT_CLI_SPECS
+        .iter()
+        .map(|spec| inspect_provider_config(spec.provider, spec.label))
+        .collect()
+}
+
+fn inspect_provider_config(provider: &str, label: &str) -> ProviderConfigInspection {
+    let mut inspection = ProviderConfigInspection {
+        provider: provider.to_string(),
+        label: label.to_string(),
+        roots: Vec::new(),
+        files: Vec::new(),
+        skills: Vec::new(),
+        hooks: Vec::new(),
+        mcp_servers: Vec::new(),
+        extensions: Vec::new(),
+        warnings: Vec::new(),
+    };
+
+    match provider {
+        "claude" => inspect_claude_config(&mut inspection),
+        "codex" => inspect_codex_config(&mut inspection),
+        "opencode" => inspect_opencode_like_config(
+            &mut inspection,
+            crate::platform::paths::xdg_config_dir("opencode"),
+            &["opencode.jsonc", "opencode.json", "config.json"],
+        ),
+        "mimo" => inspect_opencode_like_config(
+            &mut inspection,
+            crate::platform::paths::xdg_config_dir("mimocode"),
+            &["mimocode.json", "mimocode.jsonc", "config.json"],
+        ),
+        "kimi" => inspect_kimi_config(&mut inspection),
+        "cursor" => inspect_cursor_config(&mut inspection),
+        "copilot" => inspect_copilot_config(&mut inspection),
+        _ => inspect_terminal_cli_config(&mut inspection, provider),
+    }
+
+    inspection
+}
+
+fn inspect_claude_config(inspection: &mut ProviderConfigInspection) {
+    let Some(home) = crate::platform::paths::home_dir() else {
+        inspection.warnings.push("HOME is not set".to_string());
+        return;
+    };
+    let root = home.join(".claude");
+    push_root(inspection, "Claude home", &root);
+    inspect_skill_dir(inspection, "Claude skills", &root.join("skills"));
+    inspect_json_file(
+        inspection,
+        "Settings",
+        &root.join("settings.json"),
+        &["hooks"],
+        &["mcpServers"],
+        &["extensions", "plugins"],
+    );
+    inspect_json_file(
+        inspection,
+        "Local settings",
+        &root.join("settings.local.json"),
+        &["hooks"],
+        &["mcpServers"],
+        &["extensions", "plugins"],
+    );
+}
+
+fn inspect_codex_config(inspection: &mut ProviderConfigInspection) {
+    let root = crate::platform::paths::codex_home_dir();
+    push_root(inspection, "Codex home", &root);
+    inspect_skill_dir(inspection, "Codex skills", &root.join("skills"));
+    let path = crate::codex_config::config_path();
+    push_file(inspection, "Config", &path);
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let Ok(value) = toml::from_str::<toml::Value>(&text) else {
+        inspection
+            .warnings
+            .push(format!("Could not parse {}", path.display()));
+        return;
+    };
+    collect_toml_table_entries(
+        value
+            .get("mcp_servers")
+            .or_else(|| value.get("mcpServers"))
+            .and_then(toml::Value::as_table),
+        "Config",
+        &path,
+        &mut inspection.mcp_servers,
+    );
+}
+
+fn inspect_opencode_like_config(
+    inspection: &mut ProviderConfigInspection,
+    root: Option<PathBuf>,
+    file_candidates: &[&str],
+) {
+    let Some(root) = root else {
+        inspection.warnings.push("HOME is not set".to_string());
+        return;
+    };
+    push_root(inspection, "Config home", &root);
+    inspect_skill_dir(inspection, "Skills", &root.join("skills"));
+    inspect_directory_entries(
+        "Extensions",
+        &root.join("extensions"),
+        &mut inspection.extensions,
+    );
+
+    let path = file_candidates
+        .iter()
+        .map(|name| root.join(name))
+        .find(|path| path.exists())
+        .unwrap_or_else(|| root.join(file_candidates[0]));
+    inspect_jsonc_config(inspection, "Config", &path);
+}
+
+fn inspect_kimi_config(inspection: &mut ProviderConfigInspection) {
+    let Some(root) = crate::provider::kimi::kimi_code_home() else {
+        inspection.warnings.push("HOME is not set".to_string());
+        return;
+    };
+    push_root(inspection, "Kimi home", &root);
+    inspect_skill_dir(inspection, "Kimi skills", &root.join("skills"));
+    inspect_directory_entries(
+        "Extensions",
+        &root.join("extensions"),
+        &mut inspection.extensions,
+    );
+    let path = root.join("config.toml");
+    push_file(inspection, "Config", &path);
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let Ok(value) = toml::from_str::<toml::Value>(&text) else {
+        inspection
+            .warnings
+            .push(format!("Could not parse {}", path.display()));
+        return;
+    };
+    collect_toml_table_entries(
+        value
+            .get("mcp_servers")
+            .or_else(|| value.get("mcpServers"))
+            .and_then(toml::Value::as_table),
+        "Config",
+        &path,
+        &mut inspection.mcp_servers,
+    );
+}
+
+fn inspect_cursor_config(inspection: &mut ProviderConfigInspection) {
+    let Some(home) = crate::platform::paths::home_dir() else {
+        inspection.warnings.push("HOME is not set".to_string());
+        return;
+    };
+    let root = home.join(".cursor");
+    push_root(inspection, "Cursor home", &root);
+    inspect_skill_dir(inspection, "Cursor skills", &root.join("skills"));
+}
+
+fn inspect_copilot_config(inspection: &mut ProviderConfigInspection) {
+    let Some(root) = crate::platform::paths::xdg_config_dir("github-copilot") else {
+        inspection.warnings.push("HOME is not set".to_string());
+        return;
+    };
+    push_root(inspection, "GitHub Copilot config", &root);
+}
+
+fn inspect_terminal_cli_config(inspection: &mut ProviderConfigInspection, provider: &str) {
+    let Some(root) = crate::platform::paths::xdg_config_dir(provider) else {
+        inspection.warnings.push("HOME is not set".to_string());
+        return;
+    };
+    push_root(inspection, "Config home", &root);
+    inspect_skill_dir(inspection, "Skills", &root.join("skills"));
+    inspect_directory_entries(
+        "Extensions",
+        &root.join("extensions"),
+        &mut inspection.extensions,
+    );
+    inspect_json_file(
+        inspection,
+        "Config",
+        &root.join("config.json"),
+        &["hooks"],
+        &["mcpServers", "mcp_servers"],
+        &["extensions", "plugins"],
+    );
+}
+
+fn push_root(inspection: &mut ProviderConfigInspection, label: &str, path: &Path) {
+    inspection.roots.push(ProviderConfigRoot {
+        label: label.to_string(),
+        path: path.display().to_string(),
+        exists: path.exists(),
+    });
+}
+
+fn push_file(inspection: &mut ProviderConfigInspection, label: &str, path: &Path) {
+    inspection.files.push(ProviderConfigFile {
+        label: label.to_string(),
+        path: path.display().to_string(),
+        exists: path.exists(),
+    });
+}
+
+fn inspect_skill_dir(inspection: &mut ProviderConfigInspection, source: &str, path: &Path) {
+    inspect_directory_entries(source, path, &mut inspection.skills);
+}
+
+fn inspect_directory_entries(source: &str, path: &Path, out: &mut Vec<ProviderConfigEntry>) {
+    if !path.exists() {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let entry_path = entry.path();
+        let Some(name) = entry_path
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.starts_with('.'))
+        else {
+            continue;
+        };
+        out.push(ProviderConfigEntry {
+            name: name.to_string(),
+            source: source.to_string(),
+            path: Some(entry_path.display().to_string()),
+            detail: None,
+        });
+    }
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+}
+
+fn inspect_json_file(
+    inspection: &mut ProviderConfigInspection,
+    label: &str,
+    path: &Path,
+    hook_keys: &[&str],
+    mcp_keys: &[&str],
+    extension_keys: &[&str],
+) {
+    push_file(inspection, label, path);
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return;
+    };
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
+        inspection
+            .warnings
+            .push(format!("Could not parse {}", path.display()));
+        return;
+    };
+    collect_json_entries(&value, hook_keys, label, path, &mut inspection.hooks);
+    collect_json_entries(&value, mcp_keys, label, path, &mut inspection.mcp_servers);
+    collect_json_entries(
+        &value,
+        extension_keys,
+        label,
+        path,
+        &mut inspection.extensions,
+    );
+}
+
+fn inspect_jsonc_config(inspection: &mut ProviderConfigInspection, label: &str, path: &Path) {
+    push_file(inspection, label, path);
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return;
+    };
+    let Ok(Some(value)) =
+        jsonc_parser::parse_to_serde_value(&text, &jsonc_parser::ParseOptions::default())
+    else {
+        inspection
+            .warnings
+            .push(format!("Could not parse {}", path.display()));
+        return;
+    };
+    collect_json_entries(&value, &["hooks"], label, path, &mut inspection.hooks);
+    collect_json_entries(
+        &value,
+        &["mcp", "mcpServers", "mcp_servers"],
+        label,
+        path,
+        &mut inspection.mcp_servers,
+    );
+    collect_json_entries(
+        &value,
+        &["extensions", "plugins"],
+        label,
+        path,
+        &mut inspection.extensions,
+    );
+}
+
+fn collect_json_entries(
+    value: &serde_json::Value,
+    keys: &[&str],
+    source: &str,
+    path: &Path,
+    out: &mut Vec<ProviderConfigEntry>,
+) {
+    let mut names = BTreeSet::new();
+    for key in keys {
+        collect_json_names(value.get(*key), &mut names);
+    }
+    for name in names {
+        out.push(ProviderConfigEntry {
+            name,
+            source: source.to_string(),
+            path: Some(path.display().to_string()),
+            detail: None,
+        });
+    }
+}
+
+fn collect_json_names(value: Option<&serde_json::Value>, names: &mut BTreeSet<String>) {
+    match value {
+        Some(serde_json::Value::Object(map)) => {
+            for key in map.keys() {
+                names.insert(key.to_string());
+            }
+        }
+        Some(serde_json::Value::Array(items)) => {
+            for item in items {
+                if let Some(name) = item
+                    .get("name")
+                    .or_else(|| item.get("id"))
+                    .and_then(serde_json::Value::as_str)
+                {
+                    names.insert(name.to_string());
+                } else if let Some(text) = item.as_str() {
+                    names.insert(text.to_string());
+                }
+            }
+        }
+        Some(serde_json::Value::String(text)) => {
+            names.insert(text.to_string());
+        }
+        _ => {}
+    }
+}
+
+fn collect_toml_table_entries(
+    table: Option<&toml::map::Map<String, toml::Value>>,
+    source: &str,
+    path: &Path,
+    out: &mut Vec<ProviderConfigEntry>,
+) {
+    let Some(table) = table else {
+        return;
+    };
+    for key in table.keys() {
+        out.push(ProviderConfigEntry {
+            name: key.to_string(),
+            source: source.to_string(),
+            path: Some(path.display().to_string()),
+            detail: None,
+        });
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct AgentCliSpec {
+    provider: &'static str,
+    label: &'static str,
+    binary: Option<&'static str>,
+    install_url: Option<&'static str>,
+    install_commands: &'static [&'static str],
+}
+
+const AGENT_CLI_SPECS: &[AgentCliSpec] = &[
+    AgentCliSpec {
+        provider: "claude",
+        label: "Claude Code",
+        binary: Some("claude"),
+        install_url: None,
+        install_commands: &[],
+    },
+    AgentCliSpec {
+        provider: "codex",
+        label: "Codex",
+        binary: Some("codex"),
+        install_url: None,
+        install_commands: &[],
+    },
+    AgentCliSpec {
+        provider: "opencode",
+        label: "OpenCode",
+        binary: Some("opencode"),
+        install_url: None,
+        install_commands: &[],
+    },
+    AgentCliSpec {
+        provider: "mimo",
+        label: "MiMo Code",
+        binary: Some("mimo"),
+        install_url: None,
+        install_commands: &[],
+    },
+    AgentCliSpec {
+        provider: "kimi",
+        label: "Kimi",
+        binary: Some("kimi"),
+        install_url: None,
+        install_commands: &[],
+    },
+    AgentCliSpec {
+        provider: "cursor",
+        label: "Cursor",
+        binary: None,
+        install_url: None,
+        install_commands: &[],
+    },
+    AgentCliSpec {
+        provider: "copilot",
+        label: "GitHub Copilot",
+        binary: None,
+        install_url: None,
+        install_commands: &[],
+    },
+    AgentCliSpec {
+        provider: "pi",
+        label: "Pi",
+        binary: Some("pi"),
+        install_url: None,
+        install_commands: &[],
+    },
+    AgentCliSpec {
+        provider: "amp",
+        label: "Amp",
+        binary: Some("amp"),
+        install_url: Some("https://ampcode.com/manual"),
+        install_commands: &["npm install -g @ampcode/cli"],
+    },
+    AgentCliSpec {
+        provider: "aider",
+        label: "Aider",
+        binary: Some("aider"),
+        install_url: Some("https://aider.chat/docs/install.html"),
+        install_commands: &["python -m pip install aider-install", "aider-install"],
+    },
+    AgentCliSpec {
+        provider: "gemini",
+        label: "Gemini CLI",
+        binary: Some("gemini"),
+        install_url: Some("https://github.com/google-gemini/gemini-cli"),
+        install_commands: &["npm install -g @google/gemini-cli"],
+    },
+    AgentCliSpec {
+        provider: "qwen",
+        label: "Qwen Code",
+        binary: Some("qwen"),
+        install_url: Some("https://github.com/QwenLM/qwen-code"),
+        install_commands: &["npm install -g @qwen-code/qwen-code"],
+    },
+    AgentCliSpec {
+        provider: "goose",
+        label: "Goose",
+        binary: Some("goose"),
+        install_url: Some("https://goose-docs.ai/docs/getting-started/installation/"),
+        install_commands: &["brew install block-goose-cli"],
+    },
+    AgentCliSpec {
+        provider: "crush",
+        label: "Crush",
+        binary: Some("crush"),
+        install_url: Some("https://github.com/charmbracelet/crush"),
+        install_commands: &["go install github.com/charmbracelet/crush@latest"],
+    },
+    AgentCliSpec {
+        provider: "plandex",
+        label: "Plandex",
+        binary: Some("plandex"),
+        install_url: Some("https://docs.plandex.ai/install/"),
+        install_commands: &["curl -fsSL https://plandex.ai/install.sh | bash"],
+    },
+];
+
+fn agent_cli_statuses() -> Vec<AgentCliStatus> {
+    AGENT_CLI_SPECS
+        .iter()
+        .map(|spec| {
+            let Some(binary) = spec.binary else {
+                return AgentCliStatus {
+                    provider: spec.provider.to_string(),
+                    label: spec.label.to_string(),
+                    binary: None,
+                    installed: true,
+                    source: AgentCliSource::ApiKeyOnly,
+                    path: None,
+                    version: None,
+                    install_url: spec.install_url.map(str::to_string),
+                    install_commands: spec
+                        .install_commands
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                };
+            };
+
+            let (path, source) = resolve_agent_binary(spec.provider);
+            let path_for_spawn = path.clone();
+            let version = agent_cli_version_for_path(&path_for_spawn);
+            let installed = !matches!(source, AgentCliSource::Missing);
+            let path_string = match source {
+                AgentCliSource::Missing => None,
+                _ => Some(path.display().to_string()),
+            };
+
+            AgentCliStatus {
+                provider: spec.provider.to_string(),
+                label: spec.label.to_string(),
+                binary: Some(binary.to_string()),
+                installed,
+                source,
+                path: path_string,
+                version,
+                install_url: spec.install_url.map(str::to_string),
+                install_commands: spec
+                    .install_commands
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+            }
+        })
+        .collect()
+}
+
+pub(crate) fn agent_provider_available(provider: &str) -> bool {
+    AGENT_CLI_SPECS
+        .iter()
+        .find(|spec| spec.provider == provider)
+        .is_none_or(|spec| {
+            spec.binary.is_none()
+                || !matches!(
+                    resolve_agent_binary(spec.provider).1,
+                    AgentCliSource::Missing
+                )
+        })
+}
+
+fn agent_cli_version_for_path(path: &Path) -> Option<String> {
+    let mut command = std::process::Command::new(path);
+    crate::platform::process::configure_background_cli(&mut command);
+    let output = command.arg("--version").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    parse_semver(&text)
 }
 
 /// Cursor "ready" = non-empty `app.cursor_provider.apiKey`.
@@ -1311,7 +1939,7 @@ fn kimi_login_ready() -> bool {
 /// so onboarding works on machines that don't have `claude` / `codex` on
 /// PATH. Falls back to the bare command name (PATH lookup) for dev builds
 /// and as a last resort.
-fn resolve_agent_binary(provider: &str) -> PathBuf {
+fn resolve_agent_binary(provider: &str) -> (PathBuf, AgentCliSource) {
     let bundled = sidecar::resolve_bundled_agent_paths();
     let bundled_path = match provider {
         "claude" => bundled.claude_bin,
@@ -1321,7 +1949,44 @@ fn resolve_agent_binary(provider: &str) -> PathBuf {
         "kimi" => bundled.kimi_bin,
         _ => None,
     };
-    bundled_path.unwrap_or_else(|| crate::platform::executable::resolve_for_spawn(provider))
+    if let Some(path) = bundled_path {
+        return (path, AgentCliSource::Bundled);
+    }
+    if let Some(path) = resolve_external_binary(provider) {
+        return (path, AgentCliSource::External);
+    }
+    (PathBuf::from(provider), AgentCliSource::Missing)
+}
+
+fn resolve_external_binary(binary: &str) -> Option<PathBuf> {
+    #[cfg(windows)]
+    let output = {
+        let mut cmd = Command::new("where");
+        crate::platform::process::configure_background_cli(&mut cmd);
+        cmd.arg(binary).output().ok()?
+    };
+
+    #[cfg(not(windows))]
+    let output = {
+        let mut cmd = Command::new("sh");
+        crate::platform::process::configure_background_cli(&mut cmd);
+        cmd.arg("-lc")
+            .arg(format!(
+                "command -v -- {}",
+                crate::platform::shell::quote_posix_arg(binary)
+            ))
+            .output()
+            .ok()?
+    };
+
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    text.lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(PathBuf::from)
 }
 
 // Read from the sidecar-computed settings row, NOT `auth.json` (which misses env/config/Zen providers).
@@ -1387,7 +2052,7 @@ fn copilot_login_ready() -> bool {
 }
 
 fn claude_login_ready() -> bool {
-    let mut command = std::process::Command::new(resolve_agent_binary("claude"));
+    let mut command = std::process::Command::new(resolve_agent_binary("claude").0);
     crate::platform::process::configure_background_cli(&mut command);
     match command.args(["auth", "status"]).output() {
         Ok(output) if output.status.success() => parse_claude_login_status(&output.stdout),
@@ -1440,7 +2105,7 @@ fn codex_auth_status() -> CodexAuthStatus {
 }
 
 fn codex_login_ready() -> bool {
-    let mut command = std::process::Command::new(resolve_agent_binary("codex"));
+    let mut command = std::process::Command::new(resolve_agent_binary("codex").0);
     crate::platform::process::configure_background_cli(&mut command);
     match command.args(["login", "status"]).output() {
         Ok(output) if output.status.success() => {
@@ -1507,7 +2172,7 @@ fn agent_login_command(provider: &str) -> anyhow::Result<String> {
     };
     // Quote the resolved binary path so spaces in `Helmor.app` survive
     // both the embedded PTY shell and AppleScript's `do shell script`.
-    let binary = shell_quote(&resolve_agent_binary(provider));
+    let binary = shell_quote(&resolve_agent_binary(provider).0);
     Ok(if args.is_empty() {
         binary
     } else {

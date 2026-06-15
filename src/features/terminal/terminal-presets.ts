@@ -6,6 +6,7 @@
 // to INVOKE it — fresh boot flags, resume syntax, bare launch — and that's
 // all a spec carries. Adding a terminal agent = adding one spec here (plus,
 // for status-sync/resume, a hook-injection arm in terminal_commands.rs).
+import { SESSION_PROVIDER_CATALOG } from "./terminal-agent-catalog";
 
 export type TerminalBootOptions = {
 	prompt: string;
@@ -151,8 +152,32 @@ const CODEX_SPEC: TerminalAgentSpec = {
 	},
 };
 
-// Supported terminal agents: Claude and Codex only.
-const TERMINAL_AGENTS: readonly TerminalAgentSpec[] = [CLAUDE_SPEC, CODEX_SPEC];
+function simpleTerminalSpec(key: string, command = key): TerminalAgentSpec {
+	return {
+		key,
+		presetCommand: command,
+		boot(opts) {
+			return opts.prompt.trim()
+				? `${command} ${shellQuotePrompt(opts.prompt)}`
+				: command;
+		},
+		resume() {
+			return null;
+		},
+	};
+}
+
+const SIMPLE_TERMINAL_AGENTS: readonly TerminalAgentSpec[] =
+	SESSION_PROVIDER_CATALOG.filter(
+		(entry) =>
+			entry.terminal && entry.key !== "claude" && entry.key !== "codex",
+	).map((entry) => simpleTerminalSpec(entry.key, entry.binary ?? entry.key));
+
+const TERMINAL_AGENTS: readonly TerminalAgentSpec[] = [
+	CLAUDE_SPEC,
+	CODEX_SPEC,
+	...SIMPLE_TERMINAL_AGENTS,
+];
 
 /** Spec for an agent key / composer provider; null = no terminal support
  * (cursor/opencode have no spec — the composer toggle hides itself). */

@@ -20,16 +20,23 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock("@/components/icons", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/components/icons")>()),
-	ClaudeIcon: (props: { className?: string }) => (
-		<span data-testid="claude-icon" {...props}>
-			claude-icon
-		</span>
-	),
-	OpenAIIcon: (props: { className?: string }) => (
-		<span data-testid="codex-icon" {...props}>
-			codex-icon
-		</span>
-	),
+	AgentProviderIcon: ({
+		agentType,
+		className,
+	}: {
+		agentType?: string | null;
+		className?: string;
+	}) => {
+		const key =
+			agentType === "codex" || agentType?.startsWith("codex:")
+				? "codex"
+				: (agentType ?? "claude");
+		return (
+			<span data-testid={`${key}-icon`} className={className}>
+				{key}-icon
+			</span>
+		);
+	},
 }));
 
 vi.mock("@/components/helmor-thinking-indicator", () => ({

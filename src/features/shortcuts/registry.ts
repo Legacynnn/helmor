@@ -63,6 +63,14 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		editable: true,
 	},
 	{
+		id: "session.newPicker",
+		title: "New session menu",
+		group: "Session",
+		defaultHotkey: "Mod+Shift+T",
+		scopes: ["chat"],
+		editable: true,
+	},
+	{
 		id: "session.close",
 		title: "Close current session",
 		group: "Session",
@@ -312,7 +320,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		id: "composer.toggleTerminalMode",
 		title: "Toggle terminal mode",
 		group: "Composer",
-		defaultHotkey: "Mod+Shift+T",
+		defaultHotkey: null,
 		// App-scoped — handled in the global shortcut table, not composer-local.
 		scopes: ["app"],
 		editable: true,

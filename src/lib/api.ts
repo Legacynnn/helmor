@@ -1006,6 +1006,57 @@ export async function getAgentLoginStatus(): Promise<AgentLoginStatusResult> {
 	return await invoke<AgentLoginStatusResult>("get_agent_login_status");
 }
 
+export type AgentCliSource = "bundled" | "external" | "missing" | "apiKeyOnly";
+
+export type AgentCliStatus = {
+	provider: string;
+	label: string;
+	binary: string | null;
+	installed: boolean;
+	source: AgentCliSource;
+	path: string | null;
+	version: string | null;
+	installUrl: string | null;
+	installCommands: string[];
+};
+
+export async function getAgentCliStatus(): Promise<AgentCliStatus[]> {
+	return await invoke<AgentCliStatus[]>("get_agent_cli_status");
+}
+
+export type ProviderConfigEntry = {
+	name: string;
+	source: string;
+	path: string | null;
+	detail: string | null;
+};
+
+export type ProviderConfigRoot = {
+	label: string;
+	path: string;
+	exists: boolean;
+};
+
+export type ProviderConfigFile = ProviderConfigRoot;
+
+export type ProviderConfigInspection = {
+	provider: string;
+	label: string;
+	roots: ProviderConfigRoot[];
+	files: ProviderConfigFile[];
+	skills: ProviderConfigEntry[];
+	hooks: ProviderConfigEntry[];
+	mcpServers: ProviderConfigEntry[];
+	extensions: ProviderConfigEntry[];
+	warnings: string[];
+};
+
+export async function inspectProviderConfigs(): Promise<
+	ProviderConfigInspection[]
+> {
+	return await invoke<ProviderConfigInspection[]>("inspect_provider_configs");
+}
+
 // Cursor is an SDK (no versioned CLI), so it has no entry.
 export type AgentVersionsResult = {
 	claude: string | null;

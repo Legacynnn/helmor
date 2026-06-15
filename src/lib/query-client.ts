@@ -80,6 +80,8 @@ export const helmorQueryKeys = {
 	customProviders: (family: string) => ["customProviders", family] as const,
 	kimiProviderConfig: ["kimiProviderConfig"] as const,
 	agentLoginStatus: ["agentLoginStatus"] as const,
+	agentCliStatus: ["agentCliStatus"] as const,
+	providerConfigInspections: ["providerConfigInspections"] as const,
 	agentVersions: ["agentVersions"] as const,
 	providerCapabilities: ["providerCapabilities"] as const,
 	workspaceDetail: (workspaceId: string) =>

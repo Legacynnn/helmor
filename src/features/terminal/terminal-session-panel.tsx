@@ -6,6 +6,7 @@ import {
 	TerminalOutput,
 } from "@/components/terminal-output";
 import { helmorQueryKeys } from "@/lib/query-client";
+import { sessionProviderLabel } from "./terminal-agent-catalog";
 import { presetBootCommand, resumeBootCommand } from "./terminal-presets";
 import {
 	attach,
@@ -31,11 +32,6 @@ type TerminalSessionPanelProps = {
 	/** False while the workspace is still initializing (start-surface create
 	 *  before finalize) — the PTY must not spawn until the worktree exists. */
 	workspaceReady?: boolean;
-};
-
-const AGENT_LABELS: Record<string, string> = {
-	claude: "Claude",
-	codex: "Codex",
 };
 
 /** Message-area terminal for a Terminal session. The panel stays mounted
@@ -174,7 +170,7 @@ export function TerminalSessionPanel({
 		[sessionId],
 	);
 
-	const agentLabel = (agentKind && AGENT_LABELS[agentKind]) || "terminal";
+	const agentLabel = agentKind ? sessionProviderLabel(agentKind) : "terminal";
 
 	return (
 		<div className="relative flex min-h-0 flex-1 flex-col">
@@ -187,7 +183,10 @@ export function TerminalSessionPanel({
 				isVisible={isActive}
 			/>
 			{booting ? (
-				<div className="absolute inset-0 z-10 flex items-center justify-center bg-panel">
+				<div
+					className="absolute inset-0 z-10 flex items-center justify-center"
+					style={{ backgroundColor: "var(--terminal-background)" }}
+				>
 					<div className="flex items-center gap-2.5 text-small text-muted-foreground">
 						<Loader2 className="size-4 animate-spin" strokeWidth={1.8} />
 						<span>

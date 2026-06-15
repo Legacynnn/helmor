@@ -20,6 +20,12 @@ import { seedNewSessionInCache } from "../session-cache";
 import { closeWorkspaceSession } from "../session-close";
 import type { SessionCloseRequest } from "../use-confirm-session-close";
 
+type CreateHeaderSessionOptions = {
+	model?: string | null;
+	sessionKind?: "gui" | "terminal";
+	agentType?: string | null;
+};
+
 function displaySessionTitle(session: WorkspaceSessionSummary): string {
 	return session.title ?? "Untitled";
 }
@@ -28,7 +34,9 @@ export type SessionActionsController = {
 	editingSessionId: string | null;
 	editingTitle: string;
 	setEditingTitle(value: string): void;
-	createSession(model?: string): Promise<void>;
+	createSession(
+		modelOrOptions?: string | CreateHeaderSessionOptions,
+	): Promise<void>;
 	hideSession(sessionId: string, event: React.MouseEvent): Promise<void>;
 	deleteHiddenSession(sessionId: string): Promise<void>;
 	startRename(session: WorkspaceSessionSummary, event: React.MouseEvent): void;
@@ -65,13 +73,20 @@ export function useSessionActions({
 	const [editingTitle, setEditingTitle] = useState("");
 
 	const createSessionAction = useCallback(
-		async (model?: string) => {
+		async (modelOrOptions?: string | CreateHeaderSessionOptions) => {
 			if (!workspace) return;
+			const options =
+				typeof modelOrOptions === "string"
+					? { model: modelOrOptions }
+					: (modelOrOptions ?? {});
+			const sessionKind = options.sessionKind ?? "gui";
+			const agentType = options.agentType ?? null;
 			try {
-				const result = await createSession(
-					workspace.id,
-					model ? { model } : undefined,
-				);
+				const result = await createSession(workspace.id, {
+					model: options.model ?? null,
+					sessionKind,
+					agentType,
+				});
 				seedNewSessionInCache({
 					queryClient,
 					workspaceId: workspace.id,
@@ -79,6 +94,8 @@ export function useSessionActions({
 					workspace,
 					existingSessions: sessions,
 					createdAt: new Date().toISOString(),
+					sessionKind,
+					agentType,
 				});
 				void queryClient.invalidateQueries({
 					queryKey: helmorQueryKeys.repoScripts(workspace.repoId, workspace.id),

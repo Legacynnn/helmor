@@ -54,6 +54,7 @@ type WorkspacePanelProps = {
 	headerActions?: ReactNode;
 	headerLeading?: ReactNode;
 	newSessionShortcut?: string | null;
+	newSessionMenuShortcut?: string | null;
 	missingScriptTypes?: WorkspaceScriptType[];
 	onInitializeScript?: (scriptType: WorkspaceScriptType) => void;
 };
@@ -86,6 +87,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	headerActions,
 	headerLeading,
 	newSessionShortcut,
+	newSessionMenuShortcut,
 	missingScriptTypes = [],
 	onInitializeScript,
 }: WorkspacePanelProps) {
@@ -148,7 +150,13 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 
 	return (
 		<HelmorProfiler id="WorkspacePanel">
-			<div className="flex min-h-0 flex-1 flex-col bg-panel">
+			<div
+				className="flex min-h-0 flex-1 flex-col bg-panel"
+				// Vesper opens a transparent "blur tunnel" to the center terminal only
+				// while a terminal session is the visible surface; chat/editor keep
+				// their protective opaque viewport. See color-theme.css.
+				data-center-surface={visibleTerminalId ? "terminal" : undefined}
+			>
 				<WorkspacePanelHeader
 					workspace={workspace}
 					changeRequest={changeRequest}
@@ -173,6 +181,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 					onWorkspaceChanged={onWorkspaceChanged}
 					onRequestCloseSession={onRequestCloseSession}
 					newSessionShortcut={newSessionShortcut}
+					newSessionMenuShortcut={newSessionMenuShortcut}
 				/>
 
 				<div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">

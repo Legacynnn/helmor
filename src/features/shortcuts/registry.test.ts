@@ -123,16 +123,20 @@ describe("shortcut registry", () => {
 		expect(getShortcut({}, "sidebar.right.toggle")).toBe("Mod+L");
 	});
 
-	it("reopens closed sessions via Mod+Shift+R and frees Mod+Shift+T for terminal mode", () => {
+	it("uses Mod+Shift+T for the new-session menu", () => {
 		const reopen = SHORTCUT_DEFINITIONS.find(
 			(d) => d.id === "session.reopenClosed",
+		);
+		const newSessionPicker = SHORTCUT_DEFINITIONS.find(
+			(d) => d.id === "session.newPicker",
 		);
 		const toggleTerminalMode = SHORTCUT_DEFINITIONS.find(
 			(d) => d.id === "composer.toggleTerminalMode",
 		);
 
 		expect(reopen?.defaultHotkey).toBe("Mod+Shift+R");
-		expect(toggleTerminalMode?.defaultHotkey).toBe("Mod+Shift+T");
+		expect(newSessionPicker?.defaultHotkey).toBe("Mod+Shift+T");
+		expect(toggleTerminalMode?.defaultHotkey).toBeNull();
 
 		// No internal conflicts after the move.
 		expect(getShortcutConflicts({}).disabledIds.size).toBe(0);

@@ -683,6 +683,10 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			headerActions={headerActions}
 			headerLeading={headerLeading}
 			newSessionShortcut={getShortcut(settings.shortcuts, "session.new")}
+			newSessionMenuShortcut={getShortcut(
+				settings.shortcuts,
+				"session.newPicker",
+			)}
 			missingScriptTypes={missingScriptTypes}
 			onInitializeScript={handleInitializeScript}
 			changeRequest={workspaceChangeRequest}

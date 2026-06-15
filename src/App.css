@@ -690,6 +690,17 @@ body {
 	}
 }
 
+/* xterm hardcodes `.xterm-viewport { background-color: #000 }` (xterm.css),
+   painting the entire terminal area opaque black. That defeats allowTransparency,
+   the transparent theme background, AND our themed wrapper
+   (`var(--terminal-background)`), so terminals render flat black regardless of
+   theme. Force it transparent so the wrapper is the single visible surface —
+   the theme's terminal color in opaque themes, frosted glass in Vesper.
+   `!important` is required to beat the vendor rule's hardcoded value. */
+.xterm .xterm-viewport {
+	background-color: transparent !important;
+}
+
 /* xterm: custom scrollbar shape to match app style */
 .xterm .xterm-scrollable-element > .scrollbar {
 	width: 8px !important;

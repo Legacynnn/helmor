@@ -628,6 +628,8 @@ pub fn run() {
             commands::system_commands::get_cli_status,
             commands::system_commands::get_data_info,
             commands::system_commands::get_agent_login_status,
+            commands::system_commands::get_agent_cli_status,
+            commands::system_commands::inspect_provider_configs,
             commands::system_commands::get_agent_versions,
             commands::system_commands::get_helmor_skills_status,
             commands::system_commands::install_cli,

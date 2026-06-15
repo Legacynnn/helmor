@@ -94,6 +94,8 @@ async fn dispatch(
         "finalize_workspace_from_repo" => to_value(crate::commands::workspace_commands::finalize_workspace_from_repo(app.clone(), arg_string(&args, "workspaceId")?).await?),
         "generate_session_title" => to_value(crate::agents::generate_session_title(app.clone(), app.state::<crate::sidecar::ManagedSidecar>(), arg_json(&args, "request")?).await?),
         "get_add_repository_defaults" => to_value(crate::commands::repository_commands::get_add_repository_defaults().await?),
+        "get_agent_cli_status" => to_value(crate::commands::system_commands::get_agent_cli_status().await?),
+        "inspect_provider_configs" => to_value(crate::commands::system_commands::inspect_provider_configs().await?),
         "get_agent_login_status" => to_value(crate::commands::system_commands::get_agent_login_status().await?),
         "get_agent_versions" => to_value(crate::commands::system_commands::get_agent_versions().await?),
         "get_app_update_status" => to_value(crate::commands::updater_commands::get_app_update_status(app.clone()).await?),

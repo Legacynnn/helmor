@@ -291,7 +291,12 @@ fn build_terminal_boot(
         }
     } else {
         let bundled = crate::sidecar::resolve_bundled_agent_paths();
-        for bin in [&bundled.claude_bin, &bundled.codex_bin] {
+        for bin in [
+            &bundled.claude_bin,
+            &bundled.codex_bin,
+            &bundled.opencode_bin,
+            &bundled.mimo_bin,
+        ] {
             if let Some(dir) = bin.as_deref().and_then(|p| p.parent()) {
                 let dir = dir.display().to_string();
                 if !bundled_dirs.contains(&dir) {

@@ -33,6 +33,7 @@ export type ShellEvent =
 	| { type: "focus-composer" }
 	| { type: "toggle-context-panel" }
 	| { type: "focus-active-terminal" }
+	| { type: "open-new-session-menu" }
 	// App-scoped ⌘⇧T — the mounted composer flips its terminalMode.
 	| { type: "toggle-terminal-mode" }
 	// Imperative archive from surfaces outside the sidebar controller (reuses its optimistic path).

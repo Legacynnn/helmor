@@ -61,7 +61,7 @@ pub fn static_model_sections() -> Vec<AgentModelSection> {
         crate::provider::codex::load_providers(),
         codex_enabled.as_deref(),
     );
-    if !custom.is_empty() {
+    if !custom.is_empty() && crate::commands::system_commands::agent_provider_available("codex") {
         let at = sections
             .iter()
             .position(|section| section.id == "codex")
@@ -72,7 +72,7 @@ pub fn static_model_sections() -> Vec<AgentModelSection> {
             sections.insert(at + offset, section);
         }
     }
-    drop_empty_sections(sections)
+    drop_empty_sections(filter_uninstalled_provider_sections(sections))
 }
 
 /// Full unfiltered catalog for the Settings "Models" multi-selects. Custom
@@ -127,6 +127,22 @@ fn drop_empty_sections(sections: Vec<AgentModelSection>) -> Vec<AgentModelSectio
     sections
         .into_iter()
         .filter(|section| !section.options.is_empty())
+        .collect()
+}
+
+fn filter_uninstalled_provider_sections(
+    sections: Vec<AgentModelSection>,
+) -> Vec<AgentModelSection> {
+    sections
+        .into_iter()
+        .filter(|section| {
+            let provider = section
+                .id
+                .split_once(':')
+                .map(|(provider, _)| provider)
+                .unwrap_or(section.id.as_str());
+            crate::commands::system_commands::agent_provider_available(provider)
+        })
         .collect()
 }
 

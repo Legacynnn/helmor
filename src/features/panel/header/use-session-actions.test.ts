@@ -52,17 +52,35 @@ describe("createSessionAction model arg", () => {
 		});
 		expect(apiMocks.createSession).toHaveBeenCalledWith("workspace-1", {
 			model: "gpt-5.5",
+			sessionKind: "gui",
+			agentType: null,
 		});
 	});
 
-	it("omits options when no model is provided", async () => {
+	it("defaults to a GUI session when no options are provided", async () => {
 		const { result } = setup();
 		await act(async () => {
 			await result.current.createSession();
 		});
-		expect(apiMocks.createSession).toHaveBeenCalledWith(
-			"workspace-1",
-			undefined,
-		);
+		expect(apiMocks.createSession).toHaveBeenCalledWith("workspace-1", {
+			model: null,
+			sessionKind: "gui",
+			agentType: null,
+		});
+	});
+
+	it("passes terminal session options when provided", async () => {
+		const { result } = setup();
+		await act(async () => {
+			await result.current.createSession({
+				sessionKind: "terminal",
+				agentType: "amp",
+			});
+		});
+		expect(apiMocks.createSession).toHaveBeenCalledWith("workspace-1", {
+			model: null,
+			sessionKind: "terminal",
+			agentType: "amp",
+		});
 	});
 });

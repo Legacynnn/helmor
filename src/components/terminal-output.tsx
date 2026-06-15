@@ -306,6 +306,21 @@ function resolveTerminalTheme(): ITheme {
 	};
 }
 
+// True when the active theme makes the terminal surface translucent (Vesper).
+// xterm's WebGL renderer paints such a background as OPAQUE BLACK in WKWebView
+// (it ignores the background alpha), which defeats the translucent wrapper and
+// makes the whole terminal read as flat black. The DOM renderer honors
+// `allowTransparency`, so we fall back to it whenever the surface is translucent.
+// resolveCssColor returns `#rrggbbaa` (8 hex digits) when alpha < 255 and
+// `#rrggbb` (6 digits) when opaque.
+function terminalBackgroundIsTranslucent(): boolean {
+	try {
+		return resolveCssColor("var(--terminal-background)").length > 7;
+	} catch {
+		return false;
+	}
+}
+
 function resolveTerminalFontFamily(
 	fontFamily: string | null | undefined,
 ): string {
@@ -616,7 +631,14 @@ function TerminalOutputImpl({
 	useEffect(() => {
 		const terminal = xtermRef.current;
 		if (!terminal || !isVisible) return;
-		if (!webglRef.current && !webglDisabledRef.current) {
+		// Skip WebGL on translucent (Vesper) surfaces — its renderer would paint an
+		// opaque black background and hide the frosted glass. The DOM renderer (no
+		// addon) honors allowTransparency. If WebGL was attached under a previous
+		// opaque theme, tear it down so the switch to a glass theme takes effect.
+		if (terminalBackgroundIsTranslucent()) {
+			webglRef.current?.dispose();
+			webglRef.current = null;
+		} else if (!webglRef.current && !webglDisabledRef.current) {
 			try {
 				const addon = new WebglAddon();
 				addon.onContextLoss(() => {
@@ -643,7 +665,9 @@ function TerminalOutputImpl({
 			webglRef.current?.dispose();
 			webglRef.current = null;
 		};
-	}, [isVisible]);
+		// Theme fields are deps so switching to/from a translucent (Vesper) theme
+		// re-evaluates whether WebGL may attach (it can't on glass surfaces).
+	}, [isVisible, settings.theme, settings.darkTheme, settings.lightTheme]);
 
 	useEffect(() => {
 		const terminal = xtermRef.current;

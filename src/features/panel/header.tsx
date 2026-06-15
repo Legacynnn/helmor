@@ -12,7 +12,6 @@ import {
 	Layers,
 	MessageCircle,
 	Pencil,
-	Plus,
 	RotateCcw,
 	Trash2,
 	X,
@@ -26,15 +25,7 @@ import { BranchPickerPopover } from "@/components/branch-picker";
 import { CachedAvatar } from "@/components/cached-avatar";
 import { TrafficLightSpacer } from "@/components/chrome/traffic-light-spacer";
 import { HelmorThinkingIndicator } from "@/components/helmor-thinking-indicator";
-import {
-	ClaudeIcon,
-	CursorIcon,
-	GithubCopilotIcon,
-	KimiIcon,
-	MiMoCodeIcon,
-	OpenAIIcon,
-	OpenCodeIcon,
-} from "@/components/icons";
+import { AgentProviderIcon, ClaudeIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -54,11 +45,9 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { InlineShortcutDisplay } from "@/features/shortcuts/shortcut-display";
 import {
 	type AgentProvider,
 	type ChangeRequestInfo,
-	isCodexProvider,
 	listRemoteBranches,
 	prefetchRemoteRefs,
 	updateIntendedTargetBranch,
@@ -79,6 +68,7 @@ import {
 	type WorkspaceBranchTone,
 } from "@/lib/workspace-helpers";
 import { useWorkspaceToast } from "@/lib/workspace-toast-context";
+import { NewSessionMenu } from "./header/new-session-menu";
 import { useBranchRename } from "./header/use-branch-rename";
 import { useHiddenHistory } from "./header/use-hidden-history";
 import { useSessionActions } from "./header/use-session-actions";
@@ -111,6 +101,7 @@ type WorkspacePanelHeaderProps = {
 	 *  chip). Wired from the shell's selection controller. */
 	onSelectWorkspace?: (workspaceId: string) => void;
 	newSessionShortcut?: string | null;
+	newSessionMenuShortcut?: string | null;
 };
 
 const SESSION_TITLE_TOOLTIP_MAX_CHARS = 240;
@@ -143,6 +134,7 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 	onRequestCloseSession,
 	onSelectWorkspace,
 	newSessionShortcut,
+	newSessionMenuShortcut,
 }: WorkspacePanelHeaderProps) {
 	const branchTone = getWorkspaceBranchTone({
 		workspaceState: workspace?.state,
@@ -728,32 +720,12 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 					</div>
 				</div>
 
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Button
-							aria-label="New session"
-							onClick={() => void sessionActions.createSession()}
-							variant="ghost"
-							size="icon-sm"
-							className="ml-0.5 shrink-0 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-						>
-							<Plus className="size-3.5" strokeWidth={1.8} />
-						</Button>
-					</TooltipTrigger>
-					<TooltipContent
-						side="bottom"
-						sideOffset={4}
-						className="flex h-[24px] items-center gap-2 rounded-md px-2 text-small leading-none"
-					>
-						<span>New session</span>
-						{newSessionShortcut ? (
-							<InlineShortcutDisplay
-								hotkey={newSessionShortcut}
-								className="text-background/60"
-							/>
-						) : null}
-					</TooltipContent>
-				</Tooltip>
+				<NewSessionMenu
+					sessionActions={sessionActions}
+					newSessionShortcut={newSessionShortcut}
+					newSessionMenuShortcut={newSessionMenuShortcut}
+					disabled={!workspace}
+				/>
 
 				<DropdownMenu
 					open={hiddenHistory.showHistory}
@@ -862,27 +834,13 @@ function SessionProviderIcon({
 	if (active) {
 		return <HelmorThinkingIndicator size={14} />;
 	}
-	if (isCodexProvider(agentType)) {
-		return <OpenAIIcon className="size-3 shrink-0 text-muted-foreground" />;
-	}
-	if (agentType === "cursor") {
-		return <CursorIcon className="size-3 shrink-0 text-muted-foreground" />;
-	}
-	if (agentType === "opencode") {
-		return <OpenCodeIcon className="size-3 shrink-0 text-muted-foreground" />;
-	}
-	if (agentType === "kimi") {
-		return <KimiIcon className="size-3 shrink-0 text-muted-foreground" />;
-	}
-	if (agentType === "mimo") {
-		return <MiMoCodeIcon className="size-3 shrink-0 text-muted-foreground" />;
-	}
-	if (agentType === "copilot") {
-		return (
-			<GithubCopilotIcon className="size-3 shrink-0 text-muted-foreground" />
-		);
-	}
-	return <ClaudeIcon className="size-3 shrink-0 text-muted-foreground" />;
+	return (
+		<AgentProviderIcon
+			agentType={agentType}
+			fallback={ClaudeIcon}
+			className="size-3 shrink-0 text-muted-foreground"
+		/>
+	);
 }
 
 function displaySessionTitle(session: WorkspaceSessionSummary): string {

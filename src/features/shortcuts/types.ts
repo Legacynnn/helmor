@@ -12,6 +12,7 @@ export type ShortcutId =
 	| "session.previous"
 	| "session.next"
 	| "session.new"
+	| "session.newPicker"
 	| "session.close"
 	| "session.reopenClosed"
 	| "window.close"
