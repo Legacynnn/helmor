@@ -21,6 +21,7 @@ import {
 	useState,
 } from "react";
 import { HelmorThinkingIndicator } from "@/components/helmor-thinking-indicator";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	ContextMenu,
@@ -450,6 +451,15 @@ export const WorkspaceRowItem = memo(
 							<HyperText text={displayTitle} className="inline" />
 						</span>
 					);
+					const primaryPill =
+						row.mode === "local" ? (
+							<Badge
+								variant="secondary"
+								className="h-[15px] shrink-0 rounded px-1 text-mini font-medium leading-none"
+							>
+								Primary
+							</Badge>
+						) : null;
 					// Chat workspaces have no real repo, so skip the avatar
 					// slot entirely — the branch icon (MessageCircle in
 					// chat mode) carries the leading visual identity. Falls
@@ -461,6 +471,7 @@ export const WorkspaceRowItem = memo(
 								{branchSlot}
 								<div className="row-content-fade flex min-w-0 flex-1 items-center gap-2">
 									{titleSlot}
+									{primaryPill}
 								</div>
 							</div>
 						);
@@ -485,6 +496,7 @@ export const WorkspaceRowItem = memo(
 							<div className="row-content-fade flex min-w-0 flex-1 items-center gap-2">
 								{branchSlot}
 								{titleSlot}
+								{primaryPill}
 							</div>
 						</div>
 					);
