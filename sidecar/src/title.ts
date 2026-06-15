@@ -111,6 +111,7 @@ export interface TitleGenerationDiagnosticsOptions {
 	readonly generateBranch: boolean;
 	readonly model?: string;
 	readonly previewLimit?: number;
+	readonly semantic?: boolean;
 	readonly logError: TitleGenerationErrorLogger;
 }
 
@@ -184,7 +185,7 @@ export function parseTitleAndBranchWithDiagnostics(
 	raw: string,
 	options: TitleGenerationDiagnosticsOptions,
 ): ParsedTitle {
-	const parsed = parseTitleAndBranch(raw);
+	const parsed = parseTitleAndBranch(raw, options.semantic ?? false);
 	const previewLimit = options.previewLimit ?? 200;
 	const rawPreview = raw.slice(0, previewLimit);
 	const model = options.model;

@@ -99,6 +99,9 @@ export interface GenerateTitleOptions {
 	 * from the prompt entirely (saves tokens for local-mode workspaces and
 	 * any other case where the caller has no intent to rename a branch). */
 	readonly generateBranch?: boolean;
+	/** When true, the title LLM also emits a Conventional-Commits type and the
+	 * returned branch slug becomes `<type>/<slug>` (Semantic prefix mode). */
+	readonly semantic?: boolean;
 }
 
 /**
