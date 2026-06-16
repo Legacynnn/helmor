@@ -2,7 +2,8 @@
 // clicking a button sets the bridge mode via `onSetMode`, and Esc snaps back to
 // Navigate (`"none"`). Draw is rendered but disabled (Phase 4). An optional
 // Console toggle reveals the buffered console/network panel without changing the
-// active inspector mode. Purely presentational — all state lives upstream.
+// active inspector mode. When Draw is active the surface renders the
+// DrawToolPalette alongside. Purely presentational — all state lives upstream.
 import { MessageSquare, MousePointer2, Pencil, Terminal } from "lucide-react";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -30,8 +31,6 @@ const MODE_BUTTONS: ModeButton[] = [
 		mode: "draw",
 		label: "Draw",
 		icon: Pencil,
-		disabled: true,
-		disabledHint: "Draw — coming soon",
 	},
 ];
 

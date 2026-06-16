@@ -38,8 +38,14 @@ describe("ModeToolbar", () => {
 		expect(comment).toHaveAttribute("aria-pressed", "false");
 	});
 
-	it("renders Draw as disabled (coming soon)", () => {
+	it("renders Draw as an enabled mode", () => {
 		renderToolbar({ mode: "none" });
-		expect(screen.getByRole("button", { name: /draw/i })).toBeDisabled();
+		expect(screen.getByRole("button", { name: /draw/i })).toBeEnabled();
+	});
+
+	it("activating Draw mode calls onSetMode('draw')", () => {
+		const { onSetMode } = renderToolbar({ mode: "none" });
+		fireEvent.click(screen.getByRole("button", { name: /draw/i }));
+		expect(onSetMode).toHaveBeenCalledWith("draw");
 	});
 });
