@@ -24,6 +24,7 @@ import { UrlBar } from "./chrome/url-bar";
 import { ContentHost } from "./content-host";
 import { CspFallback } from "./csp-fallback";
 import { activeTab, type BrowserTab } from "./tab-model";
+import { DEVICE_PRESETS, type ViewportPresetId } from "./viewport/presets";
 
 /** Build an in-memory {@link CommentPin} from a persisted DB row. */
 function pinFromRow(row: {
@@ -93,6 +94,14 @@ export function WorkspaceBrowserSurface({
 	// Console/network panel visibility (surface-local UI state). Toggled from the
 	// mode toolbar; independent of the active inspector mode.
 	const [consoleOpen, setConsoleOpen] = useState(false);
+
+	// Active device viewport preset (surface-local UI state). Defaults to
+	// "desktop" (fill the host). Switching constrains the content webview to the
+	// device size so the page renders — and captures — at that size.
+	const [viewportPreset, setViewportPreset] =
+		useState<ViewportPresetId>("desktop");
+	const activePreset =
+		DEVICE_PRESETS.find((p) => p.id === viewportPreset) ?? null;
 
 	// Per-mount bridge store. Created once; registered in the module registry so
 	// the global UI-sync bridge can route page → host events here by workspace.
@@ -239,6 +248,8 @@ export function WorkspaceBrowserSurface({
 						onSetMode={applyMode}
 						consoleOpen={consoleOpen}
 						onToggleConsole={() => setConsoleOpen((open) => !open)}
+						viewportPreset={viewportPreset}
+						onViewportPresetChange={setViewportPreset}
 					/>
 				</div>
 			</div>
@@ -251,7 +262,11 @@ export function WorkspaceBrowserSurface({
 			) : workspaceId ? (
 				<div className="relative flex min-h-0 flex-1">
 					<AgentControlBanner workspaceId={workspaceId} />
-					<ContentHost workspaceId={workspaceId} url={current?.url ?? null} />
+					<ContentHost
+						workspaceId={workspaceId}
+						url={current?.url ?? null}
+						viewport={activePreset}
+					/>
 				</div>
 			) : null}
 

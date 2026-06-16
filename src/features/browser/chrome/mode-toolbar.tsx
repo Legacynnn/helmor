@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { BridgeMode } from "../bridge/channel";
+import type { ViewportPresetId } from "../viewport/presets";
+import { ViewportPresets } from "../viewport/viewport-presets";
 
 type ModeButton = {
 	mode: BridgeMode;
@@ -41,6 +43,10 @@ type ModeToolbarProps = {
 	consoleOpen?: boolean;
 	/** Toggle the console/network panel. When omitted the button is hidden. */
 	onToggleConsole?: () => void;
+	/** Active device viewport preset. When omitted the picker is hidden. */
+	viewportPreset?: ViewportPresetId;
+	/** Change the active device viewport preset. */
+	onViewportPresetChange?: (id: ViewportPresetId) => void;
 };
 
 export function ModeToolbar({
@@ -48,6 +54,8 @@ export function ModeToolbar({
 	onSetMode,
 	consoleOpen,
 	onToggleConsole,
+	viewportPreset,
+	onViewportPresetChange,
 }: ModeToolbarProps) {
 	// Esc returns to Navigate, mirroring inspector tools elsewhere.
 	useEffect(() => {
@@ -96,6 +104,13 @@ export function ModeToolbar({
 					</Tooltip>
 				);
 			})}
+
+			{viewportPreset && onViewportPresetChange ? (
+				<ViewportPresets
+					value={viewportPreset}
+					onChange={onViewportPresetChange}
+				/>
+			) : null}
 
 			{onToggleConsole ? (
 				<Tooltip>
