@@ -188,6 +188,18 @@ pub enum UiMutationEvent {
         message: String,
         ts: f64,
     },
+    /// The embedded content webview began loading a URL (native
+    /// `PageLoadEvent::Started`). The surface flips the active tab to a loading
+    /// state and shows the top progress bar.
+    BrowserLoadStarted {
+        url: String,
+    },
+    /// The embedded content webview finished loading a URL (native
+    /// `PageLoadEvent::Finished`). Clears the tab's loading state and cancels
+    /// any pending https→http fallback timer for that URL.
+    BrowserLoadFinished {
+        url: String,
+    },
     /// A failed/slow network request was captured by the page-side network
     /// collector. Routed into the workspace's bridge store like console entries.
     BrowserNetworkEvent {
@@ -197,6 +209,15 @@ pub enum UiMutationEvent {
         status: Option<i64>,
         duration_ms: f64,
         failed: bool,
+    },
+    /// An agent began controlling a workspace's preview surface.
+    BrowserAgentControlStarted {
+        workspace_id: String,
+        surface_kind: crate::preview::PreviewSurfaceKind,
+    },
+    /// Agent control ended (kill switch, session end, or surface teardown).
+    BrowserAgentControlEnded {
+        workspace_id: String,
     },
 }
 
@@ -341,6 +362,12 @@ mod tests {
                 duration_ms: 12.0,
                 failed: true,
             },
+            UiMutationEvent::BrowserLoadStarted {
+                url: "https://x.test".into(),
+            },
+            UiMutationEvent::BrowserLoadFinished {
+                url: "https://x.test".into(),
+            },
         ];
         for event in cases {
             let s = serde_json::to_string(&event).unwrap();
@@ -401,6 +428,18 @@ mod tests {
         assert_eq!(json["outerHTML"], "<div></div>");
         assert_eq!(json["rect"]["x"], 1);
         assert!(json.get("workspace_id").is_none());
+    }
+
+    #[test]
+    fn agent_control_started_serializes() {
+        let ev = UiMutationEvent::BrowserAgentControlStarted {
+            workspace_id: "ws1".into(),
+            surface_kind: crate::preview::PreviewSurfaceKind::Browser,
+        };
+        let json = serde_json::to_value(&ev).unwrap();
+        assert_eq!(json["type"], "browserAgentControlStarted");
+        assert_eq!(json["workspaceId"], "ws1");
+        assert_eq!(json["surfaceKind"], "browser");
     }
 
     #[test]

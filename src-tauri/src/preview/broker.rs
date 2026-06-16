@@ -150,18 +150,16 @@ pub async fn dispatch<R: Runtime>(
     call: PreviewCall,
 ) -> PreviewResult<PreviewValue> {
     let surface = registry().resolve(workspace_id)?;
-    let _ = app; // used by the publish blocks re-enabled in Task 6.
 
     if is_mutating(&call) && !registry().is_controlled(workspace_id) {
         registry().mark_controlled(workspace_id);
-        // Re-enabled in Task 6 once the UiMutationEvent variant exists.
-        // crate::ui_sync::publish(
-        //     app,
-        //     crate::ui_sync::UiMutationEvent::BrowserAgentControlStarted {
-        //         workspace_id: workspace_id.to_string(),
-        //         surface_kind: surface.kind,
-        //     },
-        // );
+        crate::ui_sync::publish(
+            app,
+            crate::ui_sync::UiMutationEvent::BrowserAgentControlStarted {
+                workspace_id: workspace_id.to_string(),
+                surface_kind: surface.kind,
+            },
+        );
     }
 
     let d = surface.driver;
@@ -207,14 +205,12 @@ pub async fn dispatch<R: Runtime>(
 /// Kill switch: clear control + tell the UI. Called by `preview_stop_agent_control`.
 pub fn stop_agent_control<R: Runtime>(app: &AppHandle<R>, workspace_id: &str) {
     registry().clear_controlled(workspace_id);
-    let _ = app; // used by the publish block re-enabled in Task 6.
-                 // Re-enabled in Task 6 once the UiMutationEvent variant exists.
-                 // crate::ui_sync::publish(
-                 //     app,
-                 //     crate::ui_sync::UiMutationEvent::BrowserAgentControlEnded {
-                 //         workspace_id: workspace_id.to_string(),
-                 //     },
-                 // );
+    crate::ui_sync::publish(
+        app,
+        crate::ui_sync::UiMutationEvent::BrowserAgentControlEnded {
+            workspace_id: workspace_id.to_string(),
+        },
+    );
 }
 
 #[cfg(test)]

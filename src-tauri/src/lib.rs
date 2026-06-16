@@ -591,6 +591,7 @@ pub fn run() {
             commands::browser_commands::browser_add_comment,
             commands::browser_commands::browser_list_comments,
             commands::browser_commands::browser_delete_comment,
+            commands::preview_commands::preview_stop_agent_control,
             commands::provider_commands::list_custom_providers,
             commands::provider_commands::upsert_custom_provider,
             commands::provider_commands::remove_custom_provider,

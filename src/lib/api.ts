@@ -2617,7 +2617,15 @@ export type UiMutationEvent =
 			status: number | null;
 			durationMs: number;
 			failed: boolean;
-	  };
+	  }
+	| { type: "browserLoadStarted"; url: string }
+	| { type: "browserLoadFinished"; url: string }
+	| {
+			type: "browserAgentControlStarted";
+			workspaceId: string;
+			surfaceKind: "browser" | "simulatorIos" | "simulatorAndroid";
+	  }
+	| { type: "browserAgentControlEnded"; workspaceId: string };
 
 export type TriageConfig = {
 	enabled: boolean;
@@ -5535,6 +5543,13 @@ export async function browserSetBounds(rect: BrowserRect): Promise<void> {
 /** Tear down the embedded content webview. */
 export async function browserDestroy(): Promise<void> {
 	await invoke("browser_destroy");
+}
+
+/** Kill switch: revoke agent control of a workspace's preview surface. */
+export async function previewStopAgentControl(
+	workspaceId: string,
+): Promise<void> {
+	await invoke("preview_stop_agent_control", { workspaceId });
 }
 
 /**
