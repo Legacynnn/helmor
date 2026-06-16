@@ -27,6 +27,11 @@ export type BrowserBridgeState = {
 	picks: BridgeSelection[];
 	consoleEntries: ConsoleEntry[];
 	networkEntries: NetworkEntry[];
+	/**
+	 * True when the page blocked bridge injection (strict CSP). The surface
+	 * switches to the screenshot-annotation fallback while this is set.
+	 */
+	injectionBlocked: boolean;
 };
 
 /** A fresh, empty bridge state. The passive default mode is `"none"`. */
@@ -37,6 +42,7 @@ export function emptyBridgeState(): BrowserBridgeState {
 		picks: [],
 		consoleEntries: [],
 		networkEntries: [],
+		injectionBlocked: false,
 	};
 }
 
@@ -99,6 +105,7 @@ export type BrowserBridgeStore = BrowserBridgeState & {
 	ingest: (message: BridgeToHostMessage) => void;
 	hydrateComments: (comments: CommentPin[]) => void;
 	removeComment: (id: string) => void;
+	setInjectionBlocked: (blocked: boolean) => void;
 	reset: () => void;
 };
 
@@ -113,6 +120,7 @@ export function createBrowserBridgeStore() {
 			set((state) => ({
 				comments: state.comments.filter((pin) => pin.id !== id),
 			})),
+		setInjectionBlocked: (injectionBlocked) => set({ injectionBlocked }),
 		reset: () => set(emptyBridgeState()),
 	}));
 }
@@ -154,4 +162,16 @@ export function ingestForWorkspace(
 	message: BridgeToHostMessage,
 ): void {
 	storeRegistry.get(workspaceId)?.getState().ingest(message);
+}
+
+/**
+ * Flag the registered store for `workspaceId` as injection-blocked (or clear
+ * it), driving the CSP screenshot-annotation fallback. No-op when no surface is
+ * mounted for the workspace.
+ */
+export function setInjectionBlockedForWorkspace(
+	workspaceId: string,
+	blocked: boolean,
+): void {
+	storeRegistry.get(workspaceId)?.getState().setInjectionBlocked(blocked);
 }

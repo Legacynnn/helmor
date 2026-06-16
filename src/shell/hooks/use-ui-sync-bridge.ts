@@ -1,6 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { ingestForWorkspace } from "@/features/browser/bridge/use-browser-bridge";
+import {
+	ingestForWorkspace,
+	setInjectionBlockedForWorkspace,
+} from "@/features/browser/bridge/use-browser-bridge";
 import { buildTitleSeed } from "@/features/conversation/hooks/seed-session-title";
 import { useStreamingStore } from "@/features/conversation/state/streaming-store";
 import {
@@ -407,8 +410,10 @@ function handleUiMutation(
 			});
 			return;
 		case "browserInjectionFailed":
-			// Notify-only: the surface flips to the screenshot-annotation
-			// fallback off a component-level flag; no shared cache to bust.
+			// Flip the workspace's bridge store into fallback mode so the surface
+			// freezes the page to a screenshot and annotates the image instead of
+			// the (uninjectable, CSP-blocked) live DOM.
+			setInjectionBlockedForWorkspace(event.workspaceId, true);
 			return;
 		case "browserConsoleEntry":
 			ingestForWorkspace(event.workspaceId, {

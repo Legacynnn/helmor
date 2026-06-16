@@ -19,6 +19,7 @@ import { ConsoleNetworkPanel } from "./chrome/console-network-panel";
 import { ModeToolbar } from "./chrome/mode-toolbar";
 import { UrlBar } from "./chrome/url-bar";
 import { ContentHost } from "./content-host";
+import { CspFallback } from "./csp-fallback";
 import { activeTab, type BrowserTab } from "./tab-model";
 
 /** Build an in-memory {@link CommentPin} from a persisted DB row. */
@@ -88,6 +89,11 @@ export function WorkspaceBrowserSurface({
 		null,
 	);
 	if (!storeRef.current) storeRef.current = createBrowserBridgeStore();
+	const store = storeRef.current;
+
+	// Reactive: flips true when the page blocks bridge injection (strict CSP),
+	// switching the surface to the screenshot-annotation fallback.
+	const injectionBlocked = store((s) => s.injectionBlocked);
 
 	useEffect(() => {
 		if (!workspaceId || !storeRef.current) return;
@@ -210,11 +216,18 @@ export function WorkspaceBrowserSurface({
 				</div>
 			</div>
 
-			<ContentHost url={current?.url ?? null} />
+			{injectionBlocked ? (
+				<CspFallback
+					screenshotSrc={null}
+					onDismiss={() => store.getState().setInjectionBlocked(false)}
+				/>
+			) : (
+				<ContentHost url={current?.url ?? null} />
+			)}
 
-			{consoleOpen && storeRef.current ? (
+			{consoleOpen ? (
 				<ConsoleNetworkPanel
-					store={storeRef.current}
+					store={store}
 					onClose={() => setConsoleOpen(false)}
 				/>
 			) : null}
