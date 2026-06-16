@@ -2598,7 +2598,23 @@ export type UiMutationEvent =
 			outerHTML: string;
 			rect: BridgeRect;
 	  }
-	| { type: "browserInjectionFailed"; workspaceId: string };
+	| { type: "browserInjectionFailed"; workspaceId: string }
+	| {
+			type: "browserConsoleEntry";
+			workspaceId: string;
+			level: "log" | "info" | "warn" | "error";
+			message: string;
+			ts: number;
+	  }
+	| {
+			type: "browserNetworkEvent";
+			workspaceId: string;
+			url: string;
+			method: string;
+			status: number | null;
+			durationMs: number;
+			failed: boolean;
+	  };
 
 export type TriageConfig = {
 	enabled: boolean;

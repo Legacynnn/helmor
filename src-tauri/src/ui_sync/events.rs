@@ -173,6 +173,25 @@ pub enum UiMutationEvent {
     BrowserInjectionFailed {
         workspace_id: String,
     },
+    /// A console error/warn was captured by the page-side console collector.
+    /// Carries the owning workspace plus the buffered entry so the surface can
+    /// fold it into its per-mount bridge store (console/network panel).
+    BrowserConsoleEntry {
+        workspace_id: String,
+        level: String,
+        message: String,
+        ts: f64,
+    },
+    /// A failed/slow network request was captured by the page-side network
+    /// collector. Routed into the workspace's bridge store like console entries.
+    BrowserNetworkEvent {
+        workspace_id: String,
+        url: String,
+        method: String,
+        status: Option<i64>,
+        duration_ms: f64,
+        failed: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -298,6 +317,20 @@ mod tests {
             },
             UiMutationEvent::BrowserInjectionFailed {
                 workspace_id: "w".into(),
+            },
+            UiMutationEvent::BrowserConsoleEntry {
+                workspace_id: "w".into(),
+                level: "error".into(),
+                message: "boom".into(),
+                ts: 1.0,
+            },
+            UiMutationEvent::BrowserNetworkEvent {
+                workspace_id: "w".into(),
+                url: "https://x.test/api".into(),
+                method: "GET".into(),
+                status: Some(500),
+                duration_ms: 12.0,
+                failed: true,
             },
         ];
         for event in cases {

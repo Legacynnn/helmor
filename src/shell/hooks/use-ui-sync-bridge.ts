@@ -407,6 +407,28 @@ function handleUiMutation(
 			// Notify-only: the surface flips to the screenshot-annotation
 			// fallback off a component-level flag; no shared cache to bust.
 			return;
+		case "browserConsoleEntry":
+			ingestForWorkspace(event.workspaceId, {
+				kind: "console-error",
+				entry: {
+					level: event.level,
+					message: event.message,
+					ts: event.ts,
+				},
+			});
+			return;
+		case "browserNetworkEvent":
+			ingestForWorkspace(event.workspaceId, {
+				kind: "network-event",
+				entry: {
+					url: event.url,
+					method: event.method,
+					status: event.status,
+					durationMs: event.durationMs,
+					failed: event.failed,
+				},
+			});
+			return;
 		// TODO(browser): UiMutationEvent cross-window tab sync. Once the Rust
 		// `UiMutationEvent::BrowserTabsChanged` variant lands, handle it here by
 		// invalidating `helmorQueryKeys.browserTabs(event.workspaceId)` so a tab

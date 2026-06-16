@@ -182,20 +182,27 @@ pub async fn browser_bridge_event(
             );
         }
         BridgeMessage::ConsoleError { entry } => {
-            tracing::debug!(
-                workspace_id,
-                level = entry.level,
-                message = entry.message,
-                "browser bridge: console entry"
+            ui_sync::publish(
+                &app,
+                UiMutationEvent::BrowserConsoleEntry {
+                    workspace_id,
+                    level: entry.level,
+                    message: entry.message,
+                    ts: entry.ts,
+                },
             );
         }
         BridgeMessage::NetworkEvent { entry } => {
-            tracing::debug!(
-                workspace_id,
-                url,
-                status = entry.status,
-                failed = entry.failed,
-                "browser bridge: network entry"
+            ui_sync::publish(
+                &app,
+                UiMutationEvent::BrowserNetworkEvent {
+                    workspace_id,
+                    url: entry.url,
+                    method: entry.method,
+                    status: entry.status,
+                    duration_ms: entry.duration_ms,
+                    failed: entry.failed,
+                },
             );
         }
         BridgeMessage::CaptureResult { .. } => {

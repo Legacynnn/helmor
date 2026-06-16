@@ -15,6 +15,7 @@ import {
 	registerBridgeStore,
 } from "./bridge/use-browser-bridge";
 import { BrowserTabs } from "./chrome/browser-tabs";
+import { ConsoleNetworkPanel } from "./chrome/console-network-panel";
 import { ModeToolbar } from "./chrome/mode-toolbar";
 import { UrlBar } from "./chrome/url-bar";
 import { ContentHost } from "./content-host";
@@ -76,6 +77,10 @@ export function WorkspaceBrowserSurface({
 	// is active at a time. Driving the injected bridge runs through the Rust
 	// `browser_send_bridge_message` command (host → page eval).
 	const [mode, setMode] = useState<BridgeMode>("none");
+
+	// Console/network panel visibility (surface-local UI state). Toggled from the
+	// mode toolbar; independent of the active inspector mode.
+	const [consoleOpen, setConsoleOpen] = useState(false);
 
 	// Per-mount bridge store. Created once; registered in the module registry so
 	// the global UI-sync bridge can route page → host events here by workspace.
@@ -196,11 +201,23 @@ export function WorkspaceBrowserSurface({
 					onReload={() => onNavigate(currentUrl)}
 				/>
 				<div className="flex shrink-0 items-center pr-2">
-					<ModeToolbar mode={mode} onSetMode={applyMode} />
+					<ModeToolbar
+						mode={mode}
+						onSetMode={applyMode}
+						consoleOpen={consoleOpen}
+						onToggleConsole={() => setConsoleOpen((open) => !open)}
+					/>
 				</div>
 			</div>
 
 			<ContentHost url={current?.url ?? null} />
+
+			{consoleOpen && storeRef.current ? (
+				<ConsoleNetworkPanel
+					store={storeRef.current}
+					onClose={() => setConsoleOpen(false)}
+				/>
+			) : null}
 		</section>
 	);
 }
