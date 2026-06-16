@@ -4,6 +4,8 @@
 //! `CommandExecutor` trait. The real `ProcessExecutor` is the ONLY place that
 //! spawns a process; every test injects a `FakeExecutor` so no test shells out.
 
+use crate::preview::driver::{PreviewError, PreviewResult};
+
 /// A single tool invocation expressed as program + args. Pure — building one
 /// spawns nothing.
 pub struct SimCommand {
@@ -149,6 +151,107 @@ fn fmt_coord(v: f64) -> String {
     (v.round() as i64).to_string()
 }
 
+/// The captured result of running one `SimCommand`.
+pub struct CommandOutput {
+    pub stdout: Vec<u8>,
+    pub status_ok: bool,
+    pub stderr: String,
+}
+
+/// Decouples argv from process execution so the driver is unit-testable. The
+/// real impl shells out; tests inject a recording fake.
+pub trait CommandExecutor: Send + Sync {
+    fn run(&self, cmd: &SimCommand) -> PreviewResult<CommandOutput>;
+}
+
+/// Real executor — the ONLY place that spawns a process. A missing binary maps
+/// to a structured `Unsupported` (so tooling-presence detection never panics).
+pub struct ProcessExecutor;
+
+impl CommandExecutor for ProcessExecutor {
+    fn run(&self, cmd: &SimCommand) -> PreviewResult<CommandOutput> {
+        let argv = cmd.argv();
+        let output = std::process::Command::new(&argv[0])
+            .args(&argv[1..])
+            .output()
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    PreviewError::unsupported(format!("tool not installed: {}", argv[0]))
+                } else {
+                    PreviewError::driver(format!("{}: {e}", argv[0]))
+                }
+            })?;
+        Ok(CommandOutput {
+            stdout: output.stdout,
+            status_ok: output.status.success(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        })
+    }
+}
+
+/// Recording fake executor for tests: keyed canned stdout + a call log. Never
+/// shells out.
+#[cfg(test)]
+pub struct FakeExecutor {
+    responses: std::collections::HashMap<String, Vec<u8>>,
+    missing: std::collections::HashSet<String>,
+    calls: std::sync::Mutex<Vec<Vec<String>>>,
+}
+
+#[cfg(test)]
+impl FakeExecutor {
+    pub fn new() -> Self {
+        Self {
+            responses: std::collections::HashMap::new(),
+            missing: std::collections::HashSet::new(),
+            calls: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Key is the space-joined argv (e.g. `"idb ui describe-all"`).
+    pub fn with_response(mut self, key: &str, stdout: Vec<u8>) -> Self {
+        self.responses.insert(key.to_string(), stdout);
+        self
+    }
+
+    /// Mark a program (argv[0]) as not installed: any call whose first token is
+    /// `program` returns `Unsupported` like a real `NotFound`.
+    pub fn with_missing(mut self, program: &str) -> Self {
+        self.missing.insert(program.to_string());
+        self
+    }
+
+    pub fn calls(&self) -> Vec<Vec<String>> {
+        self.calls.lock().expect("fake calls lock").clone()
+    }
+}
+
+#[cfg(test)]
+impl CommandExecutor for FakeExecutor {
+    fn run(&self, cmd: &SimCommand) -> PreviewResult<CommandOutput> {
+        let argv = cmd.argv();
+        self.calls
+            .lock()
+            .expect("fake calls lock")
+            .push(argv.clone());
+        if self.missing.contains(&argv[0]) {
+            return Err(PreviewError::unsupported(format!(
+                "tool not installed: {}",
+                argv[0]
+            )));
+        }
+        let key = argv.join(" ");
+        match self.responses.get(&key) {
+            Some(stdout) => Ok(CommandOutput {
+                stdout: stdout.clone(),
+                status_ok: true,
+                stderr: String::new(),
+            }),
+            None => Err(PreviewError::driver(format!("no fake response for: {key}"))),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,6 +297,14 @@ mod tests {
             SimCommand::idb_key("4").argv(),
             vec!["idb", "ui", "key", "4"]
         );
+    }
+
+    #[test]
+    fn fake_executor_records_and_replies() {
+        let fake = FakeExecutor::new().with_response("idb ui describe-all", b"[]".to_vec());
+        let out = fake.run(&SimCommand::idb_describe_all()).unwrap();
+        assert_eq!(out.stdout, b"[]");
+        assert_eq!(fake.calls(), vec![vec!["idb", "ui", "describe-all"]]);
     }
 
     #[test]
