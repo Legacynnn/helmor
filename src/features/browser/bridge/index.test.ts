@@ -75,6 +75,28 @@ describe("createBridge mode activation", () => {
 		}
 	});
 
+	it("installs ZERO listeners while mode is none (passive Navigate)", () => {
+		const doc = document.implementation.createHTMLDocument("t");
+		const add = vi.spyOn(doc, "addEventListener");
+		const bridge = createBridge({ mode: "none", post: vi.fn(), doc });
+		bridge.init();
+		expect(add).not.toHaveBeenCalled();
+		bridge.teardown();
+	});
+
+	it("attaches listeners only when an interactive mode is set, removes on return to none", () => {
+		const doc = document.implementation.createHTMLDocument("t");
+		const add = vi.spyOn(doc, "addEventListener");
+		const remove = vi.spyOn(doc, "removeEventListener");
+		const bridge = createBridge({ mode: "none", post: vi.fn(), doc });
+		bridge.init();
+		bridge.setMode("pick");
+		expect(add).toHaveBeenCalled(); // mousemove + click now live
+		bridge.setMode("none");
+		expect(remove).toHaveBeenCalled(); // listeners torn down again
+		bridge.teardown();
+	});
+
 	it("switching back to 'none' removes active-mode listeners", () => {
 		const remove = vi.spyOn(document, "removeEventListener");
 		const bridge = createBridge({ mode: "comment", post: vi.fn() });
