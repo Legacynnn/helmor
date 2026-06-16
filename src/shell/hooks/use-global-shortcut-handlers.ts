@@ -300,6 +300,19 @@ export function useGlobalShortcutHandlers({
 					workspaceViewMode === "conversation" || workspaceViewMode === "start",
 			},
 			{
+				id: "browser.toggleSplit" as const,
+				callback: () => publishShellEvent({ type: "toggle-browser-split" }),
+				enabled:
+					workspaceViewMode === "conversation" ||
+					workspaceViewMode === "browser" ||
+					workspaceViewMode === "start",
+			},
+			{
+				id: "browser.toggleExpand" as const,
+				callback: () => publishShellEvent({ type: "toggle-browser-expand" }),
+				enabled: workspaceViewMode === "browser",
+			},
+			{
 				id: "zoom.in" as const,
 				callback: () =>
 					updateSettings({
