@@ -21,6 +21,7 @@ pub mod mcp;
 pub mod models;
 pub mod pipeline;
 pub(crate) mod platform;
+pub mod preview;
 pub mod provider;
 pub mod quick_panel;
 pub mod rate_limits;
