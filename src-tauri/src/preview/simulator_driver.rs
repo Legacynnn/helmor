@@ -275,6 +275,186 @@ pub fn parse_idb_describe_all(json: &str) -> PreviewResult<SnapshotParse> {
     })
 }
 
+/// Parse `bounds="[x1,y1][x2,y2]"` into `(x, y, width, height)`.
+fn parse_bounds(bounds: &str) -> Option<(f64, f64, f64, f64)> {
+    let cleaned: String = bounds
+        .chars()
+        .map(|c| match c {
+            '[' | ']' => ' ',
+            ',' => ' ',
+            other => other,
+        })
+        .collect();
+    let nums: Vec<f64> = cleaned
+        .split_whitespace()
+        .filter_map(|t| t.parse::<f64>().ok())
+        .collect();
+    if nums.len() != 4 {
+        return None;
+    }
+    Some((nums[0], nums[1], nums[2] - nums[0], nums[3] - nums[1]))
+}
+
+/// `role` = last `.`-segment of the Android `class`.
+fn android_role(class: &str) -> String {
+    class.rsplit('.').next().unwrap_or(class).to_string()
+}
+
+/// Parse `uiautomator dump` XML into snapshot pieces. Builds a nested JSON tree
+/// mirroring the node hierarchy plus flat interactive/rect lists.
+pub fn parse_uiautomator_dump(xml: &str) -> PreviewResult<SnapshotParse> {
+    use quick_xml::events::Event;
+    use quick_xml::reader::Reader;
+
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+
+    // Stack of in-progress node objects + their children arrays.
+    struct Frame {
+        node: serde_json::Map<String, serde_json::Value>,
+        children: Vec<serde_json::Value>,
+    }
+    let mut stack: Vec<Frame> = Vec::new();
+    let mut roots: Vec<serde_json::Value> = Vec::new();
+
+    let mut interactive_elements = Vec::new();
+    let mut rects = Vec::new();
+    let mut visible_parts: Vec<String> = Vec::new();
+    let mut index_counter = 0usize;
+
+    // Read an attribute as an owned String.
+    let attr = |e: &quick_xml::events::BytesStart, key: &str| -> Option<String> {
+        e.attributes().flatten().find_map(|a| {
+            if a.key.as_ref() == key.as_bytes() {
+                let raw = String::from_utf8_lossy(a.value.as_ref());
+                quick_xml::escape::unescape(&raw)
+                    .map(|cow| cow.into_owned())
+                    .ok()
+            } else {
+                None
+            }
+        })
+    };
+
+    // Turn a start/empty element into a node object + record flat pieces.
+    let mut build_node =
+        |e: &quick_xml::events::BytesStart| -> serde_json::Map<String, serde_json::Value> {
+            let class = attr(e, "class").unwrap_or_default();
+            if class.is_empty() && e.name().as_ref() == b"hierarchy" {
+                // The wrapping <hierarchy> root carries no node attrs.
+                let mut map = serde_json::Map::new();
+                map.insert(
+                    "class".into(),
+                    serde_json::Value::String("hierarchy".into()),
+                );
+                return map;
+            }
+            let text = attr(e, "text").unwrap_or_default();
+            let content_desc = attr(e, "content-desc").unwrap_or_default();
+            let resource_id = attr(e, "resource-id").unwrap_or_default();
+            let clickable = attr(e, "clickable").as_deref() == Some("true");
+            let bounds = attr(e, "bounds").unwrap_or_default();
+
+            let selector = if !resource_id.is_empty() {
+                resource_id.clone()
+            } else if !content_desc.is_empty() {
+                content_desc.clone()
+            } else {
+                let s = format!("#{index_counter}");
+                index_counter += 1;
+                s
+            };
+            let role = android_role(&class);
+            let name = if !text.is_empty() {
+                text.clone()
+            } else {
+                content_desc.clone()
+            };
+
+            if clickable {
+                interactive_elements.push(InteractiveElement {
+                    role: role.clone(),
+                    name: name.clone(),
+                    selector: selector.clone(),
+                });
+            }
+            if let Some((x, y, width, height)) = parse_bounds(&bounds) {
+                rects.push(ElementRect {
+                    selector: selector.clone(),
+                    x,
+                    y,
+                    width,
+                    height,
+                });
+            }
+            if !text.is_empty() {
+                visible_parts.push(text.clone());
+            }
+
+            let mut map = serde_json::Map::new();
+            map.insert("selector".into(), serde_json::Value::String(selector));
+            map.insert("role".into(), serde_json::Value::String(role));
+            map.insert("name".into(), serde_json::Value::String(name));
+            map.insert("clickable".into(), serde_json::Value::Bool(clickable));
+            map.insert("bounds".into(), serde_json::Value::String(bounds));
+            map
+        };
+
+    let finish_frame = |frame: Frame| -> serde_json::Value {
+        let mut node = frame.node;
+        if !frame.children.is_empty() {
+            node.insert("children".into(), serde_json::Value::Array(frame.children));
+        }
+        serde_json::Value::Object(node)
+    };
+
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) => {
+                let node = build_node(e);
+                stack.push(Frame {
+                    node,
+                    children: Vec::new(),
+                });
+            }
+            Ok(Event::Empty(ref e)) => {
+                let node = build_node(e);
+                let value = serde_json::Value::Object(node);
+                match stack.last_mut() {
+                    Some(parent) => parent.children.push(value),
+                    None => roots.push(value),
+                }
+            }
+            Ok(Event::End(_)) => {
+                if let Some(frame) = stack.pop() {
+                    let value = finish_frame(frame);
+                    match stack.last_mut() {
+                        Some(parent) => parent.children.push(value),
+                        None => roots.push(value),
+                    }
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => {
+                return Err(PreviewError::driver(format!("uiautomator dump parse: {e}")));
+            }
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    // The single <hierarchy> root is the a11y tree.
+    let a11y_tree = roots.into_iter().next().unwrap_or(serde_json::Value::Null);
+
+    Ok(SnapshotParse {
+        a11y_tree,
+        interactive_elements,
+        visible_text: visible_parts.join(" "),
+        rects,
+    })
+}
+
 /// Probe each tool the platform needs; collect the ones that aren't installed.
 /// Never panics — a `NotFound` spawn maps to `Unsupported`, which we treat as
 /// "missing".

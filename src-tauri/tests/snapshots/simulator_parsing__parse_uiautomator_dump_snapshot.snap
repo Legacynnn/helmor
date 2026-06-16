@@ -1,0 +1,84 @@
+---
+source: tests/simulator_parsing.rs
+expression: parsed
+---
+{
+  "a11yTree": {
+    "children": [
+      {
+        "bounds": "[0,0][1080,2400]",
+        "children": [
+          {
+            "bounds": "[48,132][1032,210]",
+            "clickable": false,
+            "name": "Sign in",
+            "role": "TextView",
+            "selector": "com.example.app:id/title"
+          },
+          {
+            "bounds": "[48,360][1032,492]",
+            "clickable": true,
+            "name": "Email",
+            "role": "EditText",
+            "selector": "com.example.app:id/email"
+          },
+          {
+            "bounds": "[48,960][1032,1092]",
+            "clickable": true,
+            "name": "Continue",
+            "role": "Button",
+            "selector": "com.example.app:id/submit"
+          }
+        ],
+        "clickable": false,
+        "name": "",
+        "role": "FrameLayout",
+        "selector": "#0"
+      }
+    ],
+    "class": "hierarchy"
+  },
+  "interactiveElements": [
+    {
+      "role": "EditText",
+      "name": "Email",
+      "selector": "com.example.app:id/email"
+    },
+    {
+      "role": "Button",
+      "name": "Continue",
+      "selector": "com.example.app:id/submit"
+    }
+  ],
+  "visibleText": "Sign in Continue",
+  "rects": [
+    {
+      "selector": "#0",
+      "x": 0.0,
+      "y": 0.0,
+      "width": 1080.0,
+      "height": 2400.0
+    },
+    {
+      "selector": "com.example.app:id/title",
+      "x": 48.0,
+      "y": 132.0,
+      "width": 984.0,
+      "height": 78.0
+    },
+    {
+      "selector": "com.example.app:id/email",
+      "x": 48.0,
+      "y": 360.0,
+      "width": 984.0,
+      "height": 132.0
+    },
+    {
+      "selector": "com.example.app:id/submit",
+      "x": 48.0,
+      "y": 960.0,
+      "width": 984.0,
+      "height": 132.0
+    }
+  ]
+}

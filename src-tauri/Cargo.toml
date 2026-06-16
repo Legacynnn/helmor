@@ -133,6 +133,9 @@ tracing-subscriber = { version = "0.3", features = [
 url = "2"
 uuid = { version = "1", features = ["v4"] }
 async-trait = "0.1.89"
+# Parses Android `uiautomator dump` view-hierarchy XML into the shared
+# PreviewSnapshot pieces for the simulator driver. See preview/simulator_driver.rs.
+quick-xml = "0.40.1"
 
 # libc backs Unix process groups, signals, and resource limits. Windows uses
 # the `windows` crate equivalents (Job Objects, DPAPI, sysinfo) — see
