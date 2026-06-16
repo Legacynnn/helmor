@@ -97,6 +97,10 @@ export function ingestMessage(
 			};
 		case "capture-result":
 			return state;
+		case "driver-result":
+			// Driver results resolve a pending broker request host-side; nothing
+			// to fold into the bridge store.
+			return state;
 	}
 }
 

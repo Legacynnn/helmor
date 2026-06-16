@@ -13,10 +13,17 @@
  *   - page → host: this runtime calls `browser_bridge_event` over Tauri IPC.
  */
 
-import { type BridgeToHostMessage, isHostToBridgeMessage } from "./channel";
+import {
+	type BridgeToHostMessage,
+	type DriverRequestPayload,
+	type DriverTarget,
+	isHostToBridgeMessage,
+} from "./channel";
 import { createConsoleCollector, createNetworkCollector } from "./collectors";
+import { buildInteractiveElements } from "./driver-snapshot";
 import { createBridge } from "./index";
 import { createHoverOverlay } from "./overlay-dom";
+import { resolveSelector } from "./selector";
 
 type TauriInternals = {
 	invoke: (cmd: string, args: unknown) => Promise<unknown>;
@@ -82,6 +89,86 @@ declare global {
 		collectorsRunning = false;
 	}
 
+	// Resolve a driver target to a live element (selector / role+name / coords).
+	function resolveTarget(target: DriverTarget): Element | null {
+		if (target.by === "selector") {
+			return resolveSelector(document, target.selector);
+		}
+		if (target.by === "coords") {
+			return document.elementFromPoint(target.x, target.y);
+		}
+		// role + name: scan interactive elements for a matching role+name.
+		for (const el of buildInteractiveElements(document)) {
+			if (el.role === target.role && el.name === target.name) {
+				return resolveSelector(document, el.selector);
+			}
+		}
+		return null;
+	}
+
+	// Perform one agent-driver op and return the opaque JSON value to post back.
+	function runDriverRequest(payload: DriverRequestPayload): unknown {
+		switch (payload.op) {
+			case "snapshot":
+				return {
+					url: location.href,
+					title: document.title,
+					visibleText: document.body?.innerText ?? "",
+					a11yTree: {},
+					interactiveElements: buildInteractiveElements(document),
+					diagnostics: { console: [], network: [] },
+					screenshotPath: null,
+				};
+			case "click": {
+				const el = resolveTarget(payload.target);
+				if (!el) return { error: "target not found" };
+				(el as HTMLElement).click();
+				return { ok: true };
+			}
+			case "type": {
+				const el = resolveTarget(payload.target);
+				if (!el) return { error: "target not found" };
+				const input = el as HTMLInputElement;
+				if (typeof input.focus === "function") input.focus();
+				input.value = (input.value ?? "") + payload.text;
+				input.dispatchEvent(new Event("input", { bubbles: true }));
+				return { ok: true };
+			}
+			case "press": {
+				const active = (document.activeElement ?? document.body) as HTMLElement;
+				active.dispatchEvent(
+					new KeyboardEvent("keydown", { key: payload.key, bubbles: true }),
+				);
+				active.dispatchEvent(
+					new KeyboardEvent("keyup", { key: payload.key, bubbles: true }),
+				);
+				return { ok: true };
+			}
+			case "scroll": {
+				const el = payload.target ? resolveTarget(payload.target) : null;
+				if (el) (el as HTMLElement).scrollBy(payload.dx, payload.dy);
+				else window.scrollBy(payload.dx, payload.dy);
+				return { ok: true };
+			}
+			case "evaluate": {
+				try {
+					// Indirect eval via `window.eval` runs in global scope; agent-driven
+					// page eval is the documented feature here.
+					// biome-ignore lint/security/noGlobalEval: agent-driven page eval is the feature.
+					const indirectEval = window.eval;
+					const result = indirectEval(payload.script);
+					return { ok: true, result };
+				} catch (error) {
+					return { error: String(error) };
+				}
+			}
+			case "waitFor":
+				// Synchronous best-effort: report current readiness. A richer
+				// polling implementation can land in a follow-up.
+				return { ok: document.readyState === "complete" };
+		}
+	}
+
 	function handleMsg(raw: string): void {
 		const message: unknown = typeof raw === "string" ? safeParse(raw) : raw;
 		if (!isHostToBridgeMessage(message)) return;
@@ -105,6 +192,16 @@ declare global {
 			case "request-capture":
 				drainCollectors();
 				break;
+			case "driver-request": {
+				let value: unknown;
+				try {
+					value = runDriverRequest(message.payload);
+				} catch (error) {
+					value = { error: String(error) };
+				}
+				post({ kind: "driver-result", id: message.id, value });
+				break;
+			}
 		}
 	}
 

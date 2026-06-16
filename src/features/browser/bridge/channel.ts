@@ -61,7 +61,24 @@ export type BridgeToHostMessage =
 	| { kind: "element-picked"; selection: BridgeSelection }
 	| { kind: "console-error"; entry: ConsoleEntry }
 	| { kind: "network-event"; entry: NetworkEntry }
-	| { kind: "capture-result"; base64: string };
+	| { kind: "capture-result"; base64: string }
+	| { kind: "driver-result"; id: string; value: unknown };
+
+/** Resolve target for an agent-driver action. Mirrors Rust `PreviewTarget`. */
+export type DriverTarget =
+	| { by: "selector"; selector: string }
+	| { by: "role"; role: string; name: string }
+	| { by: "coords"; x: number; y: number };
+
+/** Page-side operation requested by the agent-control broker. */
+export type DriverRequestPayload =
+	| { op: "snapshot" }
+	| { op: "click"; target: DriverTarget }
+	| { op: "type"; target: DriverTarget; text: string }
+	| { op: "press"; key: string }
+	| { op: "scroll"; target?: DriverTarget; dx: number; dy: number }
+	| { op: "evaluate"; script: string }
+	| { op: "waitFor"; condition: unknown; timeoutMs: number };
 
 // ── host → page ──────────────────────────────────────────────────────────
 
@@ -69,7 +86,8 @@ export type HostToBridgeMessage =
 	| { kind: "set-mode"; mode: BridgeMode }
 	| { kind: "set-context"; workspaceId: string; url: string }
 	| { kind: "clear-comments" }
-	| { kind: "request-capture" };
+	| { kind: "request-capture" }
+	| { kind: "driver-request"; id: string; payload: DriverRequestPayload };
 
 /** Callback the host injects so the bridge can post messages out of the page. */
 export type BridgePost = (message: BridgeToHostMessage) => void;
@@ -81,6 +99,7 @@ const HOST_TO_BRIDGE_KINDS = new Set([
 	"set-context",
 	"clear-comments",
 	"request-capture",
+	"driver-request",
 ]);
 
 const BRIDGE_TO_HOST_KINDS = new Set([
@@ -89,6 +108,7 @@ const BRIDGE_TO_HOST_KINDS = new Set([
 	"console-error",
 	"network-event",
 	"capture-result",
+	"driver-result",
 ]);
 
 const BRIDGE_MODES = new Set<BridgeMode>(["none", "comment", "pick", "draw"]);
