@@ -562,6 +562,13 @@ pub struct FakeExecutor {
 }
 
 #[cfg(test)]
+impl Default for FakeExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
 impl FakeExecutor {
     pub fn new() -> Self {
         Self {
