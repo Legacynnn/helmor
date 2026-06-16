@@ -11,7 +11,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
+use image::{DynamicImage, GenericImage, ImageFormat, RgbaImage};
 use uuid::Uuid;
 
 use crate::commands::system_commands::base64_decode;
@@ -62,6 +63,80 @@ pub fn save_capture_png(session_id: &str, base64_png: &str) -> Result<String> {
     save_capture_to_cache(&paste_root, session_id, base64_png)
 }
 
+/// Write raw stitched PNG bytes into the per-session paste-cache as
+/// `fullpage-<uuid>.png`, returning the absolute path. Mirrors
+/// `save_capture_png` but skips the base64 round-trip (the stitcher already
+/// holds decoded bytes).
+pub fn save_stitched_png(session_id: &str, png_bytes: &[u8]) -> Result<String> {
+    let paste_root = crate::data_dir::paste_cache_dir()?;
+    let paste_dir = crate::maintenance::paste_cache::destination_dir(&paste_root, session_id)?;
+    fs::create_dir_all(&paste_dir).context("Failed to create capture-cache directory")?;
+
+    let filename = format!("fullpage-{}.png", Uuid::new_v4());
+    let filepath: PathBuf = paste_dir.join(&filename);
+    fs::write(&filepath, png_bytes)
+        .with_context(|| format!("Failed to write stitched capture to {}", filepath.display()))?;
+
+    Ok(filepath.to_string_lossy().to_string())
+}
+
+/// Vertically stack PNG byte slices (top → bottom scroll order) into a single
+/// PNG. All segments must share the same width — they come from one viewport
+/// scrolled down a full-page capture, so a width mismatch signals a corrupt /
+/// misordered segment and is rejected rather than silently letter-boxed.
+///
+/// CPU-bound (decode + recompose + re-encode); callers run it off the main
+/// thread via `run_blocking` / `spawn_blocking`.
+///
+/// CAVEAT: the page-side segment collector cannot recover content that was
+/// never rendered. Pages using virtualized lists (rows unmounted when scrolled
+/// out of view) or lazy-loaded media may stitch with gaps; the scroll-step
+/// overlap in `capture/fullpage.ts` only mitigates lazy-load timing, not
+/// virtualization.
+pub fn stitch_segments(segments: Vec<Vec<u8>>) -> Result<Vec<u8>> {
+    if segments.is_empty() {
+        bail!("stitch_segments: segment list is empty");
+    }
+
+    let decoded: Vec<DynamicImage> = segments
+        .iter()
+        .enumerate()
+        .map(|(i, bytes)| {
+            image::load_from_memory(bytes)
+                .with_context(|| format!("stitch_segments: failed to decode segment {i}"))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let width = decoded[0].width();
+    for (i, img) in decoded.iter().enumerate().skip(1) {
+        if img.width() != width {
+            bail!(
+                "stitch_segments: segment {i} width {} != expected {width}",
+                img.width(),
+            );
+        }
+    }
+
+    let total_height: u32 = decoded.iter().map(|img| img.height()).sum();
+    let mut canvas = RgbaImage::new(width, total_height);
+
+    let mut y_offset = 0u32;
+    for img in &decoded {
+        let rgba = img.to_rgba8();
+        canvas
+            .copy_from(&rgba, 0, y_offset)
+            .with_context(|| format!("stitch_segments: copy_from failed at y_offset {y_offset}"))?;
+        y_offset += img.height();
+    }
+
+    let mut out = Vec::new();
+    DynamicImage::ImageRgba8(canvas)
+        .write_to(&mut std::io::Cursor::new(&mut out), ImageFormat::Png)
+        .context("stitch_segments: PNG encode failed")?;
+
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,5 +172,48 @@ mod tests {
         assert!(path.contains("capture-"));
         assert!(path.ends_with(".png"));
         assert!(path.contains(session_id));
+    }
+
+    /// Encode a solid-color RGB image as in-memory PNG bytes for stitch tests.
+    fn solid_png(width: u32, height: u32, color: [u8; 3]) -> Vec<u8> {
+        let img = image::RgbImage::from_fn(width, height, |_, _| image::Rgb(color));
+        let mut buf = Vec::new();
+        image::DynamicImage::ImageRgb8(img)
+            .write_to(&mut std::io::Cursor::new(&mut buf), ImageFormat::Png)
+            .unwrap();
+        buf
+    }
+
+    #[test]
+    fn stitch_two_segments_sums_heights_keeps_width() {
+        let top = solid_png(800, 600, [255, 0, 0]);
+        let bottom = solid_png(800, 400, [0, 0, 255]);
+        let stitched = stitch_segments(vec![top, bottom]).unwrap();
+
+        let img = image::load_from_memory(&stitched).unwrap();
+        assert_eq!(img.width(), 800);
+        assert_eq!(img.height(), 1000, "600 + 400 = 1000");
+    }
+
+    #[test]
+    fn stitch_single_segment_round_trips_dimensions() {
+        let seg = solid_png(1024, 768, [128, 64, 32]);
+        let stitched = stitch_segments(vec![seg]).unwrap();
+        let img = image::load_from_memory(&stitched).unwrap();
+        assert_eq!(img.width(), 1024);
+        assert_eq!(img.height(), 768);
+    }
+
+    #[test]
+    fn stitch_empty_segments_errors() {
+        assert!(stitch_segments(vec![]).is_err());
+    }
+
+    #[test]
+    fn stitch_mismatched_widths_errors() {
+        let top = solid_png(800, 600, [255, 0, 0]);
+        let bottom = solid_png(1024, 600, [0, 255, 0]);
+        let err = stitch_segments(vec![top, bottom]).unwrap_err();
+        assert!(err.to_string().contains("width"));
     }
 }

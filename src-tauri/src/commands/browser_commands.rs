@@ -107,6 +107,37 @@ pub async fn browser_capture(session_id: String, base64_png: String) -> CmdResul
     run_blocking(move || browser::capture::save_capture_png(&session_id, &base64_png)).await
 }
 
+/// Base64-encoded PNG segments to stitch into one tall full-page screenshot.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StitchInput {
+    /// Segments in scroll order (top → bottom). May carry a `data:` URL prefix.
+    pub segments: Vec<String>,
+}
+
+/// Stitch full-page capture segments into one tall PNG and persist it to the
+/// session paste-cache, returning the absolute path. Decode + compose + encode
+/// runs off the main thread via `run_blocking`. The returned path rides the same
+/// `images` wire as a single `browser_capture` shot.
+#[tauri::command]
+pub async fn browser_stitch_captures(session_id: String, input: StitchInput) -> CmdResult<String> {
+    run_blocking(move || {
+        let decoded = input
+            .segments
+            .iter()
+            .map(|b64| {
+                // Tolerate `data:image/png;base64,...` prefixes from canvas exports.
+                let raw = b64.rsplit(',').next().unwrap_or(b64);
+                browser::capture::decode_base64_png(raw)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+
+        let stitched = browser::capture::stitch_segments(decoded)?;
+        browser::capture::save_stitched_png(&session_id, &stitched)
+    })
+    .await
+}
+
 /// Send a host → page inspector-bridge message into the embedded content
 /// webview (e.g. `{ "kind": "set-mode", "mode": "comment" }`). Evals
 /// `window.__helmorBridge.handleMsg(<json>)`. No-op if no webview is embedded.

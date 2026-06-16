@@ -39,6 +39,8 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 hmac = "0.12"
+# Phase 4 browser surface: vertical PNG stitch for full-page captures.
+image = { version = "0.25", default-features = false, features = ["png"] }
 pbkdf2 = { version = "0.12", default-features = false }
 rand = "0.10.0"
 reqwest = { version = "0.12", default-features = false, features = [

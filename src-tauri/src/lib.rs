@@ -584,6 +584,7 @@ pub fn run() {
             commands::browser_commands::browser_set_bounds,
             commands::browser_commands::browser_destroy,
             commands::browser_commands::browser_capture,
+            commands::browser_commands::browser_stitch_captures,
             commands::browser_commands::browser_bridge_event,
             commands::browser_commands::browser_send_bridge_message,
             commands::browser_commands::browser_add_comment,
