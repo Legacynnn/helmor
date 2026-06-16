@@ -12,7 +12,6 @@ import {
 } from "@/shell/layout";
 
 const RESIZE_STEP = 16;
-const RESIZE_HIT_AREA = 20;
 
 // The browser companion panel is anchored to the RIGHT of the workspace pane,
 // so a rightward drag (positive deltaX) shrinks it: `startWidth - deltaX`.
@@ -59,6 +58,13 @@ export function useBrowserSplitPanel() {
 			const targetPane = document.querySelector<HTMLElement>(
 				`[data-shell-pane="browser-split"]`,
 			);
+			// The chat viewport pads its right edge by the panel width so chat
+			// content never sits under the browser pane. Mutate it inline during
+			// the drag so chat reflows in lockstep (React state re-applies the
+			// same paddingRight on pointer-up, keeping the two consistent).
+			const viewport = document.querySelector<HTMLElement>(
+				"[data-shell-viewport]",
+			);
 
 			let pendingWidth = startWidth;
 			let rafId: number | null = null;
@@ -67,7 +73,7 @@ export function useBrowserSplitPanel() {
 				rafId = null;
 				const widthPx = `${pendingWidth}px`;
 				if (targetPane) targetPane.style.width = widthPx;
-				node.style.right = `${pendingWidth - RESIZE_HIT_AREA}px`;
+				if (viewport) viewport.style.paddingRight = widthPx;
 			};
 
 			const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {

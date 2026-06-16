@@ -215,6 +215,7 @@ export function WorkspacePaneSurface({
 
 			<div
 				aria-label="Workspace viewport"
+				data-shell-viewport=""
 				className="relative z-20 flex min-h-0 flex-1 flex-col bg-background"
 				style={browserSplit ? { paddingRight: browserSplitWidth } : undefined}
 			>
