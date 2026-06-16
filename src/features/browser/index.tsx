@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { browserListComments, browserSendBridgeMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { BrowserLayoutState } from "@/shell/controllers/use-browser-session-controller";
+import { AgentControlBanner } from "./agent-control-banner";
 import type { BridgeMode } from "./bridge/channel";
 import type { CommentPin } from "./bridge/comments";
 import {
@@ -248,7 +249,12 @@ export function WorkspaceBrowserSurface({
 					onDismiss={() => store.getState().setInjectionBlocked(false)}
 				/>
 			) : (
-				<ContentHost url={current?.url ?? null} />
+				<div className="relative flex min-h-0 flex-1">
+					{workspaceId ? (
+						<AgentControlBanner workspaceId={workspaceId} />
+					) : null}
+					<ContentHost url={current?.url ?? null} />
+				</div>
 			)}
 
 			{consoleOpen ? (

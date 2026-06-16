@@ -4,6 +4,7 @@ import {
 	ingestForWorkspace,
 	setInjectionBlockedForWorkspace,
 } from "@/features/browser/bridge/use-browser-bridge";
+import { useAgentControlStore } from "@/features/browser/use-agent-control";
 import { buildTitleSeed } from "@/features/conversation/hooks/seed-session-title";
 import { useStreamingStore } from "@/features/conversation/state/streaming-store";
 import {
@@ -436,6 +437,16 @@ function handleUiMutation(
 					failed: event.failed,
 				},
 			});
+			return;
+		case "browserAgentControlStarted":
+			useAgentControlStore
+				.getState()
+				.apply({ type: "start", workspaceId: event.workspaceId });
+			return;
+		case "browserAgentControlEnded":
+			useAgentControlStore
+				.getState()
+				.apply({ type: "end", workspaceId: event.workspaceId });
 			return;
 		// TODO(browser): UiMutationEvent cross-window tab sync. Once the Rust
 		// `UiMutationEvent::BrowserTabsChanged` variant lands, handle it here by
