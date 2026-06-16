@@ -5447,3 +5447,39 @@ export async function destroyStableUrl(): Promise<CompanionStatus> {
 		);
 	}
 }
+
+// ── Browser surface: embedded content-webview lifecycle ──────────────────────
+// Thin typed wrappers over the Rust `browser_*` commands in
+// `src-tauri/src/commands/browser_commands.rs`. The rect is logical pixels from
+// the host element's `getBoundingClientRect()`.
+
+/** A logical-pixel rectangle for the embedded content webview. */
+export type BrowserRect = {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+};
+
+/** Embed (or re-target) the content webview at `rect` navigated to `url`. */
+export async function browserCreate(
+	url: string,
+	rect: BrowserRect,
+): Promise<void> {
+	await invoke("browser_create", { url, rect });
+}
+
+/** Navigate the embedded content webview to `url`. */
+export async function browserNavigate(url: string): Promise<void> {
+	await invoke("browser_navigate", { url });
+}
+
+/** Reposition/resize the embedded content webview to track the pane rect. */
+export async function browserSetBounds(rect: BrowserRect): Promise<void> {
+	await invoke("browser_set_bounds", { rect });
+}
+
+/** Tear down the embedded content webview. */
+export async function browserDestroy(): Promise<void> {
+	await invoke("browser_destroy");
+}
