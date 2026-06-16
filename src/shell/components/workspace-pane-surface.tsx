@@ -4,6 +4,8 @@
 // branch and renders either <StartSurfacePane> (start) or
 // <ShellWorkspaceConversation> (chat) below the editor. Selection-track reads
 // stay inside ShellWorkspaceConversation; only the delivery channel moved.
+
+import { WorkspaceBrowserSurface } from "@/features/browser";
 import type {
 	ComposerCreateContext,
 	WorkspaceConversationContainerProps,
@@ -15,6 +17,7 @@ import type { ChangeRequestInfo, RepositoryCreateOption } from "@/lib/api";
 import type { EditorSessionState } from "@/lib/editor-session";
 import type { AppSettings } from "@/lib/settings";
 import type { ContextCard } from "@/lib/sources/types";
+import type { BrowserSessionController } from "@/shell/controllers/use-browser-session-controller";
 import type { ContextPanelActions } from "@/shell/controllers/use-context-panel-controller";
 import type { EditorSessionActions } from "@/shell/controllers/use-editor-session-controller";
 import type { PendingQueueActions } from "@/shell/controllers/use-pending-queue-controller";
@@ -40,6 +43,8 @@ type Props = {
 	// Editor surface
 	handleEditorSessionChange: (session: EditorSessionState) => void;
 	editorSessionActions: EditorSessionActions;
+	// Browser surface (state + actions, mirrors the editor controller pair).
+	browserSession: BrowserSessionController;
 	// Shared between both surfaces
 	repositories: RepositoryCreateOption[];
 	selectionActions: SelectionActions;
@@ -92,6 +97,7 @@ export function WorkspacePaneSurface({
 	contextPanelOpen,
 	handleEditorSessionChange,
 	editorSessionActions,
+	browserSession,
 	repositories,
 	selectionActions,
 	readStateActions,
@@ -139,7 +145,7 @@ export function WorkspacePaneSurface({
 			// owns Monaco's ~2900 cached CSS rules after the editor opens once).
 			style={{ contain: "layout style" }}
 		>
-			{workspaceViewMode !== "editor" && (
+			{workspaceViewMode !== "editor" && workspaceViewMode !== "browser" && (
 				<div
 					aria-label="Workspace panel drag region"
 					className="absolute inset-x-0 top-0 z-10 h-9 bg-transparent"
@@ -162,10 +168,21 @@ export function WorkspacePaneSurface({
 						onError={editorSessionActions.reportError}
 					/>
 				)}
+				{workspaceViewMode === "browser" && (
+					<WorkspaceBrowserSurface
+						tabs={browserSession.state.tabs}
+						activeTabId={browserSession.state.activeTabId}
+						onNavigate={browserSession.actions.navigate}
+						onSelectTab={browserSession.actions.selectTab}
+						onCloseTab={browserSession.actions.closeTab}
+						onOpenUrl={browserSession.actions.openUrl}
+						onExit={browserSession.actions.exit}
+					/>
+				)}
 				<div
 					data-focus-scope="chat"
 					className={
-						workspaceViewMode === "editor"
+						workspaceViewMode === "editor" || workspaceViewMode === "browser"
 							? "hidden"
 							: "flex min-h-0 flex-1 flex-col"
 					}

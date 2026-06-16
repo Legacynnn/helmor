@@ -372,6 +372,10 @@ function handleUiMutation(
 		case "workspaceRevealRequested":
 			options.onWorkspaceReveal?.(event.workspaceId, event.sessionId);
 			return;
+		// TODO(browser): UiMutationEvent cross-window tab sync. Once the Rust
+		// `UiMutationEvent::BrowserTabsChanged` variant lands, handle it here by
+		// invalidating `helmorQueryKeys.browserTabs(event.workspaceId)` so a tab
+		// change in one window re-hydrates the browser surface in the others.
 	}
 }
 

@@ -20,6 +20,7 @@ import type { SettingsSection } from "@/features/settings";
 import type { AppSettings } from "@/lib/settings";
 import { useOsNotifications } from "@/lib/use-os-notifications";
 import type { PushWorkspaceToast } from "@/lib/workspace-toast-context";
+import { useBrowserSessionController } from "@/shell/controllers/use-browser-session-controller";
 import { useEditorSessionController } from "@/shell/controllers/use-editor-session-controller";
 import { useReadStateController } from "@/shell/controllers/use-read-state-controller";
 import type { SelectionActions } from "@/shell/controllers/use-selection-controller";
@@ -159,6 +160,15 @@ export function useWorkspaceDataControllers({
 			editorSession,
 		],
 	);
+	// Browser surface controller — mirrors the editor controller above. The
+	// conversation ⇄ browser view-mode switch lives in the selection controller;
+	// this controller owns the per-workspace tab list (hydrated/persisted to the
+	// DB) and the enter/exit-browser-mode transitions.
+	const browserSession = useBrowserSessionController({
+		selectedWorkspaceId,
+		enterBrowserMode: () => selectionActions.setViewMode("browser"),
+		exitBrowserMode: () => selectionActions.setViewMode("conversation"),
+	});
 	const handleEditorSessionChange = editorSessionActions.changeSession;
 	const { canEditEditorSession, handleEnterEditorEditMode } = useEditorEditMode(
 		{
@@ -206,6 +216,7 @@ export function useWorkspaceDataControllers({
 		editorSession,
 		editorSessionActions,
 		editorDiscardConfirmDialog,
+		browserSession,
 		activeEditorTarget,
 		handleEditorSessionChange,
 		canEditEditorSession,

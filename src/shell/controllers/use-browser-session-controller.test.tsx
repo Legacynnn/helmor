@@ -1,16 +1,35 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { createHelmorQueryClient } from "@/lib/query-client";
 import { useBrowserSessionController } from "./use-browser-session-controller";
+
+// Persistence wrappers hit Tauri `invoke`; stub them out so the in-memory tab
+// state machine can be exercised in isolation (no DB round-trip in jsdom).
+vi.mock("@/lib/api", () => ({
+	browserListTabs: vi.fn().mockResolvedValue([]),
+	browserPersistTabs: vi.fn().mockResolvedValue(undefined),
+}));
+
+function wrapper({ children }: { children: ReactNode }) {
+	const queryClient = createHelmorQueryClient();
+	return (
+		<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+	);
+}
 
 describe("useBrowserSessionController", () => {
 	it("opens a tab and calls enterBrowserMode", () => {
 		const enterBrowserMode = vi.fn();
-		const { result } = renderHook(() =>
-			useBrowserSessionController({
-				selectedWorkspaceId: "ws1",
-				enterBrowserMode,
-				exitBrowserMode: vi.fn(),
-			}),
+		const { result } = renderHook(
+			() =>
+				useBrowserSessionController({
+					selectedWorkspaceId: "ws1",
+					enterBrowserMode,
+					exitBrowserMode: vi.fn(),
+				}),
+			{ wrapper },
 		);
 		act(() => result.current.actions.openUrl("http://localhost:3000"));
 		expect(result.current.state.tabs).toHaveLength(1);
@@ -22,12 +41,14 @@ describe("useBrowserSessionController", () => {
 	});
 
 	it("navigates the active tab's url", () => {
-		const { result } = renderHook(() =>
-			useBrowserSessionController({
-				selectedWorkspaceId: "ws1",
-				enterBrowserMode: vi.fn(),
-				exitBrowserMode: vi.fn(),
-			}),
+		const { result } = renderHook(
+			() =>
+				useBrowserSessionController({
+					selectedWorkspaceId: "ws1",
+					enterBrowserMode: vi.fn(),
+					exitBrowserMode: vi.fn(),
+				}),
+			{ wrapper },
 		);
 		act(() => result.current.actions.openUrl("http://a"));
 		act(() => result.current.actions.navigate("http://b"));
@@ -36,12 +57,14 @@ describe("useBrowserSessionController", () => {
 
 	it("closing the last tab exits browser mode", () => {
 		const exitBrowserMode = vi.fn();
-		const { result } = renderHook(() =>
-			useBrowserSessionController({
-				selectedWorkspaceId: "ws1",
-				enterBrowserMode: vi.fn(),
-				exitBrowserMode,
-			}),
+		const { result } = renderHook(
+			() =>
+				useBrowserSessionController({
+					selectedWorkspaceId: "ws1",
+					enterBrowserMode: vi.fn(),
+					exitBrowserMode,
+				}),
+			{ wrapper },
 		);
 		act(() => result.current.actions.openUrl("http://a"));
 		const id = result.current.state.tabs[0].id;
@@ -52,12 +75,14 @@ describe("useBrowserSessionController", () => {
 	});
 
 	it("selects a tab by id", () => {
-		const { result } = renderHook(() =>
-			useBrowserSessionController({
-				selectedWorkspaceId: "ws1",
-				enterBrowserMode: vi.fn(),
-				exitBrowserMode: vi.fn(),
-			}),
+		const { result } = renderHook(
+			() =>
+				useBrowserSessionController({
+					selectedWorkspaceId: "ws1",
+					enterBrowserMode: vi.fn(),
+					exitBrowserMode: vi.fn(),
+				}),
+			{ wrapper },
 		);
 		act(() => result.current.actions.openUrl("http://a"));
 		act(() => result.current.actions.openUrl("http://b"));

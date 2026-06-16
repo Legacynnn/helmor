@@ -119,6 +119,7 @@ export const helmorQueryKeys = {
 		["workspaceSearch", workspaceRootPath, paramsKey] as const,
 	workspaceChangeRequest: (workspaceId: string) =>
 		["workspaceChangeRequest", workspaceId] as const,
+	browserTabs: (workspaceId: string) => ["browserTabs", workspaceId] as const,
 	workspaceForge: (workspaceId: string) =>
 		["workspaceForge", workspaceId] as const,
 	forgeAccounts: (gitlabHosts: string[]) =>

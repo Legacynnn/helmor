@@ -5,6 +5,7 @@ import {
 	Check,
 	ChevronDown,
 	FolderOpen,
+	Globe,
 	MoreHorizontal,
 	PanelRightClose,
 	PanelRightOpen,
@@ -45,6 +46,7 @@ type Props = {
 	 *  inspector toggle (the inspector is hidden entirely in chat). */
 	isChatMode?: boolean;
 	onOpenPreferredEditor: () => void;
+	onOpenBrowser: () => void;
 	onToggleInspector: () => void;
 	onPickEditor: (editorId: string) => void;
 	pushWorkspaceToast: PushWorkspaceToast;
@@ -59,6 +61,7 @@ export function WorkspaceHeaderActions({
 	inspectorCollapsed,
 	isChatMode = false,
 	onOpenPreferredEditor,
+	onOpenBrowser,
 	onToggleInspector,
 	onPickEditor,
 	pushWorkspaceToast,
@@ -224,6 +227,29 @@ export function WorkspaceHeaderActions({
 							</DropdownMenuSub>
 						</DropdownMenuContent>
 					</DropdownMenu>
+				) : null}
+				{/* Browser surface toggle — opens the in-app browser at a blank
+				 *  page (peer to the editor). Hidden in chat-mode workspaces. */}
+				{!isChatMode ? (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								aria-label="Open browser"
+								onClick={onOpenBrowser}
+								variant="ghost"
+								size="icon-xs"
+								className="text-muted-foreground hover:text-foreground"
+							>
+								<Globe className="size-4" strokeWidth={1.8} />
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent
+							side="bottom"
+							className="flex h-[24px] items-center gap-2 rounded-md px-2 text-small leading-none"
+						>
+							<span>Open browser</span>
+						</TooltipContent>
+					</Tooltip>
 				) : null}
 				{/* Inspector toggle hidden in chat mode — the inspector pane
 				 *  itself is hidden, so the button has nothing to toggle. */}

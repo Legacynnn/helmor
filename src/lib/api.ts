@@ -5483,3 +5483,41 @@ export async function browserSetBounds(rect: BrowserRect): Promise<void> {
 export async function browserDestroy(): Promise<void> {
 	await invoke("browser_destroy");
 }
+
+// ── Browser surface: DB-backed tab persistence ───────────────────────────────
+// Typed wrappers over the Rust `browser_list_tabs` / `browser_persist_tabs`
+// commands. Field names match the camelCase serde of the Rust `BrowserTab` /
+// `TabInput` structs in `src-tauri/src/commands/browser_commands.rs`.
+
+/** A persisted browser tab row, as returned by `browser_list_tabs`. */
+export type BrowserTabRow = {
+	id: string;
+	workspaceId: string;
+	url: string;
+	title: string | null;
+	position: number;
+	active: boolean;
+};
+
+/** A tab to persist via `browser_persist_tabs` (no server-assigned id). */
+export type BrowserTabInput = {
+	url: string;
+	title: string | null;
+	position: number;
+	active: boolean;
+};
+
+/** Load the persisted tab set for a workspace, ordered by position. */
+export async function browserListTabs(
+	workspaceId: string,
+): Promise<BrowserTabRow[]> {
+	return await invoke<BrowserTabRow[]>("browser_list_tabs", { workspaceId });
+}
+
+/** Replace a workspace's persisted tab set. */
+export async function browserPersistTabs(
+	workspaceId: string,
+	tabs: BrowserTabInput[],
+): Promise<void> {
+	await invoke("browser_persist_tabs", { workspaceId, tabs });
+}

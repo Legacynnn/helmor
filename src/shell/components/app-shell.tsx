@@ -79,6 +79,9 @@ export function AppShell({
 					inspectorCollapsed={inspectorCollapsed}
 					isChatMode={data.selectedWorkspaceDetail?.mode === "chat"}
 					onOpenPreferredEditor={chrome.handleOpenPreferredEditor}
+					onOpenBrowser={() =>
+						data.browserSession.actions.openUrl("about:blank")
+					}
 					onToggleInspector={() =>
 						setInspectorCollapsed((collapsed) => !collapsed)
 					}
@@ -93,6 +96,7 @@ export function AppShell({
 			chrome.openPreferredEditorShortcut,
 			chrome.rightSidebarToggleShortcut,
 			chrome.handleOpenPreferredEditor,
+			data.browserSession.actions.openUrl,
 			inspectorCollapsed,
 			data.selectedWorkspaceDetail?.mode,
 			s.pushWorkspaceToast,

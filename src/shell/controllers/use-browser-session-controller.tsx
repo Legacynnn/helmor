@@ -12,6 +12,7 @@ import {
 	closeTab,
 	openTab,
 } from "@/features/browser/tab-model";
+import { useBrowserTabPersistence } from "@/shell/controllers/use-browser-tab-persistence";
 
 export type BrowserSessionActions = {
 	openUrl(url: string): void;
@@ -40,7 +41,22 @@ export function useBrowserSessionController(
 	const [tabs, setTabs] = useState<BrowserTab[]>([]);
 	const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
-	const { enterBrowserMode, exitBrowserMode } = deps;
+	const { selectedWorkspaceId, enterBrowserMode, exitBrowserMode } = deps;
+
+	// Hydrate from / debounce-persist to the DB for the active workspace.
+	const hydrate = useCallback(
+		(nextTabs: BrowserTab[], nextActiveId: string | null) => {
+			setTabs(nextTabs);
+			setActiveTabId(nextActiveId);
+		},
+		[],
+	);
+	useBrowserTabPersistence({
+		workspaceId: selectedWorkspaceId,
+		tabs,
+		activeTabId,
+		hydrate,
+	});
 
 	const openUrl = useCallback(
 		(url: string) => {

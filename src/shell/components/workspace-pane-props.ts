@@ -27,6 +27,7 @@ export function buildWorkspacePaneProps({
 		contextPanelOpen: sel.contextPanel.contextPanelOpen,
 		handleEditorSessionChange: data.handleEditorSessionChange,
 		editorSessionActions: data.editorSessionActions,
+		browserSession: data.browserSession,
 		repositories: s.repositories,
 		selectionActions: sel.selectionActions,
 		readStateActions: data.readStateActions,
