@@ -5,6 +5,7 @@
 // <ShellWorkspaceConversation> (chat) below the editor. Selection-track reads
 // stay inside ShellWorkspaceConversation; only the delivery channel moved.
 
+import { useState } from "react";
 import { WorkspaceBrowserSurface } from "@/features/browser";
 import type {
 	ComposerCreateContext,
@@ -12,8 +13,13 @@ import type {
 } from "@/features/conversation";
 import { WorkspaceEditorSurface } from "@/features/editor";
 import { getShortcut } from "@/features/shortcuts/registry";
+import { WorkspaceSimulatorSurface } from "@/features/simulator";
 import type { WorkspaceStartPage } from "@/features/workspace-start";
-import type { ChangeRequestInfo, RepositoryCreateOption } from "@/lib/api";
+import type {
+	ChangeRequestInfo,
+	RepositoryCreateOption,
+	SimSurfaceKind,
+} from "@/lib/api";
 import type { EditorSessionState } from "@/lib/editor-session";
 import type { AppSettings } from "@/lib/settings";
 import type { ContextCard } from "@/lib/sources/types";
@@ -151,6 +157,28 @@ export function WorkspacePaneSurface({
 	const browserLayout = browserSession.state.layout;
 	const browserActive = workspaceViewMode === "browser";
 
+	// Simulator preview surface (Phase 4). Additive overlay: `null` until a
+	// shell event opens it, so the existing browser/chat paths are unchanged
+	// while it is closed. When open it fills the workspace viewport (like the
+	// expanded browser) and hides the chat scope.
+	const [simulatorSurface, setSimulatorSurface] = useState<{
+		workspaceId: string;
+		kind: SimSurfaceKind;
+		udid: string;
+	} | null>(null);
+	const simulatorActive = simulatorSurface !== null;
+
+	useShellEvent("open-simulator-surface", (event) => {
+		setSimulatorSurface({
+			workspaceId: event.workspaceId,
+			kind: event.kind,
+			udid: event.udid,
+		});
+	});
+	useShellEvent("close-simulator-surface", () => {
+		setSimulatorSurface(null);
+	});
+
 	useShellEvent("toggle-browser-expand", () => {
 		if (browserActive) browserSession.actions.toggleExpand();
 	});
@@ -243,10 +271,23 @@ export function WorkspacePaneSurface({
 						/>
 					</div>
 				)}
+				{simulatorActive && simulatorSurface && (
+					<div
+						data-shell-pane="simulator"
+						className="absolute inset-0 z-30 flex min-h-0 flex-col"
+					>
+						<WorkspaceSimulatorSurface
+							workspaceId={simulatorSurface.workspaceId}
+							kind={simulatorSurface.kind}
+							udid={simulatorSurface.udid}
+							onExit={() => setSimulatorSurface(null)}
+						/>
+					</div>
+				)}
 				<div
 					data-focus-scope="chat"
 					className={
-						workspaceViewMode === "editor" || browserExpanded
+						workspaceViewMode === "editor" || browserExpanded || simulatorActive
 							? "hidden"
 							: "flex min-h-0 flex-1 flex-col"
 					}

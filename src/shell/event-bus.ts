@@ -10,7 +10,7 @@ import type {
 	ContextProviderTab,
 	SettingsSection,
 } from "@/features/settings/types";
-import type { WorkspaceMode } from "@/lib/api";
+import type { SimSurfaceKind, WorkspaceMode } from "@/lib/api";
 
 export type ShellEvent =
 	| {
@@ -34,6 +34,16 @@ export type ShellEvent =
 	| { type: "toggle-context-panel" }
 	| { type: "toggle-browser-split" }
 	| { type: "toggle-browser-expand" }
+	// Open the simulator preview surface for the current workspace on a booted
+	// device (Phase 4). `null` workspaceId targets the selected workspace.
+	| {
+			type: "open-simulator-surface";
+			workspaceId: string;
+			kind: SimSurfaceKind;
+			udid: string;
+	  }
+	// Close the open simulator preview surface.
+	| { type: "close-simulator-surface" }
 	| { type: "focus-active-terminal" }
 	| { type: "open-new-session-menu" }
 	// App-scoped ⌘⇧T — the mounted composer flips its terminalMode.
