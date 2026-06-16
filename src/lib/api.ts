@@ -4164,6 +4164,19 @@ export async function savePastedImage(
 }
 
 /**
+ * Save a browser screenshot (base64 PNG from the content-webview capture
+ * bridge) into the session paste-cache and return its absolute path. Mirrors
+ * `savePastedImage` but writes `capture-<uuid>.png`, so the path travels
+ * through the same `images` wire into the agent.
+ */
+export async function browserCapture(
+	sessionId: string,
+	base64Png: string,
+): Promise<string> {
+	return invoke<string>("browser_capture", { sessionId, base64Png });
+}
+
+/**
  * Pull an image that lives *only* on the system clipboard (e.g. "Copy Image"
  * from a browser/Preview, or a Cmd+Ctrl+Shift+4 screenshot) into the session
  * paste-cache and return its absolute path. macOS WKWebView does not expose
