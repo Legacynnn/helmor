@@ -11,6 +11,7 @@
  */
 
 import type { BridgeMode, BridgePost, BridgeSelection } from "./channel";
+import { curateComputedStyles } from "./enrich";
 import { outlineRectFor } from "./overlay-geometry";
 import { cssSelectorFor } from "./selector";
 
@@ -53,8 +54,22 @@ export function createBridge(options: CreateBridgeOptions): Bridge {
 		return {
 			selector: cssSelectorFor(el),
 			outerHTML: el.outerHTML,
+			computedStyles: computedStylesFor(el),
 			rect: outlineRectFor(el),
 		};
+	}
+
+	/**
+	 * Read the curated computed-style subset for `el`. Resolved against the
+	 * element's owning window (`defaultView`) so it works for elements in the
+	 * live page; returns `undefined` when no view is available (e.g. detached
+	 * documents in tests that don't supply one).
+	 */
+	function computedStylesFor(el: Element): Record<string, string> | undefined {
+		const view = doc.defaultView;
+		if (!view) return undefined;
+		const declaration = view.getComputedStyle(el);
+		return curateComputedStyles((prop) => declaration.getPropertyValue(prop));
 	}
 
 	function onClick(event: MouseEvent): void {

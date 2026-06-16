@@ -167,6 +167,8 @@ pub async fn browser_bridge_event(
                     selector: selection.selector,
                     outer_html: selection.outer_html,
                     rect: selection.rect,
+                    computed_styles: selection.computed_styles,
+                    crop_path: selection.crop_path,
                 },
             );
         }
@@ -178,6 +180,7 @@ pub async fn browser_bridge_event(
                     selector: selection.selector,
                     outer_html: selection.outer_html,
                     rect: selection.rect,
+                    computed_styles: selection.computed_styles,
                 },
             );
         }

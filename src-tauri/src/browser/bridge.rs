@@ -68,6 +68,9 @@ pub struct Selection {
     #[serde(default)]
     pub computed_styles: Option<serde_json::Value>,
     pub rect: serde_json::Value,
+    /// Path to a cropped screenshot of the element's rect, when one was made.
+    #[serde(default)]
+    pub crop_path: Option<String>,
 }
 
 /// Page → host message. Mirrors `BridgeToHostMessage` in

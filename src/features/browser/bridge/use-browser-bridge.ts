@@ -52,6 +52,8 @@ function pinFromComment(
 		text,
 		rect: selection.rect,
 		outerHTML: selection.outerHTML,
+		computedStyles: selection.computedStyles,
+		cropPath: selection.cropPath ?? null,
 		resolved: true,
 	};
 }

@@ -2590,6 +2590,8 @@ export type UiMutationEvent =
 			selector: string;
 			outerHTML: string;
 			rect: BridgeRect;
+			computedStyles?: Record<string, string>;
+			cropPath?: string | null;
 	  }
 	| {
 			type: "browserElementPicked";
@@ -2597,6 +2599,7 @@ export type UiMutationEvent =
 			selector: string;
 			outerHTML: string;
 			rect: BridgeRect;
+			computedStyles?: Record<string, string>;
 	  }
 	| { type: "browserInjectionFailed"; workspaceId: string }
 	| {

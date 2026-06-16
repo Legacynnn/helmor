@@ -387,6 +387,8 @@ function handleUiMutation(
 					selector: event.selector,
 					outerHTML: event.outerHTML,
 					rect: event.rect,
+					computedStyles: event.computedStyles,
+					cropPath: event.cropPath,
 				},
 			});
 			void queryClient.invalidateQueries({
@@ -400,6 +402,7 @@ function handleUiMutation(
 					selector: event.selector,
 					outerHTML: event.outerHTML,
 					rect: event.rect,
+					computedStyles: event.computedStyles,
 				},
 			});
 			return;

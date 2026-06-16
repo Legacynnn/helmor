@@ -20,6 +20,10 @@ export type CommentPin = {
 	text: string;
 	rect: BridgeRect;
 	outerHTML: string;
+	/** Curated computed-style subset captured at pin time, when available. */
+	computedStyles?: Record<string, string>;
+	/** Path to a cropped screenshot of the element's rect, when one was made. */
+	cropPath?: string | null;
 	/** false once the selector fails to re-resolve after a reload. */
 	resolved: boolean;
 };

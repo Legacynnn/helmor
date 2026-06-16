@@ -157,6 +157,10 @@ pub enum UiMutationEvent {
         #[serde(rename = "outerHTML")]
         outer_html: String,
         rect: serde_json::Value,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        computed_styles: Option<serde_json::Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        crop_path: Option<String>,
     },
     /// An element was picked in the content webview's "Pick" mode. Carries the
     /// owning workspace plus the full selection so the surface can surface it.
@@ -166,6 +170,8 @@ pub enum UiMutationEvent {
         #[serde(rename = "outerHTML")]
         outer_html: String,
         rect: serde_json::Value,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        computed_styles: Option<serde_json::Value>,
     },
     /// The inspector bridge failed to inject (CSP-blocked
     /// `initialization_script`). The surface offers the screenshot-annotation
@@ -308,12 +314,15 @@ mod tests {
                 selector: "#hero".into(),
                 outer_html: "<div></div>".into(),
                 rect: serde_json::json!({ "x": 1 }),
+                computed_styles: Some(serde_json::json!({ "display": "flex" })),
+                crop_path: Some("/cache/crop.png".into()),
             },
             UiMutationEvent::BrowserElementPicked {
                 workspace_id: "w".into(),
                 selector: "button".into(),
                 outer_html: "<button></button>".into(),
                 rect: serde_json::json!({}),
+                computed_styles: None,
             },
             UiMutationEvent::BrowserInjectionFailed {
                 workspace_id: "w".into(),
@@ -381,6 +390,8 @@ mod tests {
             selector: "#hero".into(),
             outer_html: "<div></div>".into(),
             rect: serde_json::json!({ "x": 1, "y": 2 }),
+            computed_styles: Some(serde_json::json!({ "display": "flex" })),
+            crop_path: Some("/cache/crop.png".into()),
         };
         let json = serde_json::to_value(&event).unwrap();
         assert_eq!(json["type"], "browserCommentPinned");

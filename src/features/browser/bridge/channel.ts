@@ -29,6 +29,8 @@ export type BridgeSelection = {
 	outerHTML: string;
 	computedStyles?: Record<string, string>;
 	rect: BridgeRect;
+	/** Path to a cropped screenshot of the element's rect, when one was made. */
+	cropPath?: string | null;
 };
 
 /** A buffered console entry from the console collector. */
