@@ -243,6 +243,9 @@ pub async fn browser_bridge_event(
             // Capture results resolve a pending capture promise host-side; the
             // dedicated capture command owns persistence, so this is a no-op.
         }
+        BridgeMessage::DriverResult { id, value } => {
+            crate::browser::bridge::resolve_pending(&id, value);
+        }
     }
     Ok(())
 }

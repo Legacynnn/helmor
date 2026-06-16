@@ -12,8 +12,12 @@
 //!   - page → host: the injected runtime invokes the `browser_bridge_event`
 //!     command (see `commands::browser_commands`) with a [`BridgeMessage`].
 
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
+use tokio::sync::oneshot;
 
 use super::content_webview;
 
@@ -95,6 +99,12 @@ pub enum BridgeMessage {
     CaptureResult {
         base64: String,
     },
+    /// Reply to a `driver-request` (snapshot/click/etc.). `value` is opaque JSON
+    /// shaped per the verb (a PreviewSnapshot, or `{ "ok": true }`, or an error).
+    DriverResult {
+        id: String,
+        value: serde_json::Value,
+    },
 }
 
 /// Eval a host → page message into the content webview, invoking
@@ -111,6 +121,58 @@ pub fn eval_into_content<T: Serialize>(payload: &T) -> Result<()> {
             .eval(&script)
             .map_err(|e| anyhow!("failed to eval bridge message into content webview: {e}"))
     })
+}
+
+type PendingMap = Mutex<HashMap<String, oneshot::Sender<serde_json::Value>>>;
+
+fn pending() -> &'static PendingMap {
+    static P: OnceLock<PendingMap> = OnceLock::new();
+    P.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Register interest in a driver reply; returns the receiver to await.
+pub fn register_pending(id: String) -> oneshot::Receiver<serde_json::Value> {
+    let (tx, rx) = oneshot::channel();
+    pending().lock().expect("pending lock").insert(id, tx);
+    rx
+}
+
+/// Resolve a pending driver request with the page's reply. No-op if unknown.
+pub fn resolve_pending(id: &str, value: serde_json::Value) {
+    if let Some(tx) = pending().lock().expect("pending lock").remove(id) {
+        let _ = tx.send(value);
+    }
+}
+
+/// Send a correlated driver request into the page. The page must reply via a
+/// `DriverResult { id, value }` bridge event (see browser_commands.rs).
+pub fn request_into_content(id: &str, payload: &serde_json::Value) -> Result<()> {
+    let envelope = serde_json::json!({ "kind": "driver-request", "id": id, "payload": payload });
+    eval_into_content(&envelope)
+}
+
+#[cfg(test)]
+mod request_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn pending_request_resolves_when_event_arrives() {
+        let id = "req-1".to_string();
+        let rx = register_pending(id.clone());
+        // Simulate the page replying.
+        resolve_pending(&id, serde_json::json!({ "ok": true }));
+        let value = tokio::time::timeout(std::time::Duration::from_millis(100), rx)
+            .await
+            .expect("not timed out")
+            .expect("sender not dropped");
+        assert_eq!(value["ok"], true);
+    }
+
+    #[tokio::test]
+    async fn unknown_id_resolve_is_noop() {
+        // Must not panic when no one is waiting.
+        resolve_pending("nobody", serde_json::json!({}));
+    }
 }
 
 #[cfg(test)]
