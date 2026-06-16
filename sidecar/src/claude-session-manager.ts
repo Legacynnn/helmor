@@ -25,6 +25,7 @@ import { parseImageRefs } from "./images.js";
 import { prependLinkedDirectoriesContext } from "./linked-directories-context.js";
 import { errorDetails, logger } from "./logger.js";
 import { listProviderModels, modelSupportsFastMode } from "./model-catalog.js";
+import { createPreviewMcpServer } from "./preview-mcp.js";
 import { createPushable, type Pushable } from "./pushable-iterable.js";
 import type {
 	GenerateTitleOptions,
@@ -382,6 +383,7 @@ export class ClaudeSessionManager implements SessionManager {
 			agentProxy,
 			images,
 			sourceRepoPath,
+			workspaceId,
 		} = params;
 		const abortController = new AbortController();
 		// Register the turn before any await so a Stop during SDK startup
@@ -442,6 +444,17 @@ export class ClaudeSessionManager implements SessionManager {
 				servers: Object.keys(projectMcpServers),
 			});
 		}
+		// In-process preview MCP server (agent-control broker). Scoped to the
+		// agent's OWN workspace via `workspaceId` (Decision D7). Only injected
+		// when the host stamped a workspace id (persisted sessions); merged
+		// alongside any project-scope MCP servers.
+		const mergedMcpServers = {
+			...(projectMcpServers ?? {}),
+			...(workspaceId
+				? { helmorPreview: createPreviewMcpServer(workspaceId) }
+				: {}),
+		};
+		const hasMcpServers = Object.keys(mergedMcpServers).length > 0;
 
 		const q = query({
 			prompt: promptSource,
@@ -461,7 +474,7 @@ export class ClaudeSessionManager implements SessionManager {
 					display: claudeThinkingDisplay ?? "summarized",
 				},
 				...(effectiveFastMode ? { settings: { fastMode: true } } : {}),
-				...(projectMcpServers ? { mcpServers: projectMcpServers } : {}),
+				...(hasMcpServers ? { mcpServers: mergedMcpServers } : {}),
 				onElicitation: async (request, options) => {
 					// MCP elicitation: surface as a unified userInputRequest
 					// with `kind: "form"` (schema-driven) or `kind: "url"`

@@ -60,6 +60,13 @@ export interface SendMessageParams {
 	 */
 	readonly sourceRepoPath?: string;
 	/**
+	 * Owning workspace id for this session. Stamped by the Rust host (resolved
+	 * from the session row) so the sidecar can scope its in-process preview MCP
+	 * server (agent-control broker) to the agent's OWN workspace (Decision D7).
+	 * Absent until the session is persisted.
+	 */
+	readonly workspaceId?: string;
+	/**
 	 * Structured image attachment paths from the composer. The single
 	 * source of truth for which `@<path>` substrings inside `prompt`
 	 * should be lifted out as image attachments. Paths may contain

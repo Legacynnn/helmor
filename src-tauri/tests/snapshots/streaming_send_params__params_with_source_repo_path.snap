@@ -12,3 +12,4 @@ provider: claude
 resume: ~
 sessionId: sidecar-sess-1
 sourceRepoPath: /Users/me/repos/my-repo
+workspaceId: w-5

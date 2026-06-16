@@ -121,6 +121,7 @@ export function parseSendMessageParams(
 			"additionalDirectories",
 		),
 		sourceRepoPath: optionalString(params, "sourceRepoPath"),
+		workspaceId: optionalString(params, "workspaceId"),
 		// Always normalize to an array. Symmetric with
 		// `parseSteerSessionParams` so neither path needs to disambiguate
 		// "field absent" vs "no images" — both mean `[]`. The structured

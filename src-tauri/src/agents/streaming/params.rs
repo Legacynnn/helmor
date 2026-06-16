@@ -44,6 +44,7 @@ pub struct BuildSendMessageParamsInput<'a> {
 pub fn build_send_message_params(input: BuildSendMessageParamsInput<'_>) -> Value {
     let additional_directories = lookup_workspace_linked_directories(input.helmor_session_id);
     let source_repo_path = lookup_workspace_repo_root_path(input.helmor_session_id);
+    let workspace_id = lookup_workspace_id(input.helmor_session_id);
 
     let mut params = serde_json::json!({
         "sessionId": input.sidecar_session_id,
@@ -67,6 +68,14 @@ pub fn build_send_message_params(input: BuildSendMessageParamsInput<'_>) -> Valu
     if let Some(path) = source_repo_path {
         if let Some(obj) = params.as_object_mut() {
             obj.insert("sourceRepoPath".to_string(), Value::from(path));
+        }
+    }
+    // The owning workspace id, so the sidecar can scope its in-process preview
+    // MCP server (agent-control broker) to the agent's OWN workspace (D7). This
+    // must match the id the browser surface registers under in the broker.
+    if let Some(workspace_id) = workspace_id {
+        if let Some(obj) = params.as_object_mut() {
+            obj.insert("workspaceId".to_string(), Value::from(workspace_id));
         }
     }
     if !input.images.is_empty() {
@@ -189,6 +198,42 @@ pub fn lookup_workspace_repo_root_path(helmor_session_id: Option<&str>) -> Optio
                 helmor_session_id = %hsid,
                 error = %err,
                 "repo root_path query failed; falling back to None",
+            );
+            None
+        }
+    }
+}
+
+/// Resolve the owning workspace id for a helmor session. The sidecar stamps it
+/// onto every `preview.*` host call so the agent-control broker can resolve the
+/// agent's OWN surface (cross-workspace safety boundary, D7). Returns `None`
+/// when the session is not yet persisted — normal for a brand-new turn.
+pub fn lookup_workspace_id(helmor_session_id: Option<&str>) -> Option<String> {
+    let hsid = helmor_session_id?;
+    let conn = match crate::models::db::read_conn() {
+        Ok(c) => c,
+        Err(err) => {
+            tracing::warn!(
+                helmor_session_id = %hsid,
+                error = %err,
+                "Failed to open DB for workspace_id lookup; falling back to None",
+            );
+            return None;
+        }
+    };
+    match conn.query_row(
+        "SELECT workspace_id FROM sessions WHERE id = ?1",
+        [hsid],
+        |row| row.get::<_, Option<String>>(0),
+    ) {
+        Ok(Some(id)) if !id.is_empty() => Some(id),
+        Ok(_) => None,
+        Err(rusqlite::Error::QueryReturnedNoRows) => None,
+        Err(err) => {
+            tracing::warn!(
+                helmor_session_id = %hsid,
+                error = %err,
+                "workspace_id query failed; falling back to None",
             );
             None
         }

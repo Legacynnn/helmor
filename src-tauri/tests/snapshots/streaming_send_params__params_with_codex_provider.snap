@@ -17,3 +17,4 @@ prompt: hello
 provider: codex
 resume: ~
 sessionId: sidecar-sess-1
+workspaceId: w-c

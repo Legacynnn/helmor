@@ -14,3 +14,4 @@ prompt: hello
 provider: claude
 resume: ~
 sessionId: sidecar-sess-1
+workspaceId: w-2
