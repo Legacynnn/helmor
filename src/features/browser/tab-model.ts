@@ -7,6 +7,9 @@ export type BrowserTab = {
 	url: string;
 	title: string;
 	loading: boolean;
+	/** True when this tab's `url` was auto-upgraded from a scheme-less host to
+	 *  `https://` (eligible for the https→http load-failure fallback). */
+	autoUpgradedHttps?: boolean;
 };
 
 /** Append a tab unless one with the same id already exists (idempotent open). */

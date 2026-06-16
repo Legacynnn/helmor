@@ -67,11 +67,28 @@ function extractHost(input: string): string {
  *   private LAN ranges → `http://`; everything else → `https://`.
  */
 export function normalizeUrl(input: string): string | null {
+	return normalizeUrlInfo(input)?.url ?? null;
+}
+
+export type NormalizedUrl = {
+	/** The fully-qualified URL. */
+	url: string;
+	/** True when we prepended `https://` to a scheme-less host (and so may retry
+	 *  over `http://` if the load fails). False for explicit schemes and for
+	 *  hosts we mapped to `http://`. */
+	autoUpgradedHttps: boolean;
+};
+
+/** Like {@link normalizeUrl} but also reports whether we auto-upgraded to
+ *  `https://` (the signal the https→http fallback keys off). `null` for empty
+ *  input. */
+export function normalizeUrlInfo(input: string): NormalizedUrl | null {
 	const trimmed = input.trim();
 	if (!trimmed) return null;
-	if (hasScheme(trimmed)) return trimmed;
+	if (hasScheme(trimmed)) return { url: trimmed, autoUpgradedHttps: false };
 
 	const host = extractHost(trimmed);
-	const scheme = isLocalHost(host) ? "http://" : "https://";
-	return `${scheme}${trimmed}`;
+	const local = isLocalHost(host);
+	const scheme = local ? "http://" : "https://";
+	return { url: `${scheme}${trimmed}`, autoUpgradedHttps: !local };
 }

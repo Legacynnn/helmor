@@ -11,6 +11,7 @@
 
 import { readEditorFile } from "@/lib/api";
 import { buildColorUtilities, type TailwindClass } from "./catalog";
+import { colorUtilityCss } from "./css";
 import { COLOR_PREFIXES } from "./palette";
 
 export type CustomToken = {
@@ -94,14 +95,21 @@ export function customTokensToClasses(tokens: CustomToken[]): TailwindClass[] {
 	for (const token of tokens) {
 		if (token.kind === "color") {
 			for (const prefix of COLOR_PREFIXES) {
+				const css = colorUtilityCss(prefix, token.value);
 				out.push({
 					name: `${prefix}-${token.name}`,
 					color: token.value,
 					detail: "theme color",
+					...(css ? { css } : {}),
 				});
 			}
 		} else {
-			out.push({ name: `font-${token.name}`, detail: "theme font" });
+			const css = token.value ? `font-family: ${token.value}` : undefined;
+			out.push({
+				name: `font-${token.name}`,
+				detail: "theme font",
+				...(css ? { css } : {}),
+			});
 		}
 	}
 	return out;

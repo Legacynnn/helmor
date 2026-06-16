@@ -4,6 +4,7 @@
 // palette. Workspace-derived classes (config.ts) are merged on top at runtime.
 // Extend the scales/prefixes below to widen coverage.
 
+import { colorUtilityCss, keywordUtilityCss, scaleUtilityCss } from "./css";
 import { COLOR_PREFIXES, PALETTE, SHADES, STATIC_COLORS } from "./palette";
 
 export type TailwindClass = {
@@ -14,6 +15,18 @@ export type TailwindClass = {
 	color?: string;
 	/** Short right-aligned category hint shown in the suggest widget. */
 	detail?: string;
+	/** Resolved CSS declaration shown on the right of the suggest row, e.g.
+	 * "padding: 1rem" — the VSCode-style translation. */
+	css?: string;
+};
+
+// CSS values for the static palette colors that have no numeric shade.
+const STATIC_COLOR_CSS_VALUE: Record<string, string> = {
+	white: "#ffffff",
+	black: "#000000",
+	transparent: "transparent",
+	current: "currentColor",
+	inherit: "inherit",
 };
 
 // Spacing scale shared by padding/margin/gap/size utilities.
@@ -291,11 +304,17 @@ export function buildColorUtilities(): TailwindClass[] {
 					name: `${prefix}-${family}-${shade}`,
 					color: hexes[index],
 					detail: "color",
+					css: colorUtilityCss(prefix, hexes[index]),
 				});
 			});
 		}
 		for (const [name, hex] of Object.entries(STATIC_COLORS)) {
-			out.push({ name: `${prefix}-${name}`, color: hex, detail: "color" });
+			out.push({
+				name: `${prefix}-${name}`,
+				color: hex,
+				detail: "color",
+				css: colorUtilityCss(prefix, STATIC_COLOR_CSS_VALUE[name]),
+			});
 		}
 	}
 	return out;
@@ -306,12 +325,20 @@ function buildScaleUtilities(): TailwindClass[] {
 	const out: TailwindClass[] = [];
 	for (const prefix of SPACING_PREFIXES) {
 		for (const value of SPACING) {
-			out.push({ name: `${prefix}-${value}`, detail: "spacing" });
+			out.push({
+				name: `${prefix}-${value}`,
+				detail: "spacing",
+				css: scaleUtilityCss(prefix, value),
+			});
 		}
 	}
 	for (const prefix of ["w", "h", "min-w", "max-w", "min-h", "max-h", "size"]) {
 		for (const value of SIZE_VALUES) {
-			out.push({ name: `${prefix}-${value}`, detail: "sizing" });
+			out.push({
+				name: `${prefix}-${value}`,
+				detail: "sizing",
+				css: scaleUtilityCss(prefix, value),
+			});
 		}
 	}
 	return out;
@@ -325,6 +352,7 @@ export function buildStaticCatalog(): TailwindClass[] {
 	const keywords: TailwindClass[] = KEYWORD_UTILITIES.map((name) => ({
 		name,
 		detail: "utility",
+		css: keywordUtilityCss(name),
 	}));
 	staticCatalogCache = dedupeByName([
 		...keywords,

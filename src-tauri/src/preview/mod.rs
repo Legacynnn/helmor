@@ -5,6 +5,7 @@
 pub mod broker;
 pub mod browser_driver;
 pub mod driver;
+pub mod simulator_driver;
 
 pub use driver::{
     InteractiveElement, PreviewDiagnostics, PreviewDriver, PreviewError, PreviewResult,

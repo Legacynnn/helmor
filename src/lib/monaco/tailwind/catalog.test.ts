@@ -22,6 +22,14 @@ describe("buildStaticCatalog", () => {
 		expect(names.has("text-red-600")).toBe(true);
 	});
 
+	it("attaches the resolved CSS translation to entries", () => {
+		expect(catalog.find((c) => c.name === "flex")?.css).toBe("display: flex");
+		expect(catalog.find((c) => c.name === "p-4")?.css).toBe("padding: 1rem");
+		expect(catalog.find((c) => c.name === "bg-blue-500")?.css).toBe(
+			"background-color: #3b82f6",
+		);
+	});
+
 	it("has no duplicate class names", () => {
 		expect(names.size).toBe(catalog.length);
 	});

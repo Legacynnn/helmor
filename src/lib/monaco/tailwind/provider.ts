@@ -11,6 +11,9 @@ type MonacoModule = typeof Monaco;
 
 const LANGUAGES = ["html", "javascript", "typescript", "css", "scss", "less"];
 const TRIGGERS = ['"', "'", "`", " ", "-", ":", "/"];
+// How many lines above the cursor to scan for a class context opener. Covers
+// Prettier-wrapped `cn(` blocks while staying cheap on every keystroke.
+const MAX_CONTEXT_LINES = 30;
 
 type CompiledItem = Omit<Monaco.languages.CompletionItem, "range">;
 
@@ -32,14 +35,23 @@ function compile(
 	return catalog.map((entry, index) => {
 		const hex = entry.color ? toHex(entry.color) : null;
 		const isColor = Boolean(entry.color);
+		// Right-of-row text: the resolved CSS translation when known, else the
+		// hex (for colors) or the category hint.
+		const detail = entry.css ?? hex ?? entry.detail;
 		return {
 			label: entry.name,
 			kind: isColor ? Kind.Color : Kind.Value,
 			insertText: entry.name,
 			filterText: entry.name,
-			detail: hex ?? entry.detail,
-			// Monaco reads the swatch color from documentation for Color items.
-			documentation: hex ?? undefined,
+			detail,
+			// Colors: Monaco extracts the swatch from `documentation` (a bare hex
+			// the relaxed color regex matches), since `detail` now holds CSS, not
+			// a plain color. Non-colors: show the CSS in the expandable panel.
+			documentation: isColor
+				? (hex ?? undefined)
+				: entry.css
+					? { value: `\`\`\`css\n${entry.css}\n\`\`\`` }
+					: undefined,
 			// Preserve catalog order (utilities before the long color list).
 			sortText: index.toString().padStart(6, "0"),
 		} satisfies CompiledItem;
@@ -69,7 +81,16 @@ export function registerTailwindProvider(
 	const provider: Monaco.languages.CompletionItemProvider = {
 		triggerCharacters: TRIGGERS,
 		provideCompletionItems(model, position) {
-			const before = model
+			// Feed a small multi-line window so Prettier-wrapped `cn(` calls — where
+			// the class string sits on a line below the opener — are still detected.
+			// The fragment never spans newlines, so the replacement range stays on
+			// the current line.
+			const startLine = Math.max(1, position.lineNumber - MAX_CONTEXT_LINES);
+			let before = "";
+			for (let line = startLine; line < position.lineNumber; line++) {
+				before += `${model.getLineContent(line)}\n`;
+			}
+			before += model
 				.getLineContent(position.lineNumber)
 				.slice(0, position.column - 1);
 			const context = detectTailwindContext(before, model.getLanguageId());
