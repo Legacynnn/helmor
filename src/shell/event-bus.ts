@@ -32,6 +32,8 @@ export type ShellEvent =
 	| { type: "run-script" }
 	| { type: "focus-composer" }
 	| { type: "toggle-context-panel" }
+	| { type: "toggle-browser-split" }
+	| { type: "toggle-browser-expand" }
 	| { type: "focus-active-terminal" }
 	| { type: "open-new-session-menu" }
 	// App-scoped ⌘⇧T — the mounted composer flips its terminalMode.
