@@ -5553,6 +5553,39 @@ export async function previewStopAgentControl(
 	await invoke("preview_stop_agent_control", { workspaceId });
 }
 
+// ── Simulator surface ─────────────────────────────────────────────────────────
+// Typed wrappers over the Rust `simulator_*` commands. Field names match the
+// camelCase serde of `PreviewSurfaceKind` / `SimDevice` in
+// `src-tauri/src/commands/simulator_commands.rs`.
+
+/** Which simulator platform a surface targets. Matches `PreviewSurfaceKind`. */
+export type SimSurfaceKind = "simulatorIos" | "simulatorAndroid";
+
+/** A simulator device, as returned by `simulator_list_devices`. */
+export type SimDevice = { udid: string; name: string; booted: boolean };
+
+/** List the simulator devices available for `kind`. */
+export const simulatorListDevices = (kind: SimSurfaceKind) =>
+	invoke<SimDevice[]>("simulator_list_devices", { kind });
+
+/** Boot a simulator device by udid. */
+export const simulatorBoot = (udid: string) =>
+	invoke<void>("simulator_boot", { udid });
+
+/** Capture the open simulator's screen and return the cache path. */
+export const simulatorScreenshot = () => invoke<string>("simulator_screenshot");
+
+/** Open a simulator surface for a workspace (registers the agent-control driver). */
+export const simulatorOpenSurface = (
+	workspaceId: string,
+	kind: SimSurfaceKind,
+	udid: string,
+) => invoke<void>("simulator_open_surface", { workspaceId, kind, udid });
+
+/** Close a workspace's simulator surface. */
+export const simulatorCloseSurface = (workspaceId: string) =>
+	invoke<void>("simulator_close_surface", { workspaceId });
+
 /**
  * Send a host → page inspector-bridge message into the content webview (e.g.
  * `{ kind: "set-mode", mode: "comment" }`). Mirrors `HostToBridgeMessage` in
