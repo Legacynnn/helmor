@@ -12,6 +12,7 @@
 // rect math is unit-testable without a DOM-positioned element.
 import { useEffect, useRef } from "react";
 import type { BrowserRect } from "@/lib/api";
+import { deviceRectInHost, type ViewportPreset } from "./viewport/presets";
 
 /** Logical-pixel rect from an element's bounding box (rounded to whole px). */
 export function rectFromElement(el: HTMLElement): BrowserRect {
@@ -28,11 +29,13 @@ type ContentHostProps = {
 	/** Owning workspace; scopes the agent-control surface registration. */
 	workspaceId: string;
 	url: string | null;
+	/** Active device preset; when fixed-size, the webview is constrained. */
+	viewport?: ViewportPreset | null;
 };
 
 const BOUNDS_DEBOUNCE_MS = 50;
 
-export function ContentHost({ workspaceId, url }: ContentHostProps) {
+export function ContentHost({ workspaceId, url, viewport }: ContentHostProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	// Track whether the webview has been created so navigation/bounds updates
 	// only fire once it exists.
@@ -41,6 +44,9 @@ export function ContentHost({ workspaceId, url }: ContentHostProps) {
 	urlRef.current = url;
 	const workspaceIdRef = useRef(workspaceId);
 	workspaceIdRef.current = workspaceId;
+	// Read the live preset through a ref so the bounds effect stays mount-once.
+	const viewportRef = useRef(viewport);
+	viewportRef.current = viewport;
 
 	// Create on mount (when a URL is present) + tear down on unmount. Reads the
 	// URL through a ref so this effect runs exactly once per mount.
@@ -96,10 +102,14 @@ export function ContentHost({ workspaceId, url }: ContentHostProps) {
 			if (timer) clearTimeout(timer);
 			timer = setTimeout(() => {
 				if (!createdRef.current) return;
+				const preset = viewportRef.current;
+				const rect = preset
+					? deviceRectInHost(preset, rectFromElement(host))
+					: rectFromElement(host);
 				void (async () => {
 					try {
 						const { browserSetBounds } = await import("@/lib/api");
-						await browserSetBounds(rectFromElement(host));
+						await browserSetBounds(rect);
 					} catch {
 						// No-op.
 					}
@@ -120,6 +130,24 @@ export function ContentHost({ workspaceId, url }: ContentHostProps) {
 			window.removeEventListener("resize", pushBounds);
 		};
 	}, []);
+
+	// Re-apply bounds when the device preset changes (so switching preset
+	// resizes the webview immediately, not just on the next host resize).
+	useEffect(() => {
+		const host = hostRef.current;
+		if (!host || !createdRef.current) return;
+		const rect = viewport
+			? deviceRectInHost(viewport, rectFromElement(host))
+			: rectFromElement(host);
+		void (async () => {
+			try {
+				const { browserSetBounds } = await import("@/lib/api");
+				await browserSetBounds(rect);
+			} catch {
+				// No-op.
+			}
+		})();
+	}, [viewport]);
 
 	return (
 		<div
