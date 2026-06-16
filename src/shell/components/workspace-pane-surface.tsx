@@ -27,6 +27,12 @@ import type {
 	ShellViewMode,
 } from "@/shell/controllers/use-selection-controller";
 import type { StartSurfaceActions } from "@/shell/controllers/use-start-surface-controller";
+import { useShellEvent } from "@/shell/event-bus";
+import { useBrowserSplitPanel } from "@/shell/hooks/use-browser-split-panel";
+import {
+	MAX_BROWSER_SPLIT_WIDTH,
+	MIN_BROWSER_SPLIT_WIDTH,
+} from "@/shell/layout";
 import { ShellWorkspaceConversation } from "./shell-workspace-conversation";
 import { StartSurfacePane } from "./start-surface-pane";
 
@@ -136,6 +142,32 @@ export function WorkspacePaneSurface({
 	headerLeadingNode,
 	headerActionsNode,
 }: Props) {
+	const {
+		browserSplitWidth,
+		isBrowserResizing,
+		handleBrowserResizeStart,
+		handleBrowserResizeKeyDown,
+	} = useBrowserSplitPanel();
+	const browserLayout = browserSession.state.layout;
+	const browserActive = workspaceViewMode === "browser";
+
+	useShellEvent("toggle-browser-expand", () => {
+		if (browserActive) browserSession.actions.toggleExpand();
+	});
+	useShellEvent("toggle-browser-split", () => {
+		if (browserActive) {
+			browserSession.actions.exit();
+		} else if (browserSession.state.tabs.length > 0) {
+			browserSession.actions.setLayout("split");
+			selectionActions.setViewMode("browser");
+		} else {
+			browserSession.actions.openUrl("about:blank");
+		}
+	});
+
+	const browserExpanded = browserActive && browserLayout === "expanded";
+	const browserSplit = browserActive && browserLayout === "split";
+
 	return (
 		<section
 			aria-label="Workspace panel"
@@ -156,6 +188,7 @@ export function WorkspacePaneSurface({
 			<div
 				aria-label="Workspace viewport"
 				className="relative z-20 flex min-h-0 flex-1 flex-col bg-background"
+				style={browserSplit ? { paddingRight: browserSplitWidth } : undefined}
 			>
 				{workspaceViewMode === "editor" && editorSession && (
 					<WorkspaceEditorSurface
@@ -168,22 +201,52 @@ export function WorkspacePaneSurface({
 						onError={editorSessionActions.reportError}
 					/>
 				)}
-				{workspaceViewMode === "browser" && (
-					<WorkspaceBrowserSurface
-						workspaceId={browserSession.state.workspaceId}
-						tabs={browserSession.state.tabs}
-						activeTabId={browserSession.state.activeTabId}
-						onNavigate={browserSession.actions.navigate}
-						onSelectTab={browserSession.actions.selectTab}
-						onCloseTab={browserSession.actions.closeTab}
-						onOpenUrl={browserSession.actions.openUrl}
-						onExit={browserSession.actions.exit}
-					/>
+				{browserActive && (
+					<div
+						data-shell-pane="browser-split"
+						className={
+							browserExpanded
+								? "absolute inset-0 z-30 flex min-h-0 flex-col"
+								: "absolute inset-y-0 right-0 z-30 flex min-h-0 flex-col border-border/40 border-l"
+						}
+						style={browserExpanded ? undefined : { width: browserSplitWidth }}
+					>
+						{browserSplit && (
+							<div
+								data-shell-resize-handle="browser-split"
+								role="separator"
+								aria-orientation="vertical"
+								aria-label="Resize browser panel"
+								aria-valuemin={MIN_BROWSER_SPLIT_WIDTH}
+								aria-valuemax={MAX_BROWSER_SPLIT_WIDTH}
+								aria-valuenow={browserSplitWidth}
+								tabIndex={0}
+								className="-translate-x-1/2 absolute top-0 bottom-0 left-0 z-40 w-1 cursor-ew-resize hover:bg-primary/40"
+								data-resizing={isBrowserResizing ? "" : undefined}
+								onPointerDown={handleBrowserResizeStart}
+								onKeyDown={handleBrowserResizeKeyDown}
+							/>
+						)}
+						<WorkspaceBrowserSurface
+							workspaceId={browserSession.state.workspaceId}
+							tabs={browserSession.state.tabs}
+							activeTabId={browserSession.state.activeTabId}
+							layout={browserLayout}
+							onNavigate={browserSession.actions.navigate}
+							onSelectTab={browserSession.actions.selectTab}
+							onCloseTab={browserSession.actions.closeTab}
+							onOpenUrl={browserSession.actions.openUrl}
+							onExit={browserSession.actions.exit}
+							onToggleExpand={browserSession.actions.toggleExpand}
+							onFallbackToHttp={browserSession.actions.fallbackToHttp}
+							onTabLoaded={browserSession.actions.setTabLoaded}
+						/>
+					</div>
 				)}
 				<div
 					data-focus-scope="chat"
 					className={
-						workspaceViewMode === "editor" || workspaceViewMode === "browser"
+						workspaceViewMode === "editor" || browserExpanded
 							? "hidden"
 							: "flex min-h-0 flex-1 flex-col"
 					}

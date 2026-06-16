@@ -63,6 +63,10 @@ type WorkspaceBrowserSurfaceProps = {
 	onExit: () => void;
 	layout: BrowserLayoutState;
 	onToggleExpand: () => void;
+	/** Retry the tab over plain http after an auto-upgraded https load failed. */
+	onFallbackToHttp?: (tabId: string, httpUrl: string) => void;
+	/** Clear a tab's loading flag once its load finishes. */
+	onTabLoaded?: (tabId: string) => void;
 };
 
 export function WorkspaceBrowserSurface({
