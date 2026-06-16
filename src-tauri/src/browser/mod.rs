@@ -21,7 +21,29 @@ use std::sync::{Mutex, OnceLock};
 use anyhow::{anyhow, Result};
 use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Webview, WebviewUrl};
 
+pub mod bridge;
 pub mod capture;
+
+/// Run `f` with the embedded content webview, if one exists. Returns the
+/// closure's result, or `Ok(())` when no webview is embedded (so host → page
+/// bridge evals are safe no-ops before the surface mounts).
+pub mod content_webview {
+    use super::{slot, Webview};
+    use anyhow::{anyhow, Result};
+
+    pub fn with<F>(f: F) -> Result<()>
+    where
+        F: FnOnce(&Webview) -> Result<()>,
+    {
+        let guard = slot()
+            .lock()
+            .map_err(|_| anyhow!("browser content webview lock poisoned"))?;
+        match guard.as_ref() {
+            Some(webview) => f(webview),
+            None => Ok(()),
+        }
+    }
+}
 
 /// Stable label for the embedded content webview.
 pub const BROWSER_CONTENT_LABEL: &str = "browser-content";
@@ -80,8 +102,10 @@ pub fn create(app: &AppHandle, url: &str, rect: Rect) -> Result<()> {
         .map_err(|e| anyhow!("invalid browser url {url:?}: {e}"))?;
     let builder =
         tauri::webview::WebviewBuilder::new(BROWSER_CONTENT_LABEL, WebviewUrl::External(parsed))
-            // Bridge placeholder — Phase 3 injects the inspector bridge here.
-            .initialization_script("/* helmor browser bridge placeholder */");
+            // Inject the compiled inspector bridge (Phase 3). It installs
+            // `window.__helmorBridge` and stays passive until the host sends a
+            // non-`none` mode via `bridge::eval_into_content`.
+            .initialization_script(bridge::injection_script());
 
     let webview = window
         .add_child(builder, rect.position(), rect.size())

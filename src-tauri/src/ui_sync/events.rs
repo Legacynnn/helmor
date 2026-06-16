@@ -143,6 +143,23 @@ pub enum UiMutationEvent {
         workspace_id: String,
         session_id: Option<String>,
     },
+    /// A hover-comment was pinned in the embedded content webview (Phase 3
+    /// inspector bridge). Frontends invalidate the `browserComments` query.
+    BrowserCommentPinned {
+        workspace_id: String,
+        comment_id: String,
+    },
+    /// An element was picked in the content webview's "Pick" mode. Carries the
+    /// owning workspace so the surface can surface the selection.
+    BrowserElementPicked {
+        workspace_id: String,
+    },
+    /// The inspector bridge failed to inject (CSP-blocked
+    /// `initialization_script`). The surface offers the screenshot-annotation
+    /// fallback.
+    BrowserInjectionFailed {
+        workspace_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -252,6 +269,16 @@ mod tests {
                 session_id: "s".into(),
                 reason: "extra usage not enabled".into(),
             },
+            UiMutationEvent::BrowserCommentPinned {
+                workspace_id: "w".into(),
+                comment_id: "c1".into(),
+            },
+            UiMutationEvent::BrowserElementPicked {
+                workspace_id: "w".into(),
+            },
+            UiMutationEvent::BrowserInjectionFailed {
+                workspace_id: "w".into(),
+            },
         ];
         for event in cases {
             let s = serde_json::to_string(&event).unwrap();
@@ -290,6 +317,19 @@ mod tests {
         assert_eq!(json["type"], "sessionTurnPersisted");
         assert_eq!(json["sessionId"], "abc");
         assert!(json.get("session_id").is_none());
+    }
+
+    #[test]
+    fn browser_comment_pinned_camel_case() {
+        let event = UiMutationEvent::BrowserCommentPinned {
+            workspace_id: "ws1".into(),
+            comment_id: "c1".into(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "browserCommentPinned");
+        assert_eq!(json["workspaceId"], "ws1");
+        assert_eq!(json["commentId"], "c1");
+        assert!(json.get("workspace_id").is_none());
     }
 
     #[test]

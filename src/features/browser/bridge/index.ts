@@ -21,6 +21,14 @@ export type CreateBridgeOptions = {
 	post: BridgePost;
 	/** Document to operate on. Defaults to the global `document`. */
 	doc?: Document;
+	/**
+	 * Called while an interactive mode is active and the pointer moves over an
+	 * element. The injected runtime uses this to draw the hover outline; the
+	 * core leaves it undefined so unit tests stay DOM-overlay-free.
+	 */
+	onHover?: (el: Element) => void;
+	/** Called when interactive listeners deactivate, so the overlay can clear. */
+	onHoverEnd?: () => void;
 };
 
 export type Bridge = {
@@ -68,10 +76,15 @@ export function createBridge(options: CreateBridgeOptions): Bridge {
 		}
 	}
 
-	// Hover handler is intentionally a no-op sink in the core; overlay drawing
-	// is layered on in the live-injection phase. It exists so the passive-guard
-	// contract (listeners only when active) is observable + testable.
-	function onMouseMove(_event: MouseEvent): void {}
+	// Hover handler: in the core it forwards the hovered element to the optional
+	// `onHover` callback (the injected runtime draws the outline there). When no
+	// callback is supplied it is a no-op sink, so the passive-guard contract
+	// (listeners only when active) stays observable + testable.
+	function onMouseMove(event: MouseEvent): void {
+		if (!options.onHover) return;
+		const target = event.target;
+		if (target instanceof Element) options.onHover(target);
+	}
 
 	function activateListeners(): void {
 		if (listenersActive) return;
@@ -85,6 +98,7 @@ export function createBridge(options: CreateBridgeOptions): Bridge {
 		doc.removeEventListener("mousemove", onMouseMove, true);
 		doc.removeEventListener("click", onClick, true);
 		listenersActive = false;
+		options.onHoverEnd?.();
 	}
 
 	function applyMode(): void {

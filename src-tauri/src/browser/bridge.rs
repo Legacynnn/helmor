@@ -1,0 +1,188 @@
+//! Inspector bridge injection + page↔host message routing (Phase 3).
+//!
+//! The bridge TypeScript lives in `src/features/browser/bridge/` and is
+//! compiled to `dist/bridge-bundle.js` (a single IIFE) by
+//! `bun run build:bridge`. That bundle is baked into the Rust binary at compile
+//! time via `include_str!` and attached to the content webview as its
+//! `initialization_script` (see `browser::create`).
+//!
+//! Direction of flow:
+//!   - host → page: [`eval_into_content`] calls
+//!     `window.__helmorBridge.handleMsg(<json>)` via `Webview::eval`.
+//!   - page → host: the injected runtime invokes the `browser_bridge_event`
+//!     command (see `commands::browser_commands`) with a [`BridgeMessage`].
+
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
+
+use super::content_webview;
+
+/// The compiled bridge IIFE. Built from `src/features/browser/bridge/` via
+/// `bun run build:bridge` (wired into `dev:prepare` + `build`) BEFORE
+/// `cargo build` — `include_str!` resolves at compile time, so a missing
+/// bundle fails the build loudly rather than silently shipping no bridge.
+const BRIDGE_BUNDLE: &str = include_str!("../../../dist/bridge-bundle.js");
+
+/// The full `initialization_script` value for the content webview. The bundle
+/// already self-invokes as an IIFE and installs `window.__helmorBridge`, so no
+/// extra wrapper is needed.
+pub fn injection_script() -> &'static str {
+    BRIDGE_BUNDLE
+}
+
+/// A buffered console entry mirrored from the page-side collector.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsoleEntry {
+    pub level: String,
+    pub message: String,
+    pub ts: f64,
+}
+
+/// A buffered network entry mirrored from the page-side collector.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkEntry {
+    pub url: String,
+    pub method: String,
+    pub status: Option<i64>,
+    pub duration_ms: f64,
+    pub failed: bool,
+}
+
+/// A DOM selection (selector + outerHTML + rect) captured by comment / pick.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Selection {
+    pub selector: String,
+    // The page contract spells this `outerHTML` (DOM casing), which serde's
+    // blanket camelCase would render as `outerHtml` — so rename explicitly.
+    #[serde(rename = "outerHTML")]
+    pub outer_html: String,
+    #[serde(default)]
+    pub computed_styles: Option<serde_json::Value>,
+    pub rect: serde_json::Value,
+}
+
+/// Page → host message. Mirrors `BridgeToHostMessage` in
+/// `src/features/browser/bridge/channel.ts` (`kind`-tagged union, camelCase).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum BridgeMessage {
+    CommentAdded {
+        id: String,
+        text: String,
+        selection: Selection,
+    },
+    ElementPicked {
+        selection: Selection,
+    },
+    ConsoleError {
+        entry: ConsoleEntry,
+    },
+    NetworkEvent {
+        entry: NetworkEntry,
+    },
+    CaptureResult {
+        base64: String,
+    },
+}
+
+/// Eval a host → page message into the content webview, invoking
+/// `window.__helmorBridge.handleMsg(<json>)`. No-op (Ok) if the webview is not
+/// embedded. `payload` is any serializable `HostToBridgeMessage` shape.
+pub fn eval_into_content<T: Serialize>(payload: &T) -> Result<()> {
+    let json = serde_json::to_string(payload)
+        .map_err(|e| anyhow!("failed to serialize bridge message: {e}"))?;
+    // `json` is valid JSON; embed it as a JS literal argument.
+    let script =
+        format!("if (window.__helmorBridge) {{ window.__helmorBridge.handleMsg({json}); }}");
+    content_webview::with(|webview| {
+        webview
+            .eval(&script)
+            .map_err(|e| anyhow!("failed to eval bridge message into content webview: {e}"))
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bridge_bundle_is_non_empty_and_exports_handle() {
+        let script = injection_script();
+        assert!(
+            !script.is_empty(),
+            "bridge-bundle.js must be built (bun run build:bridge) before cargo build"
+        );
+        assert!(
+            script.contains("__helmorBridge"),
+            "bridge bundle must install window.__helmorBridge"
+        );
+    }
+
+    #[test]
+    fn comment_added_message_deserializes_from_camel_case() {
+        let json = r##"{
+            "kind": "comment-added",
+            "id": "c1",
+            "text": "fix spacing",
+            "selection": {
+                "selector": "#hero",
+                "outerHTML": "<div id=\"hero\"></div>",
+                "rect": { "x": 1, "y": 2, "width": 3, "height": 4 }
+            }
+        }"##;
+        let msg: BridgeMessage = serde_json::from_str(json).unwrap();
+        match msg {
+            BridgeMessage::CommentAdded {
+                id,
+                text,
+                selection,
+                ..
+            } => {
+                assert_eq!(id, "c1");
+                assert_eq!(text, "fix spacing");
+                assert_eq!(selection.selector, "#hero");
+            }
+            other => panic!("wrong variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn element_picked_message_deserializes() {
+        let json = r#"{
+            "kind": "element-picked",
+            "selection": {
+                "selector": "button.cta",
+                "outerHTML": "<button></button>",
+                "rect": {}
+            }
+        }"#;
+        let msg: BridgeMessage = serde_json::from_str(json).unwrap();
+        assert!(matches!(msg, BridgeMessage::ElementPicked { .. }));
+    }
+
+    #[test]
+    fn network_event_uses_camel_case_duration_field() {
+        let json = r#"{
+            "kind": "network-event",
+            "entry": {
+                "url": "https://x.test/api",
+                "method": "GET",
+                "status": 500,
+                "durationMs": 42,
+                "failed": true
+            }
+        }"#;
+        let msg: BridgeMessage = serde_json::from_str(json).unwrap();
+        match msg {
+            BridgeMessage::NetworkEvent { entry } => {
+                assert_eq!(entry.status, Some(500));
+                assert!((entry.duration_ms - 42.0).abs() < f64::EPSILON);
+                assert!(entry.failed);
+            }
+            other => panic!("wrong variant: {other:?}"),
+        }
+    }
+}

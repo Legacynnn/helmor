@@ -12,8 +12,9 @@
 use serde::Deserialize;
 
 use super::common::{run_blocking, CmdResult};
-use crate::browser;
+use crate::browser::{self, bridge::BridgeMessage};
 use crate::models::browser::{self as browser_model, BrowserTab, NewBrowserTab};
+use crate::ui_sync::{self, UiMutationEvent};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -103,6 +104,58 @@ pub async fn browser_destroy(app: tauri::AppHandle) -> CmdResult<()> {
 #[tauri::command]
 pub async fn browser_capture(session_id: String, base64_png: String) -> CmdResult<String> {
     run_blocking(move || browser::capture::save_capture_png(&session_id, &base64_png)).await
+}
+
+/// Receive a page → host inspector-bridge message from the embedded content
+/// webview and fan it out to the frontend as a `UiMutationEvent`.
+///
+/// The injected runtime (`bridge/injected.ts`) invokes this with the
+/// `BridgeToHostMessage` shape. `workspace_id` is the owning workspace so the
+/// surface can scope comment / pick state. Console + network entries are
+/// accepted (so the collectors have a sink) but only logged for now — the
+/// console/network UI lands in a later wave.
+#[tauri::command]
+pub async fn browser_bridge_event(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    message: BridgeMessage,
+) -> CmdResult<()> {
+    match message {
+        BridgeMessage::CommentAdded { id, .. } => {
+            ui_sync::publish(
+                &app,
+                UiMutationEvent::BrowserCommentPinned {
+                    workspace_id,
+                    comment_id: id,
+                },
+            );
+        }
+        BridgeMessage::ElementPicked { .. } => {
+            ui_sync::publish(&app, UiMutationEvent::BrowserElementPicked { workspace_id });
+        }
+        BridgeMessage::ConsoleError { entry } => {
+            tracing::debug!(
+                workspace_id,
+                level = entry.level,
+                message = entry.message,
+                "browser bridge: console entry"
+            );
+        }
+        BridgeMessage::NetworkEvent { entry } => {
+            tracing::debug!(
+                workspace_id,
+                url = entry.url,
+                status = entry.status,
+                failed = entry.failed,
+                "browser bridge: network entry"
+            );
+        }
+        BridgeMessage::CaptureResult { .. } => {
+            // Capture results resolve a pending capture promise host-side; the
+            // dedicated capture command owns persistence, so this is a no-op.
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
