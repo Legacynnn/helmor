@@ -5524,10 +5524,11 @@ export type BrowserRect = {
 
 /** Embed (or re-target) the content webview at `rect` navigated to `url`. */
 export async function browserCreate(
+	workspaceId: string,
 	url: string,
 	rect: BrowserRect,
 ): Promise<void> {
-	await invoke("browser_create", { url, rect });
+	await invoke("browser_create", { workspaceId, url, rect });
 }
 
 /** Navigate the embedded content webview to `url`. */
@@ -5541,8 +5542,8 @@ export async function browserSetBounds(rect: BrowserRect): Promise<void> {
 }
 
 /** Tear down the embedded content webview. */
-export async function browserDestroy(): Promise<void> {
-	await invoke("browser_destroy");
+export async function browserDestroy(workspaceId: string): Promise<void> {
+	await invoke("browser_destroy", { workspaceId });
 }
 
 /** Kill switch: revoke agent control of a workspace's preview surface. */

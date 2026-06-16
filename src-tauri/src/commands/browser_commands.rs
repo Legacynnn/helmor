@@ -75,8 +75,13 @@ impl From<RectInput> for browser::Rect {
 
 /// Embed (or re-target) the content webview at `rect` navigated to `url`.
 #[tauri::command]
-pub async fn browser_create(app: tauri::AppHandle, url: String, rect: RectInput) -> CmdResult<()> {
-    Ok(browser::create(&app, &url, rect.into())?)
+pub async fn browser_create(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    url: String,
+    rect: RectInput,
+) -> CmdResult<()> {
+    Ok(browser::create(&app, &workspace_id, &url, rect.into())?)
 }
 
 /// Navigate the embedded content webview to `url`.
@@ -93,8 +98,8 @@ pub async fn browser_set_bounds(app: tauri::AppHandle, rect: RectInput) -> CmdRe
 
 /// Tear down the embedded content webview.
 #[tauri::command]
-pub async fn browser_destroy(app: tauri::AppHandle) -> CmdResult<()> {
-    Ok(browser::destroy(&app)?)
+pub async fn browser_destroy(app: tauri::AppHandle, workspace_id: String) -> CmdResult<()> {
+    Ok(browser::destroy(&app, &workspace_id)?)
 }
 
 /// Save a browser-captured screenshot (base64 PNG from the content-webview

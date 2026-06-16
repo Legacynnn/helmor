@@ -248,14 +248,12 @@ export function WorkspaceBrowserSurface({
 					screenshotSrc={null}
 					onDismiss={() => store.getState().setInjectionBlocked(false)}
 				/>
-			) : (
+			) : workspaceId ? (
 				<div className="relative flex min-h-0 flex-1">
-					{workspaceId ? (
-						<AgentControlBanner workspaceId={workspaceId} />
-					) : null}
-					<ContentHost url={current?.url ?? null} />
+					<AgentControlBanner workspaceId={workspaceId} />
+					<ContentHost workspaceId={workspaceId} url={current?.url ?? null} />
 				</div>
-			)}
+			) : null}
 
 			{consoleOpen ? (
 				<ConsoleNetworkPanel

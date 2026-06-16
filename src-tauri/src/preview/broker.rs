@@ -236,4 +236,82 @@ mod tests {
         reg.clear_controlled("ws1");
         assert!(!reg.is_controlled("ws1"));
     }
+
+    #[test]
+    fn register_then_unregister_round_trips_resolution() {
+        struct Dummy;
+        #[async_trait::async_trait]
+        impl crate::preview::PreviewDriver for Dummy {
+            async fn status(&self) -> crate::preview::PreviewResult<crate::preview::PreviewStatus> {
+                Ok(crate::preview::PreviewStatus {
+                    surface_kind: crate::preview::PreviewSurfaceKind::Browser,
+                    present: true,
+                    url: None,
+                    title: None,
+                })
+            }
+            async fn open(&self, _t: String) -> crate::preview::PreviewResult<()> {
+                Ok(())
+            }
+            async fn navigate(&self, _u: String) -> crate::preview::PreviewResult<()> {
+                Ok(())
+            }
+            async fn snapshot(
+                &self,
+            ) -> crate::preview::PreviewResult<crate::preview::PreviewSnapshot> {
+                unreachable!()
+            }
+            async fn click(
+                &self,
+                _t: crate::preview::PreviewTarget,
+            ) -> crate::preview::PreviewResult<()> {
+                Ok(())
+            }
+            async fn type_text(
+                &self,
+                _t: crate::preview::PreviewTarget,
+                _x: String,
+            ) -> crate::preview::PreviewResult<()> {
+                Ok(())
+            }
+            async fn press(&self, _k: String) -> crate::preview::PreviewResult<()> {
+                Ok(())
+            }
+            async fn scroll(
+                &self,
+                _t: Option<crate::preview::PreviewTarget>,
+                _dx: f64,
+                _dy: f64,
+            ) -> crate::preview::PreviewResult<()> {
+                Ok(())
+            }
+            async fn evaluate(
+                &self,
+                _s: String,
+            ) -> crate::preview::PreviewResult<serde_json::Value> {
+                Ok(serde_json::Value::Null)
+            }
+            async fn wait_for(
+                &self,
+                _c: crate::preview::WaitCondition,
+                _t: u64,
+            ) -> crate::preview::PreviewResult<()> {
+                Ok(())
+            }
+        }
+        let reg = SurfaceRegistry::new();
+        reg.register(
+            "ws1",
+            RegisteredSurface {
+                kind: PreviewSurfaceKind::Browser,
+                driver: std::sync::Arc::new(Dummy),
+            },
+        );
+        assert!(reg.resolve("ws1").is_ok());
+        reg.unregister("ws1");
+        assert_eq!(
+            reg.resolve("ws1").err(),
+            Some(crate::preview::PreviewError::NoSurface)
+        );
+    }
 }

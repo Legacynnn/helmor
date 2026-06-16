@@ -25,30 +25,35 @@ export function rectFromElement(el: HTMLElement): BrowserRect {
 }
 
 type ContentHostProps = {
+	/** Owning workspace; scopes the agent-control surface registration. */
+	workspaceId: string;
 	url: string | null;
 };
 
 const BOUNDS_DEBOUNCE_MS = 50;
 
-export function ContentHost({ url }: ContentHostProps) {
+export function ContentHost({ workspaceId, url }: ContentHostProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	// Track whether the webview has been created so navigation/bounds updates
 	// only fire once it exists.
 	const createdRef = useRef(false);
 	const urlRef = useRef(url);
 	urlRef.current = url;
+	const workspaceIdRef = useRef(workspaceId);
+	workspaceIdRef.current = workspaceId;
 
 	// Create on mount (when a URL is present) + tear down on unmount. Reads the
 	// URL through a ref so this effect runs exactly once per mount.
 	useEffect(() => {
 		const host = hostRef.current;
 		const initialUrl = urlRef.current;
+		const wsId = workspaceIdRef.current;
 		if (!host || !initialUrl) return;
 
 		void (async () => {
 			try {
 				const { browserCreate } = await import("@/lib/api");
-				await browserCreate(initialUrl, rectFromElement(host));
+				await browserCreate(wsId, initialUrl, rectFromElement(host));
 				createdRef.current = true;
 			} catch {
 				// No-op under jsdom / when the Tauri bridge is unavailable.
@@ -60,7 +65,7 @@ export function ContentHost({ url }: ContentHostProps) {
 			void (async () => {
 				try {
 					const { browserDestroy } = await import("@/lib/api");
-					await browserDestroy();
+					await browserDestroy(wsId);
 				} catch {
 					// No-op.
 				}

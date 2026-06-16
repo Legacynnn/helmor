@@ -19,7 +19,10 @@
 use std::sync::{Mutex, OnceLock};
 
 use anyhow::{anyhow, Result};
+use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Webview, WebviewUrl};
+
+use crate::ui_sync::{self, UiMutationEvent};
 
 pub mod bridge;
 pub mod capture;
@@ -80,7 +83,12 @@ fn slot() -> &'static Mutex<Option<Webview>> {
 
 /// Create the content webview at `rect` navigated to `url`, or — if it already
 /// exists — navigate it to `url` and reposition it to `rect` (idempotent).
-pub fn create(app: &AppHandle, url: &str, rect: Rect) -> Result<()> {
+///
+/// `workspace_id` is the owning workspace; the embedded surface registers a
+/// `BrowserDriver` under it in the agent-control broker so `preview.*` host
+/// calls can resolve it (Decision D7).
+pub fn create(app: &AppHandle, workspace_id: &str, url: &str, rect: Rect) -> Result<()> {
+    register_surface(app, workspace_id);
     {
         let guard = slot()
             .lock()
@@ -100,12 +108,23 @@ pub fn create(app: &AppHandle, url: &str, rect: Rect) -> Result<()> {
     let parsed = url
         .parse()
         .map_err(|e| anyhow!("invalid browser url {url:?}: {e}"))?;
+    let load_app = app.clone();
     let builder =
         tauri::webview::WebviewBuilder::new(BROWSER_CONTENT_LABEL, WebviewUrl::External(parsed))
             // Inject the compiled inspector bridge (Phase 3). It installs
             // `window.__helmorBridge` and stays passive until the host sends a
             // non-`none` mode via `bridge::eval_into_content`.
-            .initialization_script(bridge::injection_script());
+            .initialization_script(bridge::injection_script())
+            // Emit page-load lifecycle so the surface can drive its loading
+            // indicator and the frontend https→http fallback timer.
+            .on_page_load(move |_webview, payload| {
+                let url = payload.url().to_string();
+                let event = match payload.event() {
+                    PageLoadEvent::Started => UiMutationEvent::BrowserLoadStarted { url },
+                    PageLoadEvent::Finished => UiMutationEvent::BrowserLoadFinished { url },
+                };
+                ui_sync::publish(&load_app, event);
+            });
 
     let webview = window
         .add_child(builder, rect.position(), rect.size())
@@ -140,9 +159,23 @@ pub fn set_bounds(_app: &AppHandle, rect: Rect) -> Result<()> {
     apply_bounds(webview, rect)
 }
 
+/// Register a `BrowserDriver` for `workspace_id` in the agent-control broker so
+/// `preview.*` host calls can resolve this surface. Idempotent.
+fn register_surface(app: &AppHandle, workspace_id: &str) {
+    crate::preview::broker::registry().register(
+        workspace_id,
+        crate::preview::broker::RegisteredSurface {
+            kind: crate::preview::PreviewSurfaceKind::Browser,
+            driver: crate::preview::browser_driver::BrowserDriver::new(app.clone()),
+        },
+    );
+}
+
 /// Tear down the embedded content webview, releasing the platform layer.
-/// Idempotent: a no-op when nothing is embedded.
-pub fn destroy(_app: &AppHandle) -> Result<()> {
+/// Idempotent: a no-op when nothing is embedded. Also unregisters the
+/// workspace's surface from the agent-control broker.
+pub fn destroy(_app: &AppHandle, workspace_id: &str) -> Result<()> {
+    crate::preview::broker::registry().unregister(workspace_id);
     let mut guard = slot()
         .lock()
         .map_err(|_| anyhow!("browser content webview lock poisoned"))?;
