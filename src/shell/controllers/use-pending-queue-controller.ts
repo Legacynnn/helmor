@@ -90,6 +90,9 @@ export function usePendingQueueController(
 					item.label.trim().length > 0 && item.submitText.trim().length > 0
 				);
 			}
+			if (item.kind === "browser-capture") {
+				return item.capturePath.length > 0;
+			}
 			return item.path.length > 0;
 		});
 		if (items.length === 0) return;

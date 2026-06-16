@@ -82,7 +82,8 @@ export type ComposerInsertItem =
 			preview?: ComposerPreviewPayload | null;
 			source?: ContextCardSource;
 			stateTone?: ContextCardStateTone;
-	  };
+	  }
+	| { kind: "browser-capture"; capturePath: string; summary: string };
 
 function truncateComposerPreviewLabel(label: string): string {
 	if (label.length <= COMPOSER_PREVIEW_LABEL_MAX_CHARS) {

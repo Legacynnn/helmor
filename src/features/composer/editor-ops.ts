@@ -6,6 +6,7 @@ import {
 	$isElementNode,
 	$isTextNode,
 } from "lexical";
+import { $createBrowserCaptureBadgeNode } from "@/features/composer/editor/browser-capture-badge-node";
 import { $createCustomTagBadgeNode } from "@/features/composer/editor/custom-tag-badge-node";
 import { $createFileBadgeNode } from "@/features/composer/editor/file-badge-node";
 import { $createImageBadgeNode } from "@/features/composer/editor/image-badge-node";
@@ -145,6 +146,10 @@ export function $appendComposerInsertItems(items: ComposerInsertItem[]) {
 			paragraph.append($createFileBadgeNode(item.path));
 		} else if (item.kind === "image") {
 			paragraph.append($createImageBadgeNode(item.path));
+		} else if (item.kind === "browser-capture") {
+			paragraph.append(
+				$createBrowserCaptureBadgeNode(item.capturePath, item.summary),
+			);
 		} else {
 			paragraph.append(
 				$createCustomTagBadgeNode({

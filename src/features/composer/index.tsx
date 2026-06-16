@@ -69,6 +69,7 @@ import {
 	type AddDirPickerEntry,
 	AddDirTypeaheadPlugin,
 } from "./editor/add-dir/typeahead-plugin";
+import { BrowserCaptureBadgeNode } from "./editor/browser-capture-badge-node";
 import { CustomTagBadgeNode } from "./editor/custom-tag-badge-node";
 import { FileBadgeNode } from "./editor/file-badge-node";
 import { ImageBadgeNode } from "./editor/image-badge-node";
@@ -557,6 +558,7 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 			AddDirTriggerNode,
 			ShimmerKeywordNode,
 			TerminalDirectiveNode,
+			BrowserCaptureBadgeNode,
 		],
 		onError: onEditorError,
 	}).current;

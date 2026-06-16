@@ -11,6 +11,7 @@ import {
 	$isTextNode,
 } from "lexical";
 import type { ComposerCustomTag } from "@/lib/composer-insert";
+import { $isBrowserCaptureBadgeNode } from "./browser-capture-badge-node";
 import { $isCustomTagBadgeNode } from "./custom-tag-badge-node";
 import { $isFileBadgeNode } from "./file-badge-node";
 import { $isImageBadgeNode } from "./image-badge-node";
@@ -47,6 +48,15 @@ export function $extractComposerContent(): {
 						textParts.push(" ");
 					}
 					textParts.push(`@${path}`);
+				} else if ($isBrowserCaptureBadgeNode(child)) {
+					const capturePath = child.getCapturePath();
+					images.push(capturePath);
+					// Ensure space before @ref so chat regex can match each one
+					const last = textParts[textParts.length - 1];
+					if (last && !last.endsWith(" ") && !last.endsWith("\n")) {
+						textParts.push(" ");
+					}
+					textParts.push(`@${capturePath}`);
 				} else if ($isFileBadgeNode(child)) {
 					const path = child.getFilePath();
 					files.push(path);
