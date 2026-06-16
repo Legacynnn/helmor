@@ -237,6 +237,35 @@ mod tests {
         assert!(!reg.is_controlled("ws1"));
     }
 
+    #[tokio::test]
+    async fn broker_resolves_simulator_surface() {
+        use crate::preview::simulator_driver::{ProcessExecutor, SimulatorDriver};
+        use std::sync::Arc;
+
+        let reg = SurfaceRegistry::new();
+        // Mirror `simulator_open_surface`: register a SimulatorDriver under the
+        // workspace so the broker resolves a simulator surface for it.
+        reg.register(
+            "ws-1",
+            RegisteredSurface {
+                kind: PreviewSurfaceKind::SimulatorIos,
+                driver: Arc::new(SimulatorDriver::new(
+                    PreviewSurfaceKind::SimulatorIos,
+                    "UDID-1".into(),
+                    Arc::new(ProcessExecutor),
+                )),
+            },
+        );
+
+        let surface = reg.resolve("ws-1").expect("simulator surface resolves");
+        assert_eq!(surface.kind, PreviewSurfaceKind::SimulatorIos);
+        let status = surface.driver.status().await.unwrap();
+        assert_eq!(status.surface_kind, PreviewSurfaceKind::SimulatorIos);
+
+        reg.unregister("ws-1");
+        assert_eq!(reg.resolve("ws-1").err(), Some(PreviewError::NoSurface));
+    }
+
     #[test]
     fn register_then_unregister_round_trips_resolution() {
         struct Dummy;
