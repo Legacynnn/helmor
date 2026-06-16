@@ -156,6 +156,9 @@ export function useBrowserSessionController(
 		state: { workspaceId: selectedWorkspaceId, tabs, activeTabId, layout },
 		actions: {
 			openUrl,
+			// D11: one live child-webview; selecting a tab only flips activeTabId.
+			// The single content webview is re-navigated by `ContentHost`'s
+			// url-change effect — there is never more than one live webview.
 			selectTab: setActiveTabId,
 			closeTab: closeTabAction,
 			navigate,

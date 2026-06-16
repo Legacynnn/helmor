@@ -91,6 +91,52 @@ describe("useBrowserSessionController", () => {
 		expect(result.current.state.activeTabId).toBe(firstId);
 	});
 
+	it("switching tabs keeps a single live surface (selects, does not re-open)", () => {
+		const enterBrowserMode = vi.fn();
+		const { result } = renderHook(
+			() =>
+				useBrowserSessionController({
+					selectedWorkspaceId: "ws1",
+					enterBrowserMode,
+					exitBrowserMode: vi.fn(),
+				}),
+			{ wrapper },
+		);
+		act(() => result.current.actions.openUrl("http://a"));
+		act(() => result.current.actions.openUrl("http://b"));
+		const firstId = result.current.state.tabs[0].id;
+
+		enterBrowserMode.mockClear();
+		act(() => result.current.actions.selectTab(firstId));
+
+		// Selecting an existing tab must NOT re-enter browser mode (no new surface).
+		expect(enterBrowserMode).not.toHaveBeenCalled();
+		expect(result.current.state.activeTabId).toBe(firstId);
+		// Exactly the two tabs that were opened — no duplicate/extra live tab.
+		expect(result.current.state.tabs).toHaveLength(2);
+	});
+
+	it("only the active tab carries the live url; others are inert state", () => {
+		const { result } = renderHook(
+			() =>
+				useBrowserSessionController({
+					selectedWorkspaceId: "ws1",
+					enterBrowserMode: vi.fn(),
+					exitBrowserMode: vi.fn(),
+				}),
+			{ wrapper },
+		);
+		act(() => result.current.actions.openUrl("http://a"));
+		act(() => result.current.actions.openUrl("http://b"));
+		const activeId = result.current.state.activeTabId;
+		// Navigate only mutates the ACTIVE tab — background tabs stay frozen.
+		act(() => result.current.actions.navigate("http://b2"));
+		const active = result.current.state.tabs.find((t) => t.id === activeId);
+		const background = result.current.state.tabs.find((t) => t.id !== activeId);
+		expect(active?.url).toBe("http://b2");
+		expect(background?.url).toBe("http://a");
+	});
+
 	it("defaults layout to split and resets to split on openUrl", () => {
 		const { result } = renderHook(
 			() =>
