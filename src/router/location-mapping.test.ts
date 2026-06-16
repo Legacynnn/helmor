@@ -240,26 +240,28 @@ describe("locationToViewInfo", () => {
 		expect(locationToViewInfo({ pathname: "/start", search: {} })).toEqual({
 			isStart: true,
 			isEditor: false,
+			isBrowser: false,
 		});
 		expect(locationToViewInfo({ pathname: "/", search: {} })).toEqual({
 			isStart: false,
 			isEditor: false,
+			isBrowser: false,
 		});
 		expect(
 			locationToViewInfo({ pathname: "/w/ws1/s/sess1", search: {} }),
-		).toEqual({ isStart: false, isEditor: false });
+		).toEqual({ isStart: false, isEditor: false, isBrowser: false });
 	});
 
 	it("flags ?view=editor as editor", () => {
 		expect(
 			locationToViewInfo({ pathname: "/w/ws1", search: { view: "editor" } }),
-		).toEqual({ isStart: false, isEditor: true });
+		).toEqual({ isStart: false, isEditor: true, isBrowser: false });
 		expect(
 			locationToViewInfo({
 				pathname: "/w/ws1/s/sess1",
 				search: { view: "editor" },
 			}),
-		).toEqual({ isStart: false, isEditor: true });
+		).toEqual({ isStart: false, isEditor: true, isBrowser: false });
 	});
 
 	it("treats an absent or conversation view as conversation (not editor)", () => {
@@ -410,7 +412,7 @@ describe("router location round-trips through the mapping", () => {
 				pathname: router.state.location.pathname,
 				search: router.state.location.search,
 			}),
-		).toEqual({ isStart: false, isEditor: false });
+		).toEqual({ isStart: false, isEditor: false, isBrowser: false });
 	});
 
 	it("keeps ?view=editor in the stored search", async () => {
@@ -428,7 +430,7 @@ describe("router location round-trips through the mapping", () => {
 				pathname: router.state.location.pathname,
 				search: router.state.location.search,
 			}),
-		).toEqual({ isStart: false, isEditor: true });
+		).toEqual({ isStart: false, isEditor: true, isBrowser: false });
 	});
 
 	it("navigates to the distinct /start route", async () => {
@@ -441,7 +443,7 @@ describe("router location round-trips through the mapping", () => {
 				pathname: router.state.location.pathname,
 				search: router.state.location.search,
 			}),
-		).toEqual({ isStart: true, isEditor: false });
+		).toEqual({ isStart: true, isEditor: false, isBrowser: false });
 	});
 
 	it("a bogus ?view never throws and falls back to conversation", async () => {

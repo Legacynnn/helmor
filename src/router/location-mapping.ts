@@ -63,10 +63,13 @@ export type SelectionLocation =
 			search: WorkspaceSearch;
 	  };
 
-// Editor carries `view: "editor"`; everything non-editor is "conversation"
-// (which the route's strip middleware keeps out of the URL).
+// Editor carries `view: "editor"`, browser carries `view: "browser"`;
+// everything else is "conversation" (which the route's strip middleware keeps
+// out of the URL).
 function viewSearch(viewMode: ShellViewMode): WorkspaceSearch {
-	return { view: viewMode === "editor" ? "editor" : "conversation" };
+	if (viewMode === "editor") return { view: "editor" };
+	if (viewMode === "browser") return { view: "browser" };
+	return { view: "conversation" };
 }
 
 /**
@@ -146,6 +149,7 @@ export function pathToSelection(pathname: string): PathSelection {
 export type LocationViewInfo = {
 	isStart: boolean;
 	isEditor: boolean;
+	isBrowser: boolean;
 };
 
 /**
@@ -170,6 +174,7 @@ export function locationToViewInfo({
 	return {
 		isStart: pathname === "/start",
 		isEditor: (search as { view?: string }).view === "editor",
+		isBrowser: (search as { view?: string }).view === "browser",
 	};
 }
 
@@ -203,13 +208,18 @@ export function locationToSelection({
 	pathname: string;
 	search: { view?: string } | Record<string, unknown>;
 }): LocationSelection {
-	const { isStart, isEditor } = locationToViewInfo({ pathname, search });
+	const { isStart, isEditor, isBrowser } = locationToViewInfo({
+		pathname,
+		search,
+	});
 	const { workspaceId, sessionId } = pathToSelection(pathname);
 	const viewMode: ShellViewMode = isStart
 		? "start"
 		: isEditor
 			? "editor"
-			: "conversation";
+			: isBrowser
+				? "browser"
+				: "conversation";
 	return { workspaceId, sessionId, viewMode };
 }
 

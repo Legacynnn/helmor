@@ -69,10 +69,16 @@ function alreadyAtTarget(input: SelectionLocationInput): boolean {
 	if (!samePath) return false;
 	const targetIsStart = input.viewMode === "start";
 	const targetIsEditor = input.viewMode === "editor";
+	const targetIsBrowser = input.viewMode === "browser";
 	const currentIsStart = current.pathname === "/start";
-	const currentIsEditor =
-		(current.search as { view?: string }).view === "editor";
-	return currentIsStart === targetIsStart && currentIsEditor === targetIsEditor;
+	const currentView = (current.search as { view?: string }).view;
+	const currentIsEditor = currentView === "editor";
+	const currentIsBrowser = currentView === "browser";
+	return (
+		currentIsStart === targetIsStart &&
+		currentIsEditor === targetIsEditor &&
+		currentIsBrowser === targetIsBrowser
+	);
 }
 
 /**

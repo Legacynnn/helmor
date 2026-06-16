@@ -35,7 +35,7 @@ interface RouterContext {
 // The `?view` search param encodes conversation-vs-editor on the workspace
 // routes. It is the URL representation of the non-"start" half of
 // `ShellViewMode` ("conversation" | "editor"). Default is "conversation".
-export type WorkspaceViewParam = "conversation" | "editor";
+export type WorkspaceViewParam = "conversation" | "editor" | "browser";
 
 export type WorkspaceSearch = {
 	view: WorkspaceViewParam;
@@ -72,7 +72,10 @@ function validateWorkspaceSearch(
 	search: Record<string, unknown>,
 ): WorkspaceSearch & RootSearch {
 	return {
-		view: search.view === "editor" ? "editor" : "conversation",
+		view:
+			search.view === "editor" || search.view === "browser"
+				? (search.view as WorkspaceViewParam)
+				: "conversation",
 		// Carry the root-level `screen` param through so the workspace routes
 		// don't strip an active top-level screen out of the location.
 		...validateRootSearch(search),
