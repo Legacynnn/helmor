@@ -1,0 +1,89 @@
+---
+source: tests/simulator_parsing.rs
+expression: parsed
+---
+{
+  "a11yTree": [
+    {
+      "AXFrame": "{{0, 44}, {390, 50}}",
+      "AXLabel": "Sign in",
+      "AXUniqueId": "login-title",
+      "AXValue": null,
+      "frame": {
+        "height": 50,
+        "width": 390,
+        "x": 0,
+        "y": 44
+      },
+      "role_description": "text",
+      "title": null,
+      "type": "StaticText"
+    },
+    {
+      "AXFrame": "{{20, 120}, {350, 44}}",
+      "AXLabel": "Email",
+      "AXUniqueId": "email-field",
+      "AXValue": "",
+      "frame": {
+        "height": 44,
+        "width": 350,
+        "x": 20,
+        "y": 120
+      },
+      "role_description": "text field",
+      "title": null,
+      "type": "TextField"
+    },
+    {
+      "AXFrame": "{{20, 320}, {350, 50}}",
+      "AXLabel": "Continue",
+      "AXUniqueId": "submit-btn",
+      "AXValue": null,
+      "frame": {
+        "height": 50,
+        "width": 350,
+        "x": 20,
+        "y": 320
+      },
+      "role_description": "button",
+      "title": "Continue",
+      "type": "Button"
+    }
+  ],
+  "interactiveElements": [
+    {
+      "role": "TextField",
+      "name": "Email",
+      "selector": "email-field"
+    },
+    {
+      "role": "Button",
+      "name": "Continue",
+      "selector": "submit-btn"
+    }
+  ],
+  "visibleText": "Sign in Email Continue Continue",
+  "rects": [
+    {
+      "selector": "login-title",
+      "x": 0.0,
+      "y": 44.0,
+      "width": 390.0,
+      "height": 50.0
+    },
+    {
+      "selector": "email-field",
+      "x": 20.0,
+      "y": 120.0,
+      "width": 350.0,
+      "height": 44.0
+    },
+    {
+      "selector": "submit-btn",
+      "x": 20.0,
+      "y": 320.0,
+      "width": 350.0,
+      "height": 50.0
+    }
+  ]
+}

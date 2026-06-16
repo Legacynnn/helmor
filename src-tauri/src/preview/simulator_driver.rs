@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::preview::driver::{PreviewError, PreviewResult, PreviewSurfaceKind};
+use crate::preview::driver::{InteractiveElement, PreviewError, PreviewResult, PreviewSurfaceKind};
 
 /// A single tool invocation expressed as program + args. Pure — building one
 /// spawns nothing.
@@ -171,6 +171,108 @@ pub fn required_tools(kind: PreviewSurfaceKind) -> Vec<&'static str> {
 pub struct ToolingReport {
     pub ready: bool,
     pub missing: Vec<String>,
+}
+
+/// A node's bounds in device-pixel space. Feeds click-target resolution
+/// (center = `x + width/2`, `y + height/2`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ElementRect {
+    pub selector: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl ElementRect {
+    #[allow(dead_code)] // used by SimulatorDriver::click in Task 7
+    fn center(&self) -> (f64, f64) {
+        (self.x + self.width / 2.0, self.y + self.height / 2.0)
+    }
+}
+
+/// The shared parse output of `idb ui describe-all` and `uiautomator dump`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotParse {
+    pub a11y_tree: serde_json::Value,
+    pub interactive_elements: Vec<InteractiveElement>,
+    pub visible_text: String,
+    pub rects: Vec<ElementRect>,
+}
+
+/// iOS tappable a11y types (idb `type` field).
+fn ios_is_tappable(ty: &str) -> bool {
+    matches!(ty, "Button" | "TextField" | "Link" | "Switch" | "Cell")
+}
+
+/// Parse `idb ui describe-all` JSON (an array of a11y nodes) into snapshot
+/// pieces. The raw JSON becomes `a11y_tree` verbatim.
+pub fn parse_idb_describe_all(json: &str) -> PreviewResult<SnapshotParse> {
+    let value: serde_json::Value = serde_json::from_str(json)
+        .map_err(|e| PreviewError::driver(format!("idb describe-all parse: {e}")))?;
+    let nodes = value
+        .as_array()
+        .ok_or_else(|| PreviewError::driver("idb describe-all: expected a JSON array"))?;
+
+    let mut interactive_elements = Vec::new();
+    let mut rects = Vec::new();
+    let mut visible_parts: Vec<String> = Vec::new();
+
+    for (index, node) in nodes.iter().enumerate() {
+        let unique_id = node.get("AXUniqueId").and_then(|v| v.as_str());
+        let selector = unique_id
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .unwrap_or_else(|| format!("#{index}"));
+        let role = node
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let label = node.get("AXLabel").and_then(|v| v.as_str());
+        let title = node.get("title").and_then(|v| v.as_str());
+        let name = label
+            .filter(|s| !s.is_empty())
+            .or(title.filter(|s| !s.is_empty()))
+            .unwrap_or("")
+            .to_string();
+
+        if ios_is_tappable(&role) {
+            interactive_elements.push(InteractiveElement {
+                role: role.clone(),
+                name: name.clone(),
+                selector: selector.clone(),
+            });
+        }
+
+        if let Some(frame) = node.get("frame") {
+            let num = |key: &str| frame.get(key).and_then(|v| v.as_f64()).unwrap_or(0.0);
+            rects.push(ElementRect {
+                selector: selector.clone(),
+                x: num("x"),
+                y: num("y"),
+                width: num("width"),
+                height: num("height"),
+            });
+        }
+
+        for key in ["AXLabel", "AXValue", "title"] {
+            if let Some(text) = node.get(key).and_then(|v| v.as_str()) {
+                if !text.is_empty() {
+                    visible_parts.push(text.to_string());
+                }
+            }
+        }
+    }
+
+    Ok(SnapshotParse {
+        a11y_tree: value,
+        interactive_elements,
+        visible_text: visible_parts.join(" "),
+        rects,
+    })
 }
 
 /// Probe each tool the platform needs; collect the ones that aren't installed.

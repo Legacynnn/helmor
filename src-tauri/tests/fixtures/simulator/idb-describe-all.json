@@ -1,0 +1,32 @@
+[
+	{
+		"AXFrame": "{{0, 44}, {390, 50}}",
+		"AXUniqueId": "login-title",
+		"frame": { "y": 44, "x": 0, "width": 390, "height": 50 },
+		"role_description": "text",
+		"AXLabel": "Sign in",
+		"AXValue": null,
+		"type": "StaticText",
+		"title": null
+	},
+	{
+		"AXFrame": "{{20, 120}, {350, 44}}",
+		"AXUniqueId": "email-field",
+		"frame": { "y": 120, "x": 20, "width": 350, "height": 44 },
+		"role_description": "text field",
+		"AXLabel": "Email",
+		"AXValue": "",
+		"type": "TextField",
+		"title": null
+	},
+	{
+		"AXFrame": "{{20, 320}, {350, 50}}",
+		"AXUniqueId": "submit-btn",
+		"frame": { "y": 320, "x": 20, "width": 350, "height": 50 },
+		"role_description": "button",
+		"AXLabel": "Continue",
+		"AXValue": null,
+		"type": "Button",
+		"title": "Continue"
+	}
+]
