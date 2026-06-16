@@ -65,6 +65,7 @@ export type BridgeToHostMessage =
 
 export type HostToBridgeMessage =
 	| { kind: "set-mode"; mode: BridgeMode }
+	| { kind: "set-context"; workspaceId: string; url: string }
 	| { kind: "clear-comments" }
 	| { kind: "request-capture" };
 
@@ -75,6 +76,7 @@ export type BridgePost = (message: BridgeToHostMessage) => void;
 
 const HOST_TO_BRIDGE_KINDS = new Set([
 	"set-mode",
+	"set-context",
 	"clear-comments",
 	"request-capture",
 ]);

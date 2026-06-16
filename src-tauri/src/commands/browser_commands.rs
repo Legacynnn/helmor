@@ -14,6 +14,7 @@ use serde::Deserialize;
 use super::common::{run_blocking, CmdResult};
 use crate::browser::{self, bridge::BridgeMessage};
 use crate::models::browser::{self as browser_model, BrowserTab, NewBrowserTab};
+use crate::models::browser_comments::{self, BrowserComment, NewBrowserComment};
 use crate::ui_sync::{self, UiMutationEvent};
 
 #[derive(Debug, Deserialize)]
@@ -118,28 +119,67 @@ pub async fn browser_send_bridge_message(message: serde_json::Value) -> CmdResul
 /// webview and fan it out to the frontend as a `UiMutationEvent`.
 ///
 /// The injected runtime (`bridge/injected.ts`) invokes this with the
-/// `BridgeToHostMessage` shape. `workspace_id` is the owning workspace so the
-/// surface can scope comment / pick state. Console + network entries are
-/// accepted (so the collectors have a sink) but only logged for now — the
-/// console/network UI lands in a later wave.
+/// `BridgeToHostMessage` shape plus the bridge context the host seeded via a
+/// `set-context` message: `workspace_id` (scopes comment / pick state) and the
+/// current page `url` (anchors persisted comments per page). Both default to
+/// empty when the host has not seeded context yet, so an early page event never
+/// fails the command.
+///
+/// Comments are PERSISTED to `browser_comments` and re-published with their full
+/// selection so the surface store renders them live; picks are published with
+/// their selection. Console + network entries are accepted (so the collectors
+/// have a sink) but only logged for now — the console/network UI lands later.
 #[tauri::command]
 pub async fn browser_bridge_event(
     app: tauri::AppHandle,
-    workspace_id: String,
+    #[allow(non_snake_case)] workspaceId: Option<String>,
+    url: Option<String>,
     message: BridgeMessage,
 ) -> CmdResult<()> {
+    let workspace_id = workspaceId.unwrap_or_default();
+    let url = url.unwrap_or_default();
     match message {
-        BridgeMessage::CommentAdded { id, .. } => {
+        BridgeMessage::CommentAdded {
+            id,
+            text,
+            selection,
+        } => {
+            // Persist so the pin survives reloads + window switches.
+            let ws = workspace_id.clone();
+            let new_comment = NewBrowserComment {
+                id: id.clone(),
+                url,
+                // seq is allocated host-side in the bridge; mirror it later if
+                // needed. For now order by creation; default seq 0.
+                seq: 0,
+                selector: selection.selector.clone(),
+                outer_html: selection.outer_html.clone(),
+                text: text.clone(),
+                rect_json: selection.rect.to_string(),
+            };
+            run_blocking(move || browser_comments::insert_comment(&ws, new_comment)).await?;
             ui_sync::publish(
                 &app,
                 UiMutationEvent::BrowserCommentPinned {
                     workspace_id,
                     comment_id: id,
+                    text,
+                    selector: selection.selector,
+                    outer_html: selection.outer_html,
+                    rect: selection.rect,
                 },
             );
         }
-        BridgeMessage::ElementPicked { .. } => {
-            ui_sync::publish(&app, UiMutationEvent::BrowserElementPicked { workspace_id });
+        BridgeMessage::ElementPicked { selection } => {
+            ui_sync::publish(
+                &app,
+                UiMutationEvent::BrowserElementPicked {
+                    workspace_id,
+                    selector: selection.selector,
+                    outer_html: selection.outer_html,
+                    rect: selection.rect,
+                },
+            );
         }
         BridgeMessage::ConsoleError { entry } => {
             tracing::debug!(
@@ -152,7 +192,7 @@ pub async fn browser_bridge_event(
         BridgeMessage::NetworkEvent { entry } => {
             tracing::debug!(
                 workspace_id,
-                url = entry.url,
+                url,
                 status = entry.status,
                 failed = entry.failed,
                 "browser bridge: network entry"
@@ -164,6 +204,59 @@ pub async fn browser_bridge_event(
         }
     }
     Ok(())
+}
+
+/// Persist a pinned comment directly (host-driven, e.g. re-anchored hydration).
+#[tauri::command]
+pub async fn browser_add_comment(
+    workspace_id: String,
+    url: String,
+    comment: CommentInput,
+) -> CmdResult<BrowserComment> {
+    run_blocking(move || {
+        browser_comments::insert_comment(
+            &workspace_id,
+            NewBrowserComment {
+                id: comment.id,
+                url,
+                seq: comment.seq,
+                selector: comment.selector,
+                outer_html: comment.outer_html,
+                text: comment.text,
+                rect_json: comment.rect.to_string(),
+            },
+        )
+    })
+    .await
+}
+
+/// List a workspace's persisted comments, optionally narrowed to one `url`.
+#[tauri::command]
+pub async fn browser_list_comments(
+    workspace_id: String,
+    url: Option<String>,
+) -> CmdResult<Vec<BrowserComment>> {
+    run_blocking(move || browser_comments::list_comments(&workspace_id, url.as_deref())).await
+}
+
+/// Delete a persisted comment by id.
+#[tauri::command]
+pub async fn browser_delete_comment(id: String) -> CmdResult<()> {
+    run_blocking(move || browser_comments::delete_comment(&id)).await
+}
+
+/// Input for `browser_add_comment`. Mirrors the page-side `CommentPin` shape;
+/// `outerHTML` keeps DOM casing, `rect` is arbitrary JSON serialized on store.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommentInput {
+    pub id: String,
+    pub seq: i64,
+    pub selector: String,
+    #[serde(rename = "outerHTML")]
+    pub outer_html: String,
+    pub text: String,
+    pub rect: serde_json::Value,
 }
 
 #[cfg(test)]

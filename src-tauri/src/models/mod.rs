@@ -1,4 +1,5 @@
 pub mod browser;
+pub mod browser_comments;
 pub mod db;
 pub mod paired_devices;
 pub mod repos;

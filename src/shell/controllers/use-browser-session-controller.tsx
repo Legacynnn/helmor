@@ -23,7 +23,11 @@ export type BrowserSessionActions = {
 };
 
 export type BrowserSessionController = {
-	state: { tabs: BrowserTab[]; activeTabId: string | null };
+	state: {
+		workspaceId: string | null;
+		tabs: BrowserTab[];
+		activeTabId: string | null;
+	};
 	actions: BrowserSessionActions;
 };
 
@@ -94,7 +98,7 @@ export function useBrowserSessionController(
 	}, []);
 
 	return {
-		state: { tabs, activeTabId },
+		state: { workspaceId: selectedWorkspaceId, tabs, activeTabId },
 		actions: {
 			openUrl,
 			selectTab: setActiveTabId,

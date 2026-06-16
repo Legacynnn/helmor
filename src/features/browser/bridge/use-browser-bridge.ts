@@ -95,6 +95,7 @@ export function ingestMessage(
 export type BrowserBridgeStore = BrowserBridgeState & {
 	setMode: (mode: BridgeMode) => void;
 	ingest: (message: BridgeToHostMessage) => void;
+	hydrateComments: (comments: CommentPin[]) => void;
 	removeComment: (id: string) => void;
 	reset: () => void;
 };
@@ -105,6 +106,7 @@ export function createBrowserBridgeStore() {
 		...emptyBridgeState(),
 		setMode: (mode) => set({ mode }),
 		ingest: (message) => set((state) => ingestMessage(state, message)),
+		hydrateComments: (comments) => set({ comments }),
 		removeComment: (id) =>
 			set((state) => ({
 				comments: state.comments.filter((pin) => pin.id !== id),
@@ -114,3 +116,40 @@ export function createBrowserBridgeStore() {
 }
 
 export type UseBrowserBridgeStore = ReturnType<typeof createBrowserBridgeStore>;
+
+/**
+ * Module-level registry mapping a workspace id to its mounted bridge store.
+ *
+ * The page → host bridge events arrive globally (through `UiMutationEvent` in
+ * `use-ui-sync-bridge`), but each browser surface owns a per-mount store. The
+ * registry bridges the two: a surface registers its store on mount, and the
+ * global UI-sync handler routes inbound `BridgeToHostMessage`s to the right
+ * store by workspace id. Keeping this OUT of React state avoids re-renders and
+ * lets the non-component UI-sync bridge reach the store without prop drilling.
+ */
+const storeRegistry = new Map<string, UseBrowserBridgeStore>();
+
+/** Register a workspace's bridge store. Returns an unregister cleanup. */
+export function registerBridgeStore(
+	workspaceId: string,
+	store: UseBrowserBridgeStore,
+): () => void {
+	storeRegistry.set(workspaceId, store);
+	return () => {
+		if (storeRegistry.get(workspaceId) === store) {
+			storeRegistry.delete(workspaceId);
+		}
+	};
+}
+
+/**
+ * Route a single inbound bridge message to the registered store for
+ * `workspaceId`. No-op when no surface is currently mounted for it (e.g. the
+ * event arrived for a background workspace).
+ */
+export function ingestForWorkspace(
+	workspaceId: string,
+	message: BridgeToHostMessage,
+): void {
+	storeRegistry.get(workspaceId)?.getState().ingest(message);
+}

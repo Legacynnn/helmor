@@ -1,5 +1,8 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { HostToBridgeMessage } from "@/features/browser/bridge/channel";
+import type {
+	BridgeRect,
+	HostToBridgeMessage,
+} from "@/features/browser/bridge/channel";
 import type { InspectorFileItem } from "./editor-session";
 import { type ErrorCode, extractError } from "./errors";
 // `invoke` / `Channel` / `listen` route through the transport shim so the same
@@ -2579,8 +2582,22 @@ export type UiMutationEvent =
 			workspaceId: string;
 			sessionId: string | null;
 	  }
-	| { type: "browserCommentPinned"; workspaceId: string; commentId: string }
-	| { type: "browserElementPicked"; workspaceId: string }
+	| {
+			type: "browserCommentPinned";
+			workspaceId: string;
+			commentId: string;
+			text: string;
+			selector: string;
+			outerHTML: string;
+			rect: BridgeRect;
+	  }
+	| {
+			type: "browserElementPicked";
+			workspaceId: string;
+			selector: string;
+			outerHTML: string;
+			rect: BridgeRect;
+	  }
 	| { type: "browserInjectionFailed"; workspaceId: string };
 
 export type TriageConfig = {
@@ -5548,4 +5565,62 @@ export async function browserPersistTabs(
 	tabs: BrowserTabInput[],
 ): Promise<void> {
 	await invoke("browser_persist_tabs", { workspaceId, tabs });
+}
+
+// ── Browser surface: persisted inspector comments ─────────────────────────────
+// Typed wrappers over the Rust `browser_add_comment` / `browser_list_comments` /
+// `browser_delete_comment` commands. Field names match the camelCase serde of
+// `BrowserComment` in `src-tauri/src/models/browser_comments.rs` — note
+// `outerHTML` keeps DOM casing on both sides.
+
+/** A persisted hover-comment row, as returned by `browser_list_comments`. */
+export type BrowserComment = {
+	id: string;
+	workspaceId: string;
+	url: string;
+	seq: number;
+	selector: string;
+	outerHTML: string;
+	text: string;
+	rectJson: string;
+	createdAt: string;
+};
+
+/** A comment to persist via `browser_add_comment` (rect as structured JSON). */
+export type BrowserCommentInput = {
+	id: string;
+	seq: number;
+	selector: string;
+	outerHTML: string;
+	text: string;
+	rect: BridgeRect;
+};
+
+/** Persist a pinned comment for a workspace + page url. */
+export async function browserAddComment(
+	workspaceId: string,
+	url: string,
+	comment: BrowserCommentInput,
+): Promise<BrowserComment> {
+	return await invoke<BrowserComment>("browser_add_comment", {
+		workspaceId,
+		url,
+		comment,
+	});
+}
+
+/** Load persisted comments for a workspace, optionally narrowed to one url. */
+export async function browserListComments(
+	workspaceId: string,
+	url?: string,
+): Promise<BrowserComment[]> {
+	return await invoke<BrowserComment[]>("browser_list_comments", {
+		workspaceId,
+		url: url ?? null,
+	});
+}
+
+/** Delete a persisted comment by id. */
+export async function browserDeleteComment(id: string): Promise<void> {
+	await invoke("browser_delete_comment", { id });
 }

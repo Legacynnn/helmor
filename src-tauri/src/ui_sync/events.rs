@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// NOTE: not `Eq` — `BrowserCommentPinned`/`BrowserElementPicked` carry a
+// `serde_json::Value` (arbitrary rect JSON), which is `PartialEq` but not `Eq`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(
     tag = "type",
     rename_all = "camelCase",
@@ -144,15 +146,26 @@ pub enum UiMutationEvent {
         session_id: Option<String>,
     },
     /// A hover-comment was pinned in the embedded content webview (Phase 3
-    /// inspector bridge). Frontends invalidate the `browserComments` query.
+    /// inspector bridge). Carries the full pinned selection so the surface can
+    /// fold it into its per-mount bridge store without an extra fetch; the
+    /// `browserComments` query is also invalidated for durable hydration.
     BrowserCommentPinned {
         workspace_id: String,
         comment_id: String,
+        text: String,
+        selector: String,
+        #[serde(rename = "outerHTML")]
+        outer_html: String,
+        rect: serde_json::Value,
     },
     /// An element was picked in the content webview's "Pick" mode. Carries the
-    /// owning workspace so the surface can surface the selection.
+    /// owning workspace plus the full selection so the surface can surface it.
     BrowserElementPicked {
         workspace_id: String,
+        selector: String,
+        #[serde(rename = "outerHTML")]
+        outer_html: String,
+        rect: serde_json::Value,
     },
     /// The inspector bridge failed to inject (CSP-blocked
     /// `initialization_script`). The surface offers the screenshot-annotation
@@ -162,7 +175,7 @@ pub enum UiMutationEvent {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UiMutationEnvelope {
     pub version: u8,
@@ -272,9 +285,16 @@ mod tests {
             UiMutationEvent::BrowserCommentPinned {
                 workspace_id: "w".into(),
                 comment_id: "c1".into(),
+                text: "note".into(),
+                selector: "#hero".into(),
+                outer_html: "<div></div>".into(),
+                rect: serde_json::json!({ "x": 1 }),
             },
             UiMutationEvent::BrowserElementPicked {
                 workspace_id: "w".into(),
+                selector: "button".into(),
+                outer_html: "<button></button>".into(),
+                rect: serde_json::json!({}),
             },
             UiMutationEvent::BrowserInjectionFailed {
                 workspace_id: "w".into(),
@@ -324,11 +344,18 @@ mod tests {
         let event = UiMutationEvent::BrowserCommentPinned {
             workspace_id: "ws1".into(),
             comment_id: "c1".into(),
+            text: "note".into(),
+            selector: "#hero".into(),
+            outer_html: "<div></div>".into(),
+            rect: serde_json::json!({ "x": 1, "y": 2 }),
         };
         let json = serde_json::to_value(&event).unwrap();
         assert_eq!(json["type"], "browserCommentPinned");
         assert_eq!(json["workspaceId"], "ws1");
         assert_eq!(json["commentId"], "c1");
+        // The DOM-cased `outerHTML` field must NOT be camelCased to `outerHtml`.
+        assert_eq!(json["outerHTML"], "<div></div>");
+        assert_eq!(json["rect"]["x"], 1);
         assert!(json.get("workspace_id").is_none());
     }
 

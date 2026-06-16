@@ -993,6 +993,19 @@ CREATE TABLE IF NOT EXISTS browser_tabs (
 );
 CREATE INDEX IF NOT EXISTS idx_browser_tabs_workspace
     ON browser_tabs(workspace_id);
+CREATE TABLE IF NOT EXISTS browser_comments (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    url TEXT NOT NULL DEFAULT '',
+    seq INTEGER NOT NULL DEFAULT 0,
+    selector TEXT NOT NULL,
+    outer_html TEXT NOT NULL,
+    text TEXT NOT NULL DEFAULT '',
+    rect_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_browser_comments_workspace
+    ON browser_comments(workspace_id);
 "#;
 
 const SESSION_PLAN_STATE_DDL: &str = r#"
@@ -2374,6 +2387,7 @@ mod tests {
         ensure_schema(&conn).unwrap();
         assert!(table_exists(&conn, "browser_sessions"));
         assert!(table_exists(&conn, "browser_tabs"));
+        assert!(table_exists(&conn, "browser_comments"));
     }
 
     #[test]
@@ -2387,8 +2401,10 @@ mod tests {
         run_migrations(&conn).unwrap();
         assert!(table_exists(&conn, "browser_sessions"));
         assert!(table_exists(&conn, "browser_tabs"));
+        assert!(table_exists(&conn, "browser_comments"));
 
         run_migrations(&conn).unwrap();
         assert!(table_exists(&conn, "browser_tabs"));
+        assert!(table_exists(&conn, "browser_comments"));
     }
 }

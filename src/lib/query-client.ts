@@ -120,6 +120,8 @@ export const helmorQueryKeys = {
 	workspaceChangeRequest: (workspaceId: string) =>
 		["workspaceChangeRequest", workspaceId] as const,
 	browserTabs: (workspaceId: string) => ["browserTabs", workspaceId] as const,
+	browserComments: (workspaceId: string) =>
+		["browserComments", workspaceId] as const,
 	workspaceForge: (workspaceId: string) =>
 		["workspaceForge", workspaceId] as const,
 	forgeAccounts: (gitlabHosts: string[]) =>

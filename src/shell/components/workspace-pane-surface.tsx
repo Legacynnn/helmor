@@ -170,6 +170,7 @@ export function WorkspacePaneSurface({
 				)}
 				{workspaceViewMode === "browser" && (
 					<WorkspaceBrowserSurface
+						workspaceId={browserSession.state.workspaceId}
 						tabs={browserSession.state.tabs}
 						activeTabId={browserSession.state.activeTabId}
 						onNavigate={browserSession.actions.navigate}

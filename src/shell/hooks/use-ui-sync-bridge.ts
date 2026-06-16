@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { ingestForWorkspace } from "@/features/browser/bridge/use-browser-bridge";
 import { buildTitleSeed } from "@/features/conversation/hooks/seed-session-title";
 import { useStreamingStore } from "@/features/conversation/state/streaming-store";
 import {
@@ -373,13 +374,38 @@ function handleUiMutation(
 			options.onWorkspaceReveal?.(event.workspaceId, event.sessionId);
 			return;
 		case "browserCommentPinned":
+			// Route the full pinned selection into the workspace's per-mount
+			// bridge store so the pin renders live, AND bust the durable
+			// `browserComments` query so a remount re-hydrates from the DB. The
+			// store lives outside React (a module registry) so this non-component
+			// bridge can reach it without prop drilling.
+			ingestForWorkspace(event.workspaceId, {
+				kind: "comment-added",
+				id: event.commentId,
+				text: event.text,
+				selection: {
+					selector: event.selector,
+					outerHTML: event.outerHTML,
+					rect: event.rect,
+				},
+			});
+			void queryClient.invalidateQueries({
+				queryKey: helmorQueryKeys.browserComments(event.workspaceId),
+			});
+			return;
 		case "browserElementPicked":
+			ingestForWorkspace(event.workspaceId, {
+				kind: "element-picked",
+				selection: {
+					selector: event.selector,
+					outerHTML: event.outerHTML,
+					rect: event.rect,
+				},
+			});
+			return;
 		case "browserInjectionFailed":
-			// The browser surface owns inspector state in a per-mount Zustand
-			// store fed directly by the bridge channel, so there is no shared
-			// React Query cache to bust here. These notify-only events stay in
-			// the global bridge (rather than an ad-hoc component listener) so the
-			// surface can subscribe centrally once cross-window sync is added.
+			// Notify-only: the surface flips to the screenshot-annotation
+			// fallback off a component-level flag; no shared cache to bust.
 			return;
 		// TODO(browser): UiMutationEvent cross-window tab sync. Once the Rust
 		// `UiMutationEvent::BrowserTabsChanged` variant lands, handle it here by

@@ -7,8 +7,11 @@ import type {
 } from "./channel";
 import {
 	type BrowserBridgeState,
+	createBrowserBridgeStore,
 	emptyBridgeState,
+	ingestForWorkspace,
 	ingestMessage,
+	registerBridgeStore,
 } from "./use-browser-bridge";
 
 const selection: BridgeSelection = {
@@ -103,5 +106,67 @@ describe("ingestMessage reducer", () => {
 		});
 		expect(state.picks).toHaveLength(1);
 		expect(state.consoleEntries).toHaveLength(1);
+	});
+});
+
+describe("store registry — ingestForWorkspace", () => {
+	it("routes a realistic comment-added payload into the registered store", () => {
+		const store = createBrowserBridgeStore();
+		const unregister = registerBridgeStore("ws-1", store);
+
+		ingestForWorkspace("ws-1", {
+			kind: "comment-added",
+			id: "c1",
+			text: "tighten the gutter",
+			selection: {
+				selector: "main > section:nth-of-type(2)",
+				outerHTML: '<section class="features">…</section>',
+				rect: { x: 12, y: 340, width: 800, height: 220 },
+			},
+		});
+
+		const pins = store.getState().comments;
+		expect(pins).toHaveLength(1);
+		expect(pins[0]).toMatchObject({
+			id: "c1",
+			text: "tighten the gutter",
+			selector: "main > section:nth-of-type(2)",
+			resolved: true,
+		});
+		unregister();
+	});
+
+	it("is a no-op when no store is registered for the workspace", () => {
+		// Must not throw for an unknown workspace (e.g. background workspace).
+		expect(() =>
+			ingestForWorkspace("ws-absent", {
+				kind: "element-picked",
+				selection,
+			}),
+		).not.toThrow();
+	});
+
+	it("unregister stops routing to a stale store", () => {
+		const store = createBrowserBridgeStore();
+		const unregister = registerBridgeStore("ws-2", store);
+		unregister();
+		ingestForWorkspace("ws-2", { kind: "element-picked", selection });
+		expect(store.getState().picks).toHaveLength(0);
+	});
+
+	it("hydrateComments replaces the comment list wholesale", () => {
+		const store = createBrowserBridgeStore();
+		store.getState().hydrateComments([
+			{
+				id: "h1",
+				selector: "#hero",
+				text: "from DB",
+				rect: { x: 0, y: 0, width: 10, height: 10 },
+				outerHTML: "<div id='hero'></div>",
+				resolved: true,
+			},
+		]);
+		expect(store.getState().comments).toHaveLength(1);
+		expect(store.getState().comments[0].id).toBe("h1");
 	});
 });

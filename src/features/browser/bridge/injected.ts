@@ -37,6 +37,10 @@ declare global {
 	const consoleCollector = createConsoleCollector(console);
 	const networkCollector = createNetworkCollector(window);
 	let collectorsRunning = false;
+	// Bridge context the host seeds via `set-context`. Echoed back on every
+	// page → host event so Rust can scope persistence (workspace + page url).
+	let workspaceId = "";
+	let pageUrl = "";
 
 	function post(message: BridgeToHostMessage): void {
 		const internals = window.__TAURI_INTERNALS__;
@@ -46,7 +50,11 @@ declare global {
 			console.warn("[helmor-bridge] Tauri IPC unavailable (CSP?)");
 			return;
 		}
-		void internals.invoke("browser_bridge_event", { message });
+		void internals.invoke("browser_bridge_event", {
+			workspaceId,
+			url: pageUrl,
+			message,
+		});
 	}
 
 	const bridge = createBridge({
@@ -86,6 +94,10 @@ declare global {
 				} else {
 					startCollectors();
 				}
+				break;
+			case "set-context":
+				workspaceId = message.workspaceId;
+				pageUrl = message.url;
 				break;
 			case "clear-comments":
 				// Comment pins live host-side; nothing page-local to clear yet.

@@ -11,6 +11,7 @@ vi.mock("@/lib/api", () => ({
 	browserSetBounds: vi.fn(() => Promise.resolve()),
 	browserDestroy: vi.fn(() => Promise.resolve()),
 	browserSendBridgeMessage: vi.fn(() => Promise.resolve()),
+	browserListComments: vi.fn(() => Promise.resolve([])),
 }));
 
 const sendBridge = vi.mocked(browserSendBridgeMessage);
@@ -19,6 +20,7 @@ function renderSurface(
 	props: Partial<Parameters<typeof WorkspaceBrowserSurface>[0]> = {},
 ) {
 	const merged: Parameters<typeof WorkspaceBrowserSurface>[0] = {
+		workspaceId: "ws-test",
 		tabs: [
 			{ id: "a", url: "http://localhost:3000", title: "Local", loading: false },
 		],
