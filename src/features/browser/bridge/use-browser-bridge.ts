@@ -12,6 +12,7 @@
  */
 
 import { create } from "zustand";
+import { type FlowStep, flowStepFromEvent } from "../flow/flow-recorder";
 import type {
 	BridgeMode,
 	BridgeSelection,
@@ -32,6 +33,10 @@ export type BrowserBridgeState = {
 	 * switches to the screenshot-annotation fallback while this is set.
 	 */
 	injectionBlocked: boolean;
+	/** Ordered flow steps captured while flow-recording is active. */
+	flowSteps: FlowStep[];
+	/** Incremented on each detected dev-server reload to trigger a re-navigate. */
+	reloadNonce: number;
 };
 
 /** A fresh, empty bridge state. The passive default mode is `"none"`. */
@@ -43,6 +48,8 @@ export function emptyBridgeState(): BrowserBridgeState {
 		consoleEntries: [],
 		networkEntries: [],
 		injectionBlocked: false,
+		flowSteps: [],
+		reloadNonce: 0,
 	};
 }
 
@@ -101,6 +108,13 @@ export function ingestMessage(
 			// Driver results resolve a pending broker request host-side; nothing
 			// to fold into the bridge store.
 			return state;
+		case "flow-event":
+			return {
+				...state,
+				flowSteps: [...state.flowSteps, flowStepFromEvent(message)],
+			};
+		case "reload-detected":
+			return { ...state, reloadNonce: state.reloadNonce + 1 };
 	}
 }
 
