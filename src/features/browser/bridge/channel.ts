@@ -62,7 +62,14 @@ export type BridgeToHostMessage =
 	| { kind: "console-error"; entry: ConsoleEntry }
 	| { kind: "network-event"; entry: NetworkEntry }
 	| { kind: "capture-result"; base64: string }
-	| { kind: "driver-result"; id: string; value: unknown };
+	| { kind: "driver-result"; id: string; value: unknown }
+	| { kind: "reload-detected" }
+	| {
+			kind: "flow-event";
+			eventType: "click" | "input" | "change" | "navigate";
+			target: BridgeSelection;
+			data?: string;
+	  };
 
 /** Resolve target for an agent-driver action. Mirrors Rust `PreviewTarget`. */
 export type DriverTarget =
@@ -87,7 +94,8 @@ export type HostToBridgeMessage =
 	| { kind: "set-context"; workspaceId: string; url: string }
 	| { kind: "clear-comments" }
 	| { kind: "request-capture" }
-	| { kind: "driver-request"; id: string; payload: DriverRequestPayload };
+	| { kind: "driver-request"; id: string; payload: DriverRequestPayload }
+	| { kind: "set-flow-recording"; enabled: boolean };
 
 /** Callback the host injects so the bridge can post messages out of the page. */
 export type BridgePost = (message: BridgeToHostMessage) => void;
@@ -100,6 +108,7 @@ const HOST_TO_BRIDGE_KINDS = new Set([
 	"clear-comments",
 	"request-capture",
 	"driver-request",
+	"set-flow-recording",
 ]);
 
 const BRIDGE_TO_HOST_KINDS = new Set([
@@ -109,6 +118,8 @@ const BRIDGE_TO_HOST_KINDS = new Set([
 	"network-event",
 	"capture-result",
 	"driver-result",
+	"reload-detected",
+	"flow-event",
 ]);
 
 const BRIDGE_MODES = new Set<BridgeMode>(["none", "comment", "pick", "draw"]);
