@@ -132,6 +132,7 @@ tracing-subscriber = { version = "0.3", features = [
 ] }
 url = "2"
 uuid = { version = "1", features = ["v4"] }
+async-trait = "0.1.89"
 
 # libc backs Unix process groups, signals, and resource limits. Windows uses
 # the `windows` crate equivalents (Job Objects, DPAPI, sysinfo) — see
