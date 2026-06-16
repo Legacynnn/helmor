@@ -3,11 +3,14 @@
 // that positions the embedded webview. All state is owned by the
 // `BrowserSessionController` upstream — this surface is presentational and
 // drives everything through callbacks.
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TrafficLightSpacer } from "@/components/chrome/traffic-light-spacer";
 import { Button } from "@/components/ui/button";
+import { browserSendBridgeMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { BridgeMode } from "./bridge/channel";
 import { BrowserTabs } from "./chrome/browser-tabs";
+import { ModeToolbar } from "./chrome/mode-toolbar";
 import { UrlBar } from "./chrome/url-bar";
 import { ContentHost } from "./content-host";
 import { activeTab, type BrowserTab } from "./tab-model";
@@ -36,16 +39,34 @@ export function WorkspaceBrowserSurface({
 	const current = activeTabId ? activeTab(tabs, activeTabId) : null;
 	const currentUrl = current?.url ?? "";
 
-	// Esc exits the browser surface, mirroring the editor surface.
+	// Active inspector mode. Lives here (surface-local UI state); only one mode
+	// is active at a time. Driving the injected bridge runs through the Rust
+	// `browser_send_bridge_message` command (host → page eval).
+	const [mode, setMode] = useState<BridgeMode>("none");
+
+	const applyMode = useCallback((next: BridgeMode) => {
+		setMode(next);
+		void browserSendBridgeMessage({ kind: "set-mode", mode: next }).catch(
+			() => {
+				// No-op under jsdom / when the Tauri bridge is unavailable.
+			},
+		);
+	}, []);
+
+	// Esc handling: when an inspector mode is active, `ModeToolbar` owns the
+	// reset-to-Navigate. Only exit the browser surface when already in Navigate
+	// (mirroring the editor surface), so a single Esc never both resets the mode
+	// AND closes the surface.
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.key !== "Escape") return;
+			if (mode !== "none") return;
 			event.preventDefault();
 			onExit();
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [onExit]);
+	}, [onExit, mode]);
 
 	return (
 		<section
@@ -97,6 +118,9 @@ export function WorkspaceBrowserSurface({
 					onForward={() => {}}
 					onReload={() => onNavigate(currentUrl)}
 				/>
+				<div className="flex shrink-0 items-center pr-2">
+					<ModeToolbar mode={mode} onSetMode={applyMode} />
+				</div>
 			</div>
 
 			<ContentHost url={current?.url ?? null} />

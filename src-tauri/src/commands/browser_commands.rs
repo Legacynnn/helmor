@@ -106,6 +106,14 @@ pub async fn browser_capture(session_id: String, base64_png: String) -> CmdResul
     run_blocking(move || browser::capture::save_capture_png(&session_id, &base64_png)).await
 }
 
+/// Send a host → page inspector-bridge message into the embedded content
+/// webview (e.g. `{ "kind": "set-mode", "mode": "comment" }`). Evals
+/// `window.__helmorBridge.handleMsg(<json>)`. No-op if no webview is embedded.
+#[tauri::command]
+pub async fn browser_send_bridge_message(message: serde_json::Value) -> CmdResult<()> {
+    Ok(browser::bridge::eval_into_content(&message)?)
+}
+
 /// Receive a page → host inspector-bridge message from the embedded content
 /// webview and fan it out to the frontend as a `UiMutationEvent`.
 ///

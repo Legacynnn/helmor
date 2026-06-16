@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { HostToBridgeMessage } from "@/features/browser/bridge/channel";
 import type { InspectorFileItem } from "./editor-session";
 import { type ErrorCode, extractError } from "./errors";
 // `invoke` / `Channel` / `listen` route through the transport shim so the same
@@ -2577,7 +2578,10 @@ export type UiMutationEvent =
 			type: "workspaceRevealRequested";
 			workspaceId: string;
 			sessionId: string | null;
-	  };
+	  }
+	| { type: "browserCommentPinned"; workspaceId: string; commentId: string }
+	| { type: "browserElementPicked"; workspaceId: string }
+	| { type: "browserInjectionFailed"; workspaceId: string };
 
 export type TriageConfig = {
 	enabled: boolean;
@@ -5495,6 +5499,17 @@ export async function browserSetBounds(rect: BrowserRect): Promise<void> {
 /** Tear down the embedded content webview. */
 export async function browserDestroy(): Promise<void> {
 	await invoke("browser_destroy");
+}
+
+/**
+ * Send a host → page inspector-bridge message into the content webview (e.g.
+ * `{ kind: "set-mode", mode: "comment" }`). Mirrors `HostToBridgeMessage` in
+ * `src/features/browser/bridge/channel.ts`. No-op when no webview is embedded.
+ */
+export async function browserSendBridgeMessage(
+	message: HostToBridgeMessage,
+): Promise<void> {
+	await invoke("browser_send_bridge_message", { message });
 }
 
 // ── Browser surface: DB-backed tab persistence ───────────────────────────────

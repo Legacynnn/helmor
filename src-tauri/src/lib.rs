@@ -585,6 +585,7 @@ pub fn run() {
             commands::browser_commands::browser_destroy,
             commands::browser_commands::browser_capture,
             commands::browser_commands::browser_bridge_event,
+            commands::browser_commands::browser_send_bridge_message,
             commands::provider_commands::list_custom_providers,
             commands::provider_commands::upsert_custom_provider,
             commands::provider_commands::remove_custom_provider,

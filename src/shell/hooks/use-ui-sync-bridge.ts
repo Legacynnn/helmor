@@ -372,6 +372,15 @@ function handleUiMutation(
 		case "workspaceRevealRequested":
 			options.onWorkspaceReveal?.(event.workspaceId, event.sessionId);
 			return;
+		case "browserCommentPinned":
+		case "browserElementPicked":
+		case "browserInjectionFailed":
+			// The browser surface owns inspector state in a per-mount Zustand
+			// store fed directly by the bridge channel, so there is no shared
+			// React Query cache to bust here. These notify-only events stay in
+			// the global bridge (rather than an ad-hoc component listener) so the
+			// surface can subscribe centrally once cross-window sync is added.
+			return;
 		// TODO(browser): UiMutationEvent cross-window tab sync. Once the Rust
 		// `UiMutationEvent::BrowserTabsChanged` variant lands, handle it here by
 		// invalidating `helmorQueryKeys.browserTabs(event.workspaceId)` so a tab
