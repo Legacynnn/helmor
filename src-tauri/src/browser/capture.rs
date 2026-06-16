@@ -195,6 +195,17 @@ mod tests {
     }
 
     #[test]
+    fn save_simulator_png_writes_into_cache() {
+        let tmp = tempfile::tempdir().unwrap();
+        let png = decode_base64_png(PNG_1X1_B64).unwrap();
+        let session_id = "aabbccdd-1111-2222-3333-444455556666";
+        let path = save_simulator_to_cache(tmp.path(), session_id, &png).unwrap();
+        assert!(path.ends_with(".png"));
+        assert!(path.contains("simulator-"));
+        assert!(std::path::Path::new(&path).exists());
+    }
+
+    #[test]
     fn save_capture_creates_file_and_returns_path() {
         let dir = tempfile::tempdir().unwrap();
         let session_id = "aabbccdd-1111-2222-3333-444455556666";
