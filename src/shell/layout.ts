@@ -39,6 +39,39 @@ export function getInitialSidebarWidth(storageKey = SIDEBAR_WIDTH_STORAGE_KEY) {
 	}
 }
 
+export const BROWSER_SPLIT_WIDTH_STORAGE_KEY =
+	"helmor.workspaceBrowserSplitWidth";
+export const DEFAULT_BROWSER_SPLIT_WIDTH = 640;
+export const MIN_BROWSER_SPLIT_WIDTH = 360;
+export const MAX_BROWSER_SPLIT_WIDTH = 1100;
+
+export function clampBrowserSplitWidth(width: number) {
+	return Math.min(
+		MAX_BROWSER_SPLIT_WIDTH,
+		Math.max(MIN_BROWSER_SPLIT_WIDTH, width),
+	);
+}
+
+export function getInitialBrowserSplitWidth(
+	storageKey = BROWSER_SPLIT_WIDTH_STORAGE_KEY,
+) {
+	if (typeof window === "undefined") {
+		return DEFAULT_BROWSER_SPLIT_WIDTH;
+	}
+	try {
+		const stored = window.localStorage.getItem(storageKey);
+		if (!stored) {
+			return DEFAULT_BROWSER_SPLIT_WIDTH;
+		}
+		const parsed = Number.parseInt(stored, 10);
+		return Number.isFinite(parsed)
+			? clampBrowserSplitWidth(parsed)
+			: DEFAULT_BROWSER_SPLIT_WIDTH;
+	} catch {
+		return DEFAULT_BROWSER_SPLIT_WIDTH;
+	}
+}
+
 export function findAdjacentSessionId(
 	workspaceSessions: WorkspaceSessionSummary[],
 	selectedSessionId: string | null,

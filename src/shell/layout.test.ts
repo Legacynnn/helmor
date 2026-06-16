@@ -1,6 +1,43 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceSessionSummary } from "@/lib/api";
-import { resolveSessionIdByOrdinal } from "./layout";
+import {
+	clampBrowserSplitWidth,
+	DEFAULT_BROWSER_SPLIT_WIDTH,
+	getInitialBrowserSplitWidth,
+	MAX_BROWSER_SPLIT_WIDTH,
+	MIN_BROWSER_SPLIT_WIDTH,
+	resolveSessionIdByOrdinal,
+} from "./layout";
+
+describe("clampBrowserSplitWidth", () => {
+	it("clamps below the min", () => {
+		expect(clampBrowserSplitWidth(10)).toBe(MIN_BROWSER_SPLIT_WIDTH);
+	});
+	it("clamps above the max", () => {
+		expect(clampBrowserSplitWidth(9999)).toBe(MAX_BROWSER_SPLIT_WIDTH);
+	});
+	it("passes a value in range through", () => {
+		expect(clampBrowserSplitWidth(700)).toBe(700);
+	});
+});
+
+describe("getInitialBrowserSplitWidth", () => {
+	afterEach(() => {
+		window.localStorage.clear();
+		vi.restoreAllMocks();
+	});
+	it("returns the default when nothing is stored", () => {
+		expect(getInitialBrowserSplitWidth()).toBe(DEFAULT_BROWSER_SPLIT_WIDTH);
+	});
+	it("returns the clamped stored value", () => {
+		window.localStorage.setItem("helmor.workspaceBrowserSplitWidth", "9999");
+		expect(getInitialBrowserSplitWidth()).toBe(MAX_BROWSER_SPLIT_WIDTH);
+	});
+	it("falls back to default on a non-numeric stored value", () => {
+		window.localStorage.setItem("helmor.workspaceBrowserSplitWidth", "abc");
+		expect(getInitialBrowserSplitWidth()).toBe(DEFAULT_BROWSER_SPLIT_WIDTH);
+	});
+});
 
 function sessions(count: number): WorkspaceSessionSummary[] {
 	return Array.from({ length: count }, (_, i) => ({
