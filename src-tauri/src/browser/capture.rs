@@ -252,6 +252,19 @@ mod tests {
     }
 
     #[test]
+    fn stitch_segments_is_synchronous_cpu_helper() {
+        // Contract: stitch_segments is a plain (non-async) CPU helper. It must be
+        // invoked from a blocking context (`run_blocking` / `spawn_blocking`),
+        // never awaited on the Tauri async command thread. This test fails to
+        // COMPILE if someone makes it async (the call below is not `.await`ed),
+        // which is the regression we guard against.
+        let top = solid_png(4, 2, [255, 0, 0]);
+        let bottom = solid_png(4, 3, [0, 0, 255]);
+        let out = stitch_segments(vec![top, bottom]).expect("stitch ok");
+        assert!(!out.is_empty());
+    }
+
+    #[test]
     fn stitch_mismatched_widths_errors() {
         let top = solid_png(800, 600, [255, 0, 0]);
         let bottom = solid_png(1024, 600, [0, 255, 0]);

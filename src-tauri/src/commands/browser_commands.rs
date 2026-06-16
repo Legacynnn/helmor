@@ -313,6 +313,34 @@ mod tests {
     use super::*;
 
     #[test]
+    fn stitch_calls_are_off_thread() {
+        // Static guard: the stitch helper must only be reached through
+        // run_blocking so the CPU-bound decode/recompose/re-encode never runs on
+        // the Tauri async command thread (PRD §6 — off the React main thread).
+        let src = include_str!("browser_commands.rs");
+        // The fully-qualified call expression we guard. Built from fragments so
+        // this literal does not itself match (avoids false positives on the
+        // test's own references in `.contains(...)` / asserts).
+        let needle = format!("capture{}stitch_segments(", "::");
+        for (i, line) in src.lines().enumerate() {
+            if line.contains(&needle) && !line.trim_start().starts_with("//") {
+                // Walk upward to the nearest run_blocking that opens the enclosing
+                // command body (the closure is a few lines above the call).
+                const LOOKBACK: usize = 16;
+                let window = src
+                    .lines()
+                    .skip(i.saturating_sub(LOOKBACK))
+                    .take(LOOKBACK + 1);
+                assert!(
+                    window.clone().any(|l| l.contains("run_blocking")),
+                    "stitch_segments at line {} must be inside a run_blocking block",
+                    i + 1
+                );
+            }
+        }
+    }
+
+    #[test]
     fn persist_tabs_round_trips() {
         let _env = crate::testkit::TestEnv::new("browser-commands");
         let ws = "ws-cmd";
