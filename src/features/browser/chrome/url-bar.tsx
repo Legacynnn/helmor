@@ -4,6 +4,7 @@
 import { ArrowLeft, ArrowRight, RotateCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { normalizeUrl } from "../url/normalize-url";
 
 type UrlBarProps = {
 	url: string;
@@ -32,7 +33,7 @@ export function UrlBar({
 			className="flex h-9 min-w-0 flex-1 items-center gap-1 px-2"
 			onSubmit={(event) => {
 				event.preventDefault();
-				const next = draft.trim();
+				const next = normalizeUrl(draft);
 				if (next) onNavigate(next);
 			}}
 		>

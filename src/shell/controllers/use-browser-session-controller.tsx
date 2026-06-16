@@ -12,6 +12,7 @@ import {
 	closeTab,
 	openTab,
 } from "@/features/browser/tab-model";
+import { normalizeUrl } from "@/features/browser/url/normalize-url";
 import { useBrowserTabPersistence } from "@/shell/controllers/use-browser-tab-persistence";
 
 export type BrowserSessionActions = {
@@ -64,8 +65,16 @@ export function useBrowserSessionController(
 
 	const openUrl = useCallback(
 		(url: string) => {
+			const normalized = normalizeUrl(url) ?? url;
 			const id = crypto.randomUUID();
-			setTabs((cur) => openTab(cur, { id, url, title: url, loading: true }));
+			setTabs((cur) =>
+				openTab(cur, {
+					id,
+					url: normalized,
+					title: normalized,
+					loading: true,
+				}),
+			);
 			setActiveTabId(id);
 			enterBrowserMode();
 		},
@@ -89,9 +98,12 @@ export function useBrowserSessionController(
 	);
 
 	const navigate = useCallback((url: string) => {
+		const normalized = normalizeUrl(url) ?? url;
 		setActiveTabId((curActiveId) => {
 			setTabs((cur) =>
-				cur.map((t) => (t.id === curActiveId ? { ...t, url } : t)),
+				cur.map((t) =>
+					t.id === curActiveId ? { ...t, url: normalized, loading: true } : t,
+				),
 			);
 			return curActiveId;
 		});
