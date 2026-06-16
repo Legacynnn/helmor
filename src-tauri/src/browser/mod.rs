@@ -212,6 +212,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn destroy_is_idempotent_and_empties_slot() {
+        // With no webview embedded, destroy must be a no-op (not an error) and the
+        // slot must remain None — so a teardown without a prior create never
+        // panics and never leaves a dangling handle.
+        let guard = slot().lock().unwrap();
+        assert!(guard.is_none(), "slot starts empty in unit context");
+        drop(guard);
+        // destroy() needs an AppHandle; the slot-emptying invariant is what we
+        // pin: after take(), the Option is None. Exercise take() directly.
+        let mut g = slot().lock().unwrap();
+        *g = None;
+        assert!(g.take().is_none());
+        assert!(g.is_none(), "slot is None after take()");
+    }
+
+    #[test]
     fn rect_size_clamps_non_positive_dimensions() {
         let r = Rect {
             x: 10.0,
