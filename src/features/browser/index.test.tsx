@@ -30,6 +30,8 @@ function renderSurface(
 		onCloseTab: vi.fn(),
 		onOpenUrl: vi.fn(),
 		onExit: vi.fn(),
+		layout: "split",
+		onToggleExpand: vi.fn(),
 		...props,
 	};
 	render(
@@ -84,5 +86,26 @@ describe("WorkspaceBrowserSurface", () => {
 		// Second Escape (now in Navigate) exits the surface.
 		fireEvent.keyDown(window, { key: "Escape" });
 		expect(onExit).toHaveBeenCalled();
+	});
+});
+
+describe("WorkspaceBrowserSurface expand control", () => {
+	afterEach(() => {
+		cleanup();
+		sendBridge.mockClear();
+	});
+
+	it("calls onToggleExpand when the expand button is clicked", () => {
+		const onToggleExpand = vi.fn();
+		renderSurface({ layout: "split", onToggleExpand });
+		fireEvent.click(screen.getByRole("button", { name: "Expand browser" }));
+		expect(onToggleExpand).toHaveBeenCalledTimes(1);
+	});
+
+	it("labels the control Restore when expanded", () => {
+		renderSurface({ layout: "expanded", onToggleExpand: vi.fn() });
+		expect(
+			screen.getByRole("button", { name: "Restore split" }),
+		).toBeInTheDocument();
 	});
 });

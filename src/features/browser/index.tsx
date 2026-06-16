@@ -3,11 +3,13 @@
 // that positions the embedded webview. All state is owned by the
 // `BrowserSessionController` upstream — this surface is presentational and
 // drives everything through callbacks.
+import { Maximize2, Minimize2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TrafficLightSpacer } from "@/components/chrome/traffic-light-spacer";
 import { Button } from "@/components/ui/button";
 import { browserListComments, browserSendBridgeMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { BrowserLayoutState } from "@/shell/controllers/use-browser-session-controller";
 import type { BridgeMode } from "./bridge/channel";
 import type { CommentPin } from "./bridge/comments";
 import {
@@ -59,6 +61,8 @@ type WorkspaceBrowserSurfaceProps = {
 	onCloseTab: (id: string) => void;
 	onOpenUrl: (url: string) => void;
 	onExit: () => void;
+	layout: BrowserLayoutState;
+	onToggleExpand: () => void;
 };
 
 export function WorkspaceBrowserSurface({
@@ -70,6 +74,8 @@ export function WorkspaceBrowserSurface({
 	onCloseTab,
 	onOpenUrl,
 	onExit,
+	layout,
+	onToggleExpand,
 }: WorkspaceBrowserSurfaceProps) {
 	const current = activeTabId ? activeTab(tabs, activeTabId) : null;
 	const currentUrl = current?.url ?? "";
@@ -180,6 +186,22 @@ export function WorkspaceBrowserSurface({
 					/>
 				</div>
 				<div className="flex shrink-0 items-center gap-0 pr-2">
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onClick={onToggleExpand}
+						aria-label={
+							layout === "expanded" ? "Restore split" : "Expand browser"
+						}
+						className="gap-1 px-1.5 text-muted-foreground hover:text-foreground"
+					>
+						{layout === "expanded" ? (
+							<Minimize2 className="size-4" />
+						) : (
+							<Maximize2 className="size-4" />
+						)}
+					</Button>
 					<Button
 						type="button"
 						variant="ghost"
