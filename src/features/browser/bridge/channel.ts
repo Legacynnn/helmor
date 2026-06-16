@@ -69,6 +69,11 @@ export type BridgeToHostMessage =
 			eventType: "click" | "input" | "change" | "navigate";
 			target: BridgeSelection;
 			data?: string;
+	  }
+	| {
+			kind: "source-ref";
+			ref: import("./source-ref").SourceRef | null;
+			selector: string;
 	  };
 
 /** Resolve target for an agent-driver action. Mirrors Rust `PreviewTarget`. */
@@ -120,6 +125,7 @@ const BRIDGE_TO_HOST_KINDS = new Set([
 	"driver-result",
 	"reload-detected",
 	"flow-event",
+	"source-ref",
 ]);
 
 const BRIDGE_MODES = new Set<BridgeMode>(["none", "comment", "pick", "draw"]);

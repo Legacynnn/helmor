@@ -115,6 +115,10 @@ export function ingestMessage(
 			};
 		case "reload-detected":
 			return { ...state, reloadNonce: state.reloadNonce + 1 };
+		case "source-ref":
+			// Element→source jumps are dispatched out of band to the editor
+			// controller (see `dispatchSourceJump`); nothing to fold into the store.
+			return state;
 	}
 }
 
