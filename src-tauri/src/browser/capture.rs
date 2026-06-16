@@ -80,6 +80,37 @@ pub fn save_stitched_png(session_id: &str, png_bytes: &[u8]) -> Result<String> {
     Ok(filepath.to_string_lossy().to_string())
 }
 
+/// Write raw simulator-screenshot PNG bytes into the per-session paste-cache as
+/// `simulator-<uuid>.png`, returning the absolute path. Mirrors
+/// `save_stitched_png` (raw bytes, no base64 round-trip); the iOS/Android
+/// capture paths already hold decoded PNG bytes.
+pub fn save_simulator_to_cache(
+    paste_root: &Path,
+    session_id: &str,
+    png_bytes: &[u8],
+) -> Result<String> {
+    let paste_dir = crate::maintenance::paste_cache::destination_dir(paste_root, session_id)?;
+    fs::create_dir_all(&paste_dir).context("Failed to create capture-cache directory")?;
+
+    let filename = format!("simulator-{}.png", Uuid::new_v4());
+    let filepath: PathBuf = paste_dir.join(&filename);
+    fs::write(&filepath, png_bytes).with_context(|| {
+        format!(
+            "Failed to write simulator capture to {}",
+            filepath.display()
+        )
+    })?;
+
+    Ok(filepath.to_string_lossy().to_string())
+}
+
+/// Save raw simulator PNG bytes into the real per-session paste-cache and return
+/// the absolute path. Thin wrapper resolving `paste_cache_dir()`.
+pub fn save_simulator_png(session_id: &str, png_bytes: &[u8]) -> Result<String> {
+    let paste_root = crate::data_dir::paste_cache_dir()?;
+    save_simulator_to_cache(&paste_root, session_id, png_bytes)
+}
+
 /// Vertically stack PNG byte slices (top → bottom scroll order) into a single
 /// PNG. All segments must share the same width — they come from one viewport
 /// scrolled down a full-page capture, so a width mismatch signals a corrupt /

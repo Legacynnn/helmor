@@ -6,7 +6,12 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::preview::driver::{InteractiveElement, PreviewError, PreviewResult, PreviewSurfaceKind};
+use std::sync::{Arc, Mutex};
+
+use crate::preview::driver::{
+    InteractiveElement, PreviewDiagnostics, PreviewDriver, PreviewError, PreviewResult,
+    PreviewSnapshot, PreviewStatus, PreviewSurfaceKind, PreviewTarget, WaitCondition,
+};
 
 /// A single tool invocation expressed as program + args. Pure — building one
 /// spawns nothing.
@@ -147,6 +152,34 @@ impl SimCommand {
         )
     }
 
+    pub fn idb_swipe(x1: f64, y1: f64, x2: f64, y2: f64) -> Self {
+        Self::new(
+            "idb",
+            vec![
+                "ui".into(),
+                "swipe".into(),
+                fmt_coord(x1),
+                fmt_coord(y1),
+                fmt_coord(x2),
+                fmt_coord(y2),
+            ],
+        )
+    }
+    pub fn adb_swipe(x1: f64, y1: f64, x2: f64, y2: f64) -> Self {
+        Self::new(
+            "adb",
+            vec![
+                "shell".into(),
+                "input".into(),
+                "swipe".into(),
+                fmt_coord(x1),
+                fmt_coord(y1),
+                fmt_coord(x2),
+                fmt_coord(y2),
+            ],
+        )
+    }
+
     /// A no-op presence probe: invokes `<program> --help`. Only the spawn
     /// outcome matters (a `NotFound` → `Unsupported`); the exit status is
     /// ignored.
@@ -186,7 +219,6 @@ pub struct ElementRect {
 }
 
 impl ElementRect {
-    #[allow(dead_code)] // used by SimulatorDriver::click in Task 7
     fn center(&self) -> (f64, f64) {
         (self.x + self.width / 2.0, self.y + self.height / 2.0)
     }
@@ -487,6 +519,12 @@ pub struct CommandOutput {
 /// real impl shells out; tests inject a recording fake.
 pub trait CommandExecutor: Send + Sync {
     fn run(&self, cmd: &SimCommand) -> PreviewResult<CommandOutput>;
+
+    /// Recorded argv calls, for test executors. Real executors return `None`.
+    #[cfg(test)]
+    fn recorded_calls(&self) -> Option<Vec<Vec<String>>> {
+        None
+    }
 }
 
 /// Real executor — the ONLY place that spawns a process. A missing binary maps
@@ -566,13 +604,243 @@ impl CommandExecutor for FakeExecutor {
             )));
         }
         let key = argv.join(" ");
-        match self.responses.get(&key) {
-            Some(stdout) => Ok(CommandOutput {
-                stdout: stdout.clone(),
-                status_ok: true,
-                stderr: String::new(),
-            }),
-            None => Err(PreviewError::driver(format!("no fake response for: {key}"))),
+        // Keyed commands replay their canned stdout; unkeyed commands (taps,
+        // swipes, key presses — verbs whose output the driver ignores) succeed
+        // with empty stdout so the recorded-call assertions can run.
+        let stdout = self.responses.get(&key).cloned().unwrap_or_default();
+        Ok(CommandOutput {
+            stdout,
+            status_ok: true,
+            stderr: String::new(),
+        })
+    }
+
+    fn recorded_calls(&self) -> Option<Vec<Vec<String>>> {
+        Some(self.calls())
+    }
+}
+
+/// A `PreviewDriver` over a booted simulator. Builds argv via `SimCommand`,
+/// runs it through the injected `CommandExecutor`, and maps the tool output
+/// into the shared `PreviewSnapshot`. iOS uses `idb`; Android uses `adb`.
+pub struct SimulatorDriver {
+    kind: PreviewSurfaceKind,
+    udid: String,
+    executor: Arc<dyn CommandExecutor>,
+    /// Rects from the most recent snapshot, used to resolve click targets.
+    last_rects: Mutex<Vec<ElementRect>>,
+    /// Interactive elements from the most recent snapshot (name/role → selector).
+    last_elements: Mutex<Vec<InteractiveElement>>,
+}
+
+impl SimulatorDriver {
+    pub fn new(kind: PreviewSurfaceKind, udid: String, executor: Arc<dyn CommandExecutor>) -> Self {
+        Self {
+            kind,
+            udid,
+            executor,
+            last_rects: Mutex::new(Vec::new()),
+            last_elements: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn is_ios(&self) -> bool {
+        matches!(self.kind, PreviewSurfaceKind::SimulatorIos)
+    }
+
+    fn run(&self, cmd: SimCommand) -> PreviewResult<CommandOutput> {
+        self.executor.run(&cmd)
+    }
+
+    /// Resolve a non-`Coords` target to a tap point from the last snapshot.
+    fn resolve_point(&self, target: &PreviewTarget) -> PreviewResult<(f64, f64)> {
+        match target {
+            PreviewTarget::Coords { x, y } => Ok((*x, *y)),
+            PreviewTarget::Selector { selector } => {
+                let rects = self.last_rects.lock().expect("last_rects lock");
+                rects
+                    .iter()
+                    .find(|r| &r.selector == selector)
+                    .map(ElementRect::center)
+                    .ok_or_else(|| PreviewError::driver("element not found"))
+            }
+            PreviewTarget::Role { role, name } => {
+                // Map (role, name) → selector via the cached interactive
+                // elements, then look that selector's rect up. Match by name
+                // when the role is empty/unknown.
+                let selector = {
+                    let elems = self.last_elements.lock().expect("last_elements lock");
+                    elems
+                        .iter()
+                        .find(|e| &e.name == name && (role.is_empty() || &e.role == role))
+                        .map(|e| e.selector.clone())
+                        .ok_or_else(|| PreviewError::driver("element not found"))?
+                };
+                let rects = self.last_rects.lock().expect("last_rects lock");
+                rects
+                    .iter()
+                    .find(|r| r.selector == selector)
+                    .map(ElementRect::center)
+                    .ok_or_else(|| PreviewError::driver("element not found"))
+            }
+        }
+    }
+
+    fn tap(&self, x: f64, y: f64) -> PreviewResult<()> {
+        let cmd = if self.is_ios() {
+            SimCommand::idb_tap(x, y)
+        } else {
+            SimCommand::adb_tap(x, y)
+        };
+        self.run(cmd)?;
+        Ok(())
+    }
+
+    /// Capture a screenshot into the paste-cache; returns `None` on any failure
+    /// so a snapshot still succeeds without a screenshot (Task 8 persists it).
+    #[cfg(test)]
+    fn executor_calls(&self) -> Vec<Vec<String>> {
+        self.executor.recorded_calls().unwrap_or_default()
+    }
+
+    fn capture_screenshot(&self) -> Option<String> {
+        if self.is_ios() {
+            // simctl writes to a path; read it back, then persist to the cache.
+            let tmp = std::env::temp_dir().join(format!("helmor-sim-{}.png", uuid::Uuid::new_v4()));
+            let tmp_str = tmp.to_string_lossy().to_string();
+            self.run(SimCommand::ios_screenshot(&tmp_str)).ok()?;
+            let bytes = std::fs::read(&tmp).ok()?;
+            let _ = std::fs::remove_file(&tmp);
+            crate::browser::capture::save_simulator_png(&self.udid, &bytes).ok()
+        } else {
+            // adb screencap streams PNG bytes on stdout.
+            let out = self.run(SimCommand::adb_screencap()).ok()?;
+            crate::browser::capture::save_simulator_png(&self.udid, &out.stdout).ok()
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl PreviewDriver for SimulatorDriver {
+    async fn status(&self) -> PreviewResult<PreviewStatus> {
+        Ok(PreviewStatus {
+            surface_kind: self.kind,
+            present: true,
+            url: None,
+            title: None,
+        })
+    }
+
+    async fn open(&self, target: String) -> PreviewResult<()> {
+        self.navigate(target).await
+    }
+
+    async fn navigate(&self, url: String) -> PreviewResult<()> {
+        let cmd = if self.is_ios() {
+            SimCommand::ios_open_url(&url)
+        } else {
+            SimCommand::adb_openurl(&url)
+        };
+        self.run(cmd)?;
+        Ok(())
+    }
+
+    async fn snapshot(&self) -> PreviewResult<PreviewSnapshot> {
+        let parsed = if self.is_ios() {
+            let out = self.run(SimCommand::idb_describe_all())?;
+            parse_idb_describe_all(&String::from_utf8_lossy(&out.stdout))?
+        } else {
+            let out = self.run(SimCommand::adb_uiautomator_dump())?;
+            parse_uiautomator_dump(&String::from_utf8_lossy(&out.stdout))?
+        };
+
+        *self.last_rects.lock().expect("last_rects lock") = parsed.rects.clone();
+        *self.last_elements.lock().expect("last_elements lock") =
+            parsed.interactive_elements.clone();
+        let screenshot_path = self.capture_screenshot();
+
+        Ok(PreviewSnapshot {
+            url: None,
+            title: None,
+            visible_text: parsed.visible_text,
+            a11y_tree: parsed.a11y_tree,
+            interactive_elements: parsed.interactive_elements,
+            diagnostics: PreviewDiagnostics::default(),
+            screenshot_path,
+        })
+    }
+
+    async fn click(&self, target: PreviewTarget) -> PreviewResult<()> {
+        let (x, y) = self.resolve_point(&target)?;
+        self.tap(x, y)
+    }
+
+    async fn type_text(&self, target: PreviewTarget, text: String) -> PreviewResult<()> {
+        // Focus the field first (skip if the caller gave raw coords with no
+        // resolvable element — still tap to focus).
+        let (x, y) = self.resolve_point(&target)?;
+        self.tap(x, y)?;
+        let cmd = if self.is_ios() {
+            SimCommand::idb_text(&text)
+        } else {
+            SimCommand::adb_text(&text)
+        };
+        self.run(cmd)?;
+        Ok(())
+    }
+
+    async fn press(&self, key: String) -> PreviewResult<()> {
+        let cmd = if self.is_ios() {
+            SimCommand::idb_key(&key)
+        } else {
+            SimCommand::adb_keyevent(&key)
+        };
+        self.run(cmd)?;
+        Ok(())
+    }
+
+    async fn scroll(&self, target: Option<PreviewTarget>, dx: f64, dy: f64) -> PreviewResult<()> {
+        // Anchor: the resolved target center, or a default mid-screen-ish point.
+        let (ax, ay) = match target {
+            Some(t) => self.resolve_point(&t)?,
+            None => (200.0, 400.0),
+        };
+        let cmd = if self.is_ios() {
+            SimCommand::idb_swipe(ax, ay, ax + dx, ay + dy)
+        } else {
+            SimCommand::adb_swipe(ax, ay, ax + dx, ay + dy)
+        };
+        self.run(cmd)?;
+        Ok(())
+    }
+
+    async fn evaluate(&self, _script: String) -> PreviewResult<serde_json::Value> {
+        Err(PreviewError::unsupported("evaluate is browser-only"))
+    }
+
+    async fn wait_for(&self, condition: WaitCondition, timeout_ms: u64) -> PreviewResult<()> {
+        if matches!(condition, WaitCondition::Ready) {
+            return Ok(());
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
+        loop {
+            let snap = self.snapshot().await?;
+            let matched = match &condition {
+                WaitCondition::Selector { selector } => snap
+                    .interactive_elements
+                    .iter()
+                    .any(|e| &e.selector == selector),
+                WaitCondition::Text { text } => snap.visible_text.contains(text.as_str()),
+                WaitCondition::Url { url } => snap.url.as_deref() == Some(url.as_str()),
+                WaitCondition::Ready => true,
+            };
+            if matched {
+                return Ok(());
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(PreviewError::Timeout);
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         }
     }
 }
@@ -621,6 +889,10 @@ mod tests {
         assert_eq!(
             SimCommand::idb_key("4").argv(),
             vec!["idb", "ui", "key", "4"]
+        );
+        assert_eq!(
+            SimCommand::idb_swipe(10.0, 20.0, 30.0, 40.0).argv(),
+            vec!["idb", "ui", "swipe", "10", "20", "30", "40"]
         );
     }
 
@@ -685,5 +957,56 @@ mod tests {
                 "myapp://x"
             ]
         );
+        assert_eq!(
+            SimCommand::adb_swipe(10.0, 20.0, 30.0, 40.0).argv(),
+            vec!["adb", "shell", "input", "swipe", "10", "20", "30", "40"]
+        );
+    }
+
+    #[tokio::test]
+    async fn driver_snapshot_and_click_and_evaluate() {
+        let json = include_str!("../../tests/fixtures/simulator/idb-describe-all.json");
+        let fake =
+            FakeExecutor::new().with_response("idb ui describe-all", json.as_bytes().to_vec());
+        let driver = SimulatorDriver::new(
+            PreviewSurfaceKind::SimulatorIos,
+            "UDID-1".into(),
+            Arc::new(fake),
+        );
+
+        // snapshot maps describe-all → PreviewSnapshot.
+        let snap = driver.snapshot().await.unwrap();
+        assert!(snap
+            .interactive_elements
+            .iter()
+            .any(|e| e.selector == "submit-btn"));
+
+        // click by Role → resolves rect from last snapshot → taps center.
+        driver
+            .click(PreviewTarget::Role {
+                role: "Button".into(),
+                name: "Continue".into(),
+            })
+            .await
+            .unwrap();
+        let calls = driver.executor_calls();
+        // center of [20,320]+[350,50] => (195, 345)
+        assert!(calls
+            .iter()
+            .any(|c| c == &vec!["idb", "ui", "tap", "195", "345"]));
+
+        // Coords tap directly.
+        driver
+            .click(PreviewTarget::Coords { x: 5.0, y: 7.0 })
+            .await
+            .unwrap();
+        assert!(driver
+            .executor_calls()
+            .iter()
+            .any(|c| c == &vec!["idb", "ui", "tap", "5", "7"]));
+
+        // evaluate is unsupported on simulators.
+        let err = driver.evaluate("1+1".into()).await.unwrap_err();
+        assert!(matches!(err, PreviewError::Unsupported { .. }));
     }
 }
