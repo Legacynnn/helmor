@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { BridgeSelection } from "../bridge/channel";
 import type { CommentPin } from "../bridge/comments";
-import { captureCommentFromPin, capturePickFromSelection } from "./from-bridge";
+import {
+	captureCommentFromPin,
+	captureFromImagePath,
+	capturePickFromSelection,
+} from "./from-bridge";
 
 describe("captureCommentFromPin", () => {
 	it("carries computedStyles and cropPath into the capture comment", () => {
@@ -65,5 +69,33 @@ describe("capturePickFromSelection", () => {
 		};
 		const pick = capturePickFromSelection(selection);
 		expect(pick.computedStyles).toEqual({});
+	});
+});
+
+describe("captureFromImagePath", () => {
+	const page = {
+		url: "https://example.com/app",
+		title: "App",
+		viewport: { w: 1280, h: 800 },
+	};
+
+	it("puts the cropped path in images[0] so the badge picks it up", () => {
+		const capture = captureFromImagePath("/cache/region-1.png", page, "region");
+		expect(capture.images).toEqual(["/cache/region-1.png"]);
+		expect(capture.comments).toEqual([]);
+		expect(capture.picks).toEqual([]);
+		expect(capture.url).toBe("https://example.com/app");
+		expect(capture.viewport).toEqual({ w: 1280, h: 800 });
+	});
+
+	it("records the production kind in drawings", () => {
+		const region = captureFromImagePath("/cache/r.png", page, "region");
+		expect(region.drawings).toEqual([
+			{ kind: "region", screenshotPath: "/cache/r.png" },
+		]);
+		const full = captureFromImagePath("/cache/f.png", page, "fullpage");
+		expect(full.drawings).toEqual([
+			{ kind: "fullpage", screenshotPath: "/cache/f.png" },
+		]);
 	});
 });
