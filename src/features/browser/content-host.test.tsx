@@ -2,6 +2,10 @@ import { render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ContentHost, rectFromElement } from "./content-host";
 
+// Captured ResizeObserver callback + rAF queue, installed per-test.
+let resizeCallback: (() => void) | null = null;
+let rafQueue: FrameRequestCallback[] = [];
+
 const browserCreate = vi.fn().mockResolvedValue(undefined);
 const browserDestroy = vi.fn().mockResolvedValue(undefined);
 const browserNavigate = vi.fn().mockResolvedValue(undefined);
@@ -19,6 +23,63 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 afterEach(() => {
 	vi.clearAllMocks();
+});
+
+describe("ContentHost bounds tracking", () => {
+	const realResizeObserver = global.ResizeObserver;
+	const realRaf = global.requestAnimationFrame;
+	const realCancelRaf = global.cancelAnimationFrame;
+
+	afterEach(() => {
+		global.ResizeObserver = realResizeObserver;
+		global.requestAnimationFrame = realRaf;
+		global.cancelAnimationFrame = realCancelRaf;
+		resizeCallback = null;
+		rafQueue = [];
+	});
+
+	const flushRaf = () => {
+		const queued = rafQueue;
+		rafQueue = [];
+		for (const cb of queued) cb(0);
+	};
+
+	it("pushes bounds via rAF on resize (no trailing timer)", async () => {
+		resizeCallback = null;
+		rafQueue = [];
+		// Capture the observer callback so the test can drive it directly.
+		global.ResizeObserver = class {
+			constructor(cb: () => void) {
+				resizeCallback = cb;
+			}
+			observe() {}
+			disconnect() {}
+			unobserve() {}
+		} as unknown as typeof ResizeObserver;
+		// Queue rAF callbacks so the test controls when they flush.
+		global.requestAnimationFrame = ((cb: FrameRequestCallback) => {
+			rafQueue.push(cb);
+			return rafQueue.length;
+		}) as typeof requestAnimationFrame;
+		global.cancelAnimationFrame = (() => {}) as typeof cancelAnimationFrame;
+
+		render(
+			<ContentHost
+				workspaceId="ws1"
+				url="http://localhost:3000"
+				shown={true}
+			/>,
+		);
+		await flush();
+		expect(browserCreate).toHaveBeenCalledTimes(1);
+
+		vi.clearAllMocks();
+		// Simulate a resize: the observer fires, scheduling an rAF push.
+		resizeCallback?.();
+		flushRaf();
+		await flush();
+		expect(browserSetBounds).toHaveBeenCalled();
+	});
 });
 
 describe("ContentHost lazy mount", () => {

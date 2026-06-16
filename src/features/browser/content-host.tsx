@@ -4,7 +4,7 @@
 //
 //   mount (with a URL)  -> browserCreate(url, rect)
 //   active URL changes  -> browserNavigate(url)
-//   host resizes / window resizes -> debounced browserSetBounds(rect)
+//   host resizes / window resizes -> rAF-throttled browserSetBounds(rect)
 //   unmount             -> browserDestroy()
 //
 // All IPC is guarded so it no-ops (and never throws) under jsdom, where the
@@ -40,8 +40,6 @@ type ContentHostProps = {
 	/** Bumped by the bridge store on dev-server reload to force a refresh. */
 	reloadNonce?: number;
 };
-
-const BOUNDS_DEBOUNCE_MS = 50;
 
 export function ContentHost({
 	workspaceId,
@@ -112,15 +110,20 @@ export function ContentHost({
 		})();
 	}, [url]);
 
-	// Track the host rect via ResizeObserver + window resize, debounced.
+	// Track the host rect via ResizeObserver + window resize, rAF-throttled.
+	// During a continuous panel drag the host resizes every frame; coalescing
+	// the push onto a single pending requestAnimationFrame keeps the native
+	// webview repositioning in lockstep with the drag (set_bounds is cheap),
+	// instead of only catching up after a trailing debounce timer fires.
 	useEffect(() => {
 		const host = hostRef.current;
 		if (!host) return;
 
-		let timer: ReturnType<typeof setTimeout> | null = null;
-		const pushBounds = () => {
-			if (timer) clearTimeout(timer);
-			timer = setTimeout(() => {
+		let rafId: number | null = null;
+		const scheduleBounds = () => {
+			if (rafId !== null) return;
+			rafId = requestAnimationFrame(() => {
+				rafId = null;
 				if (!createdRef.current) return;
 				const preset = viewportRef.current;
 				const rect = preset
@@ -134,20 +137,20 @@ export function ContentHost({
 						// No-op.
 					}
 				})();
-			}, BOUNDS_DEBOUNCE_MS);
+			});
 		};
 
 		const observer =
 			typeof ResizeObserver !== "undefined"
-				? new ResizeObserver(pushBounds)
+				? new ResizeObserver(scheduleBounds)
 				: null;
 		observer?.observe(host);
-		window.addEventListener("resize", pushBounds);
+		window.addEventListener("resize", scheduleBounds);
 
 		return () => {
-			if (timer) clearTimeout(timer);
+			if (rafId !== null) cancelAnimationFrame(rafId);
 			observer?.disconnect();
-			window.removeEventListener("resize", pushBounds);
+			window.removeEventListener("resize", scheduleBounds);
 		};
 	}, []);
 
