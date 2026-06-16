@@ -77,6 +77,13 @@ tauri = { version = "2", features = [
     "test",
     "devtools",
     "macos-private-api",
+    # Gates the multiple-webviews-per-window API (`Window::add_child` +
+    # `WebviewBuilder`) used to embed the integrated browser surface's content
+    # webview inside the main window. Phase 0 ADR verified this adds no new
+    # transitive dependency in Tauri 2.11.2 (it only flips already-present
+    # `#[cfg(feature = "unstable")]` gates). See
+    # `.agent-contexts/browser-surface/plan.md` (Phase 0 ADR).
+    "unstable",
 ] }
 sysinfo = "0.33"
 tempfile = "3"

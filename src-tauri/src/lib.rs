@@ -1,4 +1,5 @@
 pub mod agents;
+pub mod browser;
 pub mod cli;
 pub(crate) mod codex_config;
 pub(crate) mod commands;
@@ -578,6 +579,10 @@ pub fn run() {
             agents::list_all_agent_model_sections,
             commands::browser_commands::browser_list_tabs,
             commands::browser_commands::browser_persist_tabs,
+            commands::browser_commands::browser_create,
+            commands::browser_commands::browser_navigate,
+            commands::browser_commands::browser_set_bounds,
+            commands::browser_commands::browser_destroy,
             commands::provider_commands::list_custom_providers,
             commands::provider_commands::upsert_custom_provider,
             commands::provider_commands::remove_custom_provider,
