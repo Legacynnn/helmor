@@ -4,7 +4,9 @@
 //! `CommandExecutor` trait. The real `ProcessExecutor` is the ONLY place that
 //! spawns a process; every test injects a `FakeExecutor` so no test shells out.
 
-use crate::preview::driver::{PreviewError, PreviewResult};
+use serde::{Deserialize, Serialize};
+
+use crate::preview::driver::{PreviewError, PreviewResult, PreviewSurfaceKind};
 
 /// A single tool invocation expressed as program + args. Pure — building one
 /// spawns nothing.
@@ -143,6 +145,47 @@ impl SimCommand {
                 url.into(),
             ],
         )
+    }
+
+    /// A no-op presence probe: invokes `<program> --help`. Only the spawn
+    /// outcome matters (a `NotFound` → `Unsupported`); the exit status is
+    /// ignored.
+    fn probe(program: &'static str) -> Self {
+        Self::new(program, vec!["--help".into()])
+    }
+}
+
+/// Binaries each platform's automation needs on `PATH`.
+pub fn required_tools(kind: PreviewSurfaceKind) -> Vec<&'static str> {
+    match kind {
+        PreviewSurfaceKind::SimulatorIos => vec!["xcrun", "idb"],
+        PreviewSurfaceKind::SimulatorAndroid => vec!["adb"],
+        PreviewSurfaceKind::Browser => vec![],
+    }
+}
+
+/// Structured tooling-presence state. Crosses IPC; a missing tool is data, not
+/// an error.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolingReport {
+    pub ready: bool,
+    pub missing: Vec<String>,
+}
+
+/// Probe each tool the platform needs; collect the ones that aren't installed.
+/// Never panics — a `NotFound` spawn maps to `Unsupported`, which we treat as
+/// "missing".
+pub fn check_tooling(executor: &dyn CommandExecutor, kind: PreviewSurfaceKind) -> ToolingReport {
+    let mut missing = Vec::new();
+    for tool in required_tools(kind) {
+        if let Err(PreviewError::Unsupported { .. }) = executor.run(&SimCommand::probe(tool)) {
+            missing.push(tool.to_string());
+        }
+    }
+    ToolingReport {
+        ready: missing.is_empty(),
+        missing,
     }
 }
 
@@ -297,6 +340,23 @@ mod tests {
             SimCommand::idb_key("4").argv(),
             vec!["idb", "ui", "key", "4"]
         );
+    }
+
+    #[test]
+    fn tooling_presence_structured() {
+        assert_eq!(
+            required_tools(PreviewSurfaceKind::SimulatorIos),
+            vec!["xcrun", "idb"]
+        );
+        assert_eq!(
+            required_tools(PreviewSurfaceKind::SimulatorAndroid),
+            vec!["adb"]
+        );
+
+        let fake = FakeExecutor::new().with_missing("idb");
+        let report = check_tooling(&fake, PreviewSurfaceKind::SimulatorIos);
+        assert!(!report.ready);
+        assert_eq!(report.missing, vec!["idb"]);
     }
 
     #[test]
