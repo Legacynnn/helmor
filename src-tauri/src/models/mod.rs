@@ -1,3 +1,4 @@
+pub mod browser;
 pub mod db;
 pub mod paired_devices;
 pub mod repos;
