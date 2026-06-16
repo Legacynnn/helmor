@@ -90,4 +90,51 @@ describe("useBrowserSessionController", () => {
 		act(() => result.current.actions.selectTab(firstId));
 		expect(result.current.state.activeTabId).toBe(firstId);
 	});
+
+	it("defaults layout to split and resets to split on openUrl", () => {
+		const { result } = renderHook(
+			() =>
+				useBrowserSessionController({
+					selectedWorkspaceId: "ws1",
+					enterBrowserMode: vi.fn(),
+					exitBrowserMode: vi.fn(),
+				}),
+			{ wrapper },
+		);
+		expect(result.current.state.layout).toBe("split");
+		act(() => result.current.actions.toggleExpand());
+		expect(result.current.state.layout).toBe("expanded");
+		act(() => result.current.actions.openUrl("http://a"));
+		expect(result.current.state.layout).toBe("split");
+	});
+
+	it("toggleExpand flips between split and expanded", () => {
+		const { result } = renderHook(
+			() =>
+				useBrowserSessionController({
+					selectedWorkspaceId: "ws1",
+					enterBrowserMode: vi.fn(),
+					exitBrowserMode: vi.fn(),
+				}),
+			{ wrapper },
+		);
+		act(() => result.current.actions.toggleExpand());
+		expect(result.current.state.layout).toBe("expanded");
+		act(() => result.current.actions.toggleExpand());
+		expect(result.current.state.layout).toBe("split");
+	});
+
+	it("setLayout sets an explicit layout", () => {
+		const { result } = renderHook(
+			() =>
+				useBrowserSessionController({
+					selectedWorkspaceId: "ws1",
+					enterBrowserMode: vi.fn(),
+					exitBrowserMode: vi.fn(),
+				}),
+			{ wrapper },
+		);
+		act(() => result.current.actions.setLayout("expanded"));
+		expect(result.current.state.layout).toBe("expanded");
+	});
 });

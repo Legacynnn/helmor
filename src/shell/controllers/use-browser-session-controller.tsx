@@ -12,14 +12,24 @@ import {
 	closeTab,
 	openTab,
 } from "@/features/browser/tab-model";
-import { normalizeUrl } from "@/features/browser/url/normalize-url";
+import { normalizeUrlInfo } from "@/features/browser/url/normalize-url";
 import { useBrowserTabPersistence } from "@/shell/controllers/use-browser-tab-persistence";
+
+export type BrowserLayoutState = "split" | "expanded";
 
 export type BrowserSessionActions = {
 	openUrl(url: string): void;
 	selectTab(id: string): void;
 	closeTab(id: string): void;
 	navigate(url: string): void;
+	/** Retry a tab over plain http after an auto-upgraded https load failed. */
+	fallbackToHttp(tabId: string, httpUrl: string): void;
+	/** Clear a tab's loading flag (load finished). */
+	setTabLoaded(tabId: string): void;
+	/** Set the companion-panel layout explicitly. */
+	setLayout(layout: BrowserLayoutState): void;
+	/** Flip between split and expanded layouts. */
+	toggleExpand(): void;
 	exit(): void;
 };
 
@@ -28,6 +38,7 @@ export type BrowserSessionController = {
 		workspaceId: string | null;
 		tabs: BrowserTab[];
 		activeTabId: string | null;
+		layout: BrowserLayoutState;
 	};
 	actions: BrowserSessionActions;
 };
@@ -45,6 +56,7 @@ export function useBrowserSessionController(
 ): BrowserSessionController {
 	const [tabs, setTabs] = useState<BrowserTab[]>([]);
 	const [activeTabId, setActiveTabId] = useState<string | null>(null);
+	const [layout, setLayout] = useState<BrowserLayoutState>("split");
 
 	const { selectedWorkspaceId, enterBrowserMode, exitBrowserMode } = deps;
 
@@ -65,7 +77,8 @@ export function useBrowserSessionController(
 
 	const openUrl = useCallback(
 		(url: string) => {
-			const normalized = normalizeUrl(url) ?? url;
+			const info = normalizeUrlInfo(url);
+			const normalized = info?.url ?? url;
 			const id = crypto.randomUUID();
 			setTabs((cur) =>
 				openTab(cur, {
@@ -73,9 +86,11 @@ export function useBrowserSessionController(
 					url: normalized,
 					title: normalized,
 					loading: true,
+					autoUpgradedHttps: info?.autoUpgradedHttps ?? false,
 				}),
 			);
 			setActiveTabId(id);
+			setLayout("split");
 			enterBrowserMode();
 		},
 		[enterBrowserMode],
@@ -98,24 +113,56 @@ export function useBrowserSessionController(
 	);
 
 	const navigate = useCallback((url: string) => {
-		const normalized = normalizeUrl(url) ?? url;
+		const info = normalizeUrlInfo(url);
+		const normalized = info?.url ?? url;
+		const autoUpgradedHttps = info?.autoUpgradedHttps ?? false;
 		setActiveTabId((curActiveId) => {
 			setTabs((cur) =>
 				cur.map((t) =>
-					t.id === curActiveId ? { ...t, url: normalized, loading: true } : t,
+					t.id === curActiveId
+						? { ...t, url: normalized, loading: true, autoUpgradedHttps }
+						: t,
 				),
 			);
 			return curActiveId;
 		});
 	}, []);
 
+	// The https→http fallback: retry the active tab over plain http when an
+	// auto-upgraded https load failed. The retry target is a plain-http URL, so
+	// it is no longer eligible for another fallback (autoUpgradedHttps = false).
+	const fallbackToHttp = useCallback((tabId: string, httpUrl: string) => {
+		setTabs((cur) =>
+			cur.map((t) =>
+				t.id === tabId
+					? { ...t, url: httpUrl, loading: true, autoUpgradedHttps: false }
+					: t,
+			),
+		);
+	}, []);
+
+	// Clear a tab's loading flag (driven by the BrowserLoadFinished UI-sync event).
+	const setTabLoaded = useCallback((tabId: string) => {
+		setTabs((cur) =>
+			cur.map((t) => (t.id === tabId ? { ...t, loading: false } : t)),
+		);
+	}, []);
+
+	const toggleExpand = useCallback(() => {
+		setLayout((cur) => (cur === "expanded" ? "split" : "expanded"));
+	}, []);
+
 	return {
-		state: { workspaceId: selectedWorkspaceId, tabs, activeTabId },
+		state: { workspaceId: selectedWorkspaceId, tabs, activeTabId, layout },
 		actions: {
 			openUrl,
 			selectTab: setActiveTabId,
 			closeTab: closeTabAction,
 			navigate,
+			fallbackToHttp,
+			setTabLoaded,
+			setLayout,
+			toggleExpand,
 			exit: exitBrowserMode,
 		},
 	};
