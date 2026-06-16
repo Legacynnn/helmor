@@ -3,7 +3,7 @@
 //! the browser. Phase 4 adds `simulator_driver`.
 
 pub mod broker;
-// pub mod browser_driver; // re-enabled in Task 4
+pub mod browser_driver;
 pub mod driver;
 
 pub use driver::{
