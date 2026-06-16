@@ -75,6 +75,73 @@ impl SimCommand {
     pub fn idb_key(code: &str) -> Self {
         Self::new("idb", vec!["ui".into(), "key".into(), code.into()])
     }
+
+    // --- Android (adb) ---
+    pub fn adb_devices() -> Self {
+        Self::new("adb", vec!["devices".into()])
+    }
+    pub fn adb_tap(x: f64, y: f64) -> Self {
+        Self::new(
+            "adb",
+            vec![
+                "shell".into(),
+                "input".into(),
+                "tap".into(),
+                fmt_coord(x),
+                fmt_coord(y),
+            ],
+        )
+    }
+    pub fn adb_text(text: &str) -> Self {
+        Self::new(
+            "adb",
+            vec!["shell".into(), "input".into(), "text".into(), text.into()],
+        )
+    }
+    pub fn adb_keyevent(code: &str) -> Self {
+        Self::new(
+            "adb",
+            vec![
+                "shell".into(),
+                "input".into(),
+                "keyevent".into(),
+                code.into(),
+            ],
+        )
+    }
+    /// Streams raw PNG bytes on stdout.
+    pub fn adb_screencap() -> Self {
+        Self::new(
+            "adb",
+            vec!["exec-out".into(), "screencap".into(), "-p".into()],
+        )
+    }
+    /// Streams the view-hierarchy XML on stdout via `/dev/tty`.
+    pub fn adb_uiautomator_dump() -> Self {
+        Self::new(
+            "adb",
+            vec![
+                "exec-out".into(),
+                "uiautomator".into(),
+                "dump".into(),
+                "/dev/tty".into(),
+            ],
+        )
+    }
+    pub fn adb_openurl(url: &str) -> Self {
+        Self::new(
+            "adb",
+            vec![
+                "shell".into(),
+                "am".into(),
+                "start".into(),
+                "-a".into(),
+                "android.intent.action.VIEW".into(),
+                "-d".into(),
+                url.into(),
+            ],
+        )
+    }
 }
 
 /// Coordinates: integer pixels for idb/adb; drop trailing `.0`.
@@ -126,6 +193,44 @@ mod tests {
         assert_eq!(
             SimCommand::idb_key("4").argv(),
             vec!["idb", "ui", "key", "4"]
+        );
+    }
+
+    #[test]
+    fn simcommand_android_argv() {
+        assert_eq!(SimCommand::adb_devices().argv(), vec!["adb", "devices"]);
+        assert_eq!(
+            SimCommand::adb_tap(10.0, 20.0).argv(),
+            vec!["adb", "shell", "input", "tap", "10", "20"]
+        );
+        assert_eq!(
+            SimCommand::adb_text("hi").argv(),
+            vec!["adb", "shell", "input", "text", "hi"]
+        );
+        assert_eq!(
+            SimCommand::adb_keyevent("66").argv(),
+            vec!["adb", "shell", "input", "keyevent", "66"]
+        );
+        assert_eq!(
+            SimCommand::adb_screencap().argv(),
+            vec!["adb", "exec-out", "screencap", "-p"]
+        );
+        assert_eq!(
+            SimCommand::adb_uiautomator_dump().argv(),
+            vec!["adb", "exec-out", "uiautomator", "dump", "/dev/tty"]
+        );
+        assert_eq!(
+            SimCommand::adb_openurl("myapp://x").argv(),
+            vec![
+                "adb",
+                "shell",
+                "am",
+                "start",
+                "-a",
+                "android.intent.action.VIEW",
+                "-d",
+                "myapp://x"
+            ]
         );
     }
 }
