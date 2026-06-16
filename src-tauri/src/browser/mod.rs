@@ -26,6 +26,7 @@ use crate::ui_sync::{self, UiMutationEvent};
 
 pub mod bridge;
 pub mod capture;
+pub mod dev_server;
 
 /// Run `f` with the embedded content webview, if one exists. Returns the
 /// closure's result, or `Ok(())` when no webview is embedded (so host → page
