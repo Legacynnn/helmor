@@ -23,6 +23,7 @@ import { ModeToolbar } from "./chrome/mode-toolbar";
 import { UrlBar } from "./chrome/url-bar";
 import { ContentHost } from "./content-host";
 import { CspFallback } from "./csp-fallback";
+import { serializeFlowSteps } from "./flow/flow-recorder";
 import { activeTab, type BrowserTab } from "./tab-model";
 import { DEVICE_PRESETS, type ViewportPresetId } from "./viewport/presets";
 
@@ -69,6 +70,11 @@ type WorkspaceBrowserSurfaceProps = {
 	onFallbackToHttp?: (tabId: string, httpUrl: string) => void;
 	/** Clear a tab's loading flag once its load finishes. */
 	onTabLoaded?: (tabId: string) => void;
+	/**
+	 * Attach a recorded flow's serialized repro steps to the composer. When
+	 * omitted the surface still records, but stopping is a no-op handoff.
+	 */
+	onAttachFlow?: (reproSteps: string) => void;
 };
 
 export function WorkspaceBrowserSurface({
@@ -82,6 +88,7 @@ export function WorkspaceBrowserSurface({
 	onExit,
 	layout,
 	onToggleExpand,
+	onAttachFlow,
 }: WorkspaceBrowserSurfaceProps) {
 	const current = activeTabId ? activeTab(tabs, activeTabId) : null;
 	const currentUrl = current?.url ?? "";
@@ -114,6 +121,31 @@ export function WorkspaceBrowserSurface({
 	// Reactive: flips true when the page blocks bridge injection (strict CSP),
 	// switching the surface to the screenshot-annotation fallback.
 	const injectionBlocked = store((s) => s.injectionBlocked);
+
+	// Reactive: bumped by the bridge store on dev-server reload so `ContentHost`
+	// re-navigates the active tab (agent edits appear live).
+	const reloadNonce = store((s) => s.reloadNonce);
+
+	// Flow-recording toggle (surface-local UI state). While active, the page
+	// reports click/input/navigate events that fold into `store.flowSteps`.
+	const [flowRecording, setFlowRecording] = useState(false);
+	const toggleFlowRecording = useCallback(() => {
+		setFlowRecording((recording) => {
+			const next = !recording;
+			void browserSendBridgeMessage({
+				kind: "set-flow-recording",
+				enabled: next,
+			}).catch(() => {
+				// No-op under jsdom / when the Tauri bridge is unavailable.
+			});
+			// Stopping serializes the recorded steps and hands them to the composer.
+			if (!next && storeRef.current) {
+				const steps = storeRef.current.getState().flowSteps;
+				onAttachFlow?.(serializeFlowSteps(steps));
+			}
+			return next;
+		});
+	}, [onAttachFlow]);
 
 	useEffect(() => {
 		if (!workspaceId || !storeRef.current) return;
@@ -250,6 +282,8 @@ export function WorkspaceBrowserSurface({
 						onToggleConsole={() => setConsoleOpen((open) => !open)}
 						viewportPreset={viewportPreset}
 						onViewportPresetChange={setViewportPreset}
+						flowRecording={flowRecording}
+						onToggleFlowRecording={toggleFlowRecording}
 					/>
 				</div>
 			</div>
@@ -266,6 +300,7 @@ export function WorkspaceBrowserSurface({
 						workspaceId={workspaceId}
 						url={current?.url ?? null}
 						viewport={activePreset}
+						reloadNonce={reloadNonce}
 					/>
 				</div>
 			) : null}

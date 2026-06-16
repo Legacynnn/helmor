@@ -31,11 +31,18 @@ type ContentHostProps = {
 	url: string | null;
 	/** Active device preset; when fixed-size, the webview is constrained. */
 	viewport?: ViewportPreset | null;
+	/** Bumped by the bridge store on dev-server reload to force a refresh. */
+	reloadNonce?: number;
 };
 
 const BOUNDS_DEBOUNCE_MS = 50;
 
-export function ContentHost({ workspaceId, url, viewport }: ContentHostProps) {
+export function ContentHost({
+	workspaceId,
+	url,
+	viewport,
+	reloadNonce,
+}: ContentHostProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	// Track whether the webview has been created so navigation/bounds updates
 	// only fire once it exists.
@@ -148,6 +155,25 @@ export function ContentHost({ workspaceId, url, viewport }: ContentHostProps) {
 			}
 		})();
 	}, [viewport]);
+
+	// Re-navigate the active tab when a dev-server reload is detected so agent
+	// edits appear live. Skips the initial mount (nonce 0).
+	const firstReloadRef = useRef(true);
+	useEffect(() => {
+		if (firstReloadRef.current) {
+			firstReloadRef.current = false;
+			return;
+		}
+		if (!url || !createdRef.current) return;
+		void (async () => {
+			try {
+				const { browserNavigate } = await import("@/lib/api");
+				await browserNavigate(url);
+			} catch {
+				// No-op.
+			}
+		})();
+	}, [reloadNonce, url]);
 
 	return (
 		<div

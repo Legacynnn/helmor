@@ -4,7 +4,13 @@
 // Console toggle reveals the buffered console/network panel without changing the
 // active inspector mode. When Draw is active the surface renders the
 // DrawToolPalette alongside. Purely presentational — all state lives upstream.
-import { MessageSquare, MousePointer2, Pencil, Terminal } from "lucide-react";
+import {
+	Circle,
+	MessageSquare,
+	MousePointer2,
+	Pencil,
+	Terminal,
+} from "lucide-react";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +53,10 @@ type ModeToolbarProps = {
 	viewportPreset?: ViewportPresetId;
 	/** Change the active device viewport preset. */
 	onViewportPresetChange?: (id: ViewportPresetId) => void;
+	/** Whether flow recording is active. */
+	flowRecording?: boolean;
+	/** Toggle flow recording. When omitted the button is hidden. */
+	onToggleFlowRecording?: () => void;
 };
 
 export function ModeToolbar({
@@ -56,6 +66,8 @@ export function ModeToolbar({
 	onToggleConsole,
 	viewportPreset,
 	onViewportPresetChange,
+	flowRecording,
+	onToggleFlowRecording,
 }: ModeToolbarProps) {
 	// Esc returns to Navigate, mirroring inspector tools elsewhere.
 	useEffect(() => {
@@ -110,6 +122,33 @@ export function ModeToolbar({
 					value={viewportPreset}
 					onChange={onViewportPresetChange}
 				/>
+			) : null}
+
+			{onToggleFlowRecording ? (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-xs"
+							aria-label="Record flow"
+							aria-pressed={Boolean(flowRecording)}
+							onClick={onToggleFlowRecording}
+							className={cn(
+								"text-muted-foreground hover:text-foreground",
+								flowRecording && "bg-accent/70 text-destructive",
+							)}
+						>
+							<Circle
+								className={cn("size-3.5", flowRecording && "fill-current")}
+								strokeWidth={1.8}
+							/>
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent>
+						{flowRecording ? "Stop recording flow" : "Record flow"}
+					</TooltipContent>
+				</Tooltip>
 			) : null}
 
 			{onToggleConsole ? (
