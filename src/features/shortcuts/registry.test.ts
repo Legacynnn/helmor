@@ -177,3 +177,12 @@ describe("shortcut registry", () => {
 		);
 	});
 });
+
+describe("browser shortcut defaults", () => {
+	it("browser.toggleSplit defaults to Mod+Shift+B", () => {
+		expect(getShortcut({}, "browser.toggleSplit")).toBe("Mod+Shift+B");
+	});
+	it("browser.toggleExpand defaults to Mod+Shift+Enter", () => {
+		expect(getShortcut({}, "browser.toggleExpand")).toBe("Mod+Shift+Enter");
+	});
+});

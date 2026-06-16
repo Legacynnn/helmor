@@ -53,6 +53,8 @@ export type ShortcutId =
 	| "editor.edit"
 	| "editor.new"
 	| "editor.close"
+	| "browser.toggleSplit"
+	| "browser.toggleExpand"
 	| "terminal.new"
 	| "terminal.close"
 	| "terminal.next"
@@ -73,6 +75,7 @@ export type ShortcutGroup =
 	| "Composer"
 	| "Start surface"
 	| "Editor"
+	| "Browser"
 	| "Terminal";
 
 // Scopes a shortcut can live in. "app" = always active regardless of focus.

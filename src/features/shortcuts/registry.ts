@@ -535,6 +535,22 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		scopes: ["app"],
 		editable: true,
 	},
+	{
+		id: "browser.toggleSplit",
+		title: "Toggle browser split mode",
+		group: "Browser",
+		defaultHotkey: "Mod+Shift+B",
+		scopes: ["app"],
+		editable: true,
+	},
+	{
+		id: "browser.toggleExpand",
+		title: "Expand / restore browser",
+		group: "Browser",
+		defaultHotkey: "Mod+Shift+Enter",
+		scopes: ["app"],
+		editable: true,
+	},
 ];
 
 export const SHORTCUT_DEFINITION_BY_ID = new Map(
