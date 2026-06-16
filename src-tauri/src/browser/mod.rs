@@ -21,6 +21,8 @@ use std::sync::{Mutex, OnceLock};
 use anyhow::{anyhow, Result};
 use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Webview, WebviewUrl};
 
+pub mod capture;
+
 /// Stable label for the embedded content webview.
 pub const BROWSER_CONTENT_LABEL: &str = "browser-content";
 

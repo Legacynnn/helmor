@@ -95,6 +95,16 @@ pub async fn browser_destroy(app: tauri::AppHandle) -> CmdResult<()> {
     Ok(browser::destroy(&app)?)
 }
 
+/// Save a browser-captured screenshot (base64 PNG from the content-webview
+/// capture bridge) into the session paste-cache and return its absolute path.
+/// `session_id` must be the bound `sessions.id` or the composer's pre-allocated
+/// provisional UUID, so the screenshot rides the same `images` wire as a
+/// pasted image.
+#[tauri::command]
+pub async fn browser_capture(session_id: String, base64_png: String) -> CmdResult<String> {
+    run_blocking(move || browser::capture::save_capture_png(&session_id, &base64_png)).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

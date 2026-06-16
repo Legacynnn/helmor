@@ -2649,7 +2649,7 @@ fn applescript_escape(input: &str) -> String {
     input.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-fn base64_decode(input: &str) -> anyhow::Result<Vec<u8>> {
+pub(crate) fn base64_decode(input: &str) -> anyhow::Result<Vec<u8>> {
     use base64::Engine;
     base64::engine::general_purpose::STANDARD
         .decode(input)
