@@ -947,6 +947,12 @@ fn run_migrations(connection: &Connection) -> Result<()> {
         .execute_batch(SESSION_PLAN_STATE_DDL)
         .context("Failed to create session_plan_state table")?;
 
+    // Browser surface persistence: per-workspace tab list. Idempotent
+    // (`IF NOT EXISTS`), so re-running is a no-op once the tables exist.
+    connection
+        .execute_batch(BROWSER_STATE_DDL)
+        .context("Failed to create browser tables")?;
+
     Ok(())
 }
 
@@ -964,6 +970,29 @@ CREATE TABLE IF NOT EXISTS runtime_processes (
 
 CREATE INDEX IF NOT EXISTS idx_runtime_processes_ended_at
     ON runtime_processes(ended_at);
+"#;
+
+// Persistence for the integrated browser surface: a per-workspace session row
+// plus the ordered tab list. Created with `IF NOT EXISTS`, so executing this on
+// every startup is idempotent (mirrors `SESSION_PLAN_STATE_DDL`).
+const BROWSER_STATE_DDL: &str = r#"
+CREATE TABLE IF NOT EXISTS browser_sessions (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS browser_tabs (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+    title TEXT,
+    position INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_browser_tabs_workspace
+    ON browser_tabs(workspace_id);
 "#;
 
 const SESSION_PLAN_STATE_DDL: &str = r#"
@@ -2337,5 +2366,29 @@ mod tests {
         assert!(read_setting(&conn, "app.review_model_id").is_none());
         assert!(read_setting(&conn, "app.pr_model_id").is_none());
         assert!(read_setting(&conn, "app.review_effort").is_none());
+    }
+
+    #[test]
+    fn creates_browser_tables_on_fresh_install() {
+        let (conn, _dir) = open_test_db();
+        ensure_schema(&conn).unwrap();
+        assert!(table_exists(&conn, "browser_sessions"));
+        assert!(table_exists(&conn, "browser_tabs"));
+    }
+
+    #[test]
+    fn browser_tables_added_to_legacy_and_idempotent() {
+        // A legacy DB (no browser tables) gets them via run_migrations, and a
+        // second pass is a clean no-op.
+        let (conn, _dir) = open_test_db();
+        create_legacy_schema(&conn);
+        assert!(!table_exists(&conn, "browser_tabs"));
+
+        run_migrations(&conn).unwrap();
+        assert!(table_exists(&conn, "browser_sessions"));
+        assert!(table_exists(&conn, "browser_tabs"));
+
+        run_migrations(&conn).unwrap();
+        assert!(table_exists(&conn, "browser_tabs"));
     }
 }
