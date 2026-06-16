@@ -16,6 +16,7 @@ pub(crate) mod script_commands;
 pub(crate) mod search_commands;
 pub(crate) mod session_commands;
 pub(crate) mod settings_commands;
+pub(crate) mod simulator_commands;
 pub(crate) mod slack_commands;
 pub(crate) mod system_commands;
 pub(crate) mod terminal_commands;
