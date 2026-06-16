@@ -313,6 +313,32 @@ export function useGlobalShortcutHandlers({
 				enabled: workspaceViewMode === "browser",
 			},
 			{
+				id: "simulator.openIos" as const,
+				callback: () => {
+					if (!selectedWorkspaceId) return;
+					publishShellEvent({
+						type: "open-simulator-surface",
+						workspaceId: selectedWorkspaceId,
+						kind: "simulatorIos",
+						udid: "",
+					});
+				},
+				enabled: Boolean(selectedWorkspaceId),
+			},
+			{
+				id: "simulator.openAndroid" as const,
+				callback: () => {
+					if (!selectedWorkspaceId) return;
+					publishShellEvent({
+						type: "open-simulator-surface",
+						workspaceId: selectedWorkspaceId,
+						kind: "simulatorAndroid",
+						udid: "",
+					});
+				},
+				enabled: Boolean(selectedWorkspaceId),
+			},
+			{
 				id: "zoom.in" as const,
 				callback: () =>
 					updateSettings({

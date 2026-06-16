@@ -55,6 +55,8 @@ export type ShortcutId =
 	| "editor.close"
 	| "browser.toggleSplit"
 	| "browser.toggleExpand"
+	| "simulator.openIos"
+	| "simulator.openAndroid"
 	| "terminal.new"
 	| "terminal.close"
 	| "terminal.next"
@@ -76,6 +78,7 @@ export type ShortcutGroup =
 	| "Start surface"
 	| "Editor"
 	| "Browser"
+	| "Simulator"
 	| "Terminal";
 
 // Scopes a shortcut can live in. "app" = always active regardless of focus.

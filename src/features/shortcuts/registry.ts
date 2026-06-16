@@ -551,6 +551,22 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		scopes: ["app"],
 		editable: true,
 	},
+	{
+		id: "simulator.openIos",
+		title: "Open iOS simulator",
+		group: "Simulator",
+		defaultHotkey: "Mod+Alt+I",
+		scopes: ["app"],
+		editable: true,
+	},
+	{
+		id: "simulator.openAndroid",
+		title: "Open Android simulator",
+		group: "Simulator",
+		defaultHotkey: "Mod+Alt+D",
+		scopes: ["app"],
+		editable: true,
+	},
 ];
 
 export const SHORTCUT_DEFINITION_BY_ID = new Map(

@@ -186,3 +186,15 @@ describe("browser shortcut defaults", () => {
 		expect(getShortcut({}, "browser.toggleExpand")).toBe("Mod+Shift+Enter");
 	});
 });
+
+describe("simulator shortcut defaults", () => {
+	it("simulator.openIos defaults to Mod+Alt+I", () => {
+		expect(getShortcut({}, "simulator.openIos")).toBe("Mod+Alt+I");
+	});
+	it("simulator.openAndroid defaults to Mod+Alt+D", () => {
+		expect(getShortcut({}, "simulator.openAndroid")).toBe("Mod+Alt+D");
+	});
+	it("introduces no internal conflicts", () => {
+		expect(getShortcutConflicts({}).disabledIds.size).toBe(0);
+	});
+});
