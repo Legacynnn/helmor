@@ -1,3 +1,4 @@
+pub(crate) mod browser_commands;
 mod common;
 pub(crate) mod companion_commands;
 pub(crate) mod conductor_commands;

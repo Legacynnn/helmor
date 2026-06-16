@@ -576,6 +576,8 @@ pub fn run() {
             agents::list_agent_model_sections,
             agents::list_copilot_models,
             agents::list_all_agent_model_sections,
+            commands::browser_commands::browser_list_tabs,
+            commands::browser_commands::browser_persist_tabs,
             commands::provider_commands::list_custom_providers,
             commands::provider_commands::upsert_custom_provider,
             commands::provider_commands::remove_custom_provider,
