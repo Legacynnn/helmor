@@ -18,9 +18,15 @@ use serde::{Deserialize, Serialize};
 use super::content_webview;
 
 /// The compiled bridge IIFE. Built from `src/features/browser/bridge/` via
-/// `bun run build:bridge` (wired into `dev:prepare` + `build`) BEFORE
-/// `cargo build` — `include_str!` resolves at compile time, so a missing
-/// bundle fails the build loudly rather than silently shipping no bridge.
+/// `bun run build:bridge` (wired into `dev:prepare` + `build`).
+///
+/// BUILD-ORDER CONTRACT: `dist/` is gitignored, so the real bundle is absent on
+/// a fresh checkout. `cargo build` MUST still succeed without a prior bun build,
+/// so `build.rs::ensure_bridge_bundle_placeholder` writes a minimal valid
+/// placeholder IIFE here when the file is missing — `include_str!` always
+/// resolves. `bun run build:bridge` then OVERWRITES that placeholder with the
+/// live bridge for dev/prod, so the real runtime always ships. See
+/// `build.rs::ensure_bridge_bundle_placeholder` for the full rationale.
 const BRIDGE_BUNDLE: &str = include_str!("../../../dist/bridge-bundle.js");
 
 /// The full `initialization_script` value for the content webview. The bundle

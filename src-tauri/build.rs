@@ -8,6 +8,7 @@ const UPDATER_PUBKEY_KEY: &str = "HELMOR_UPDATER_PUBKEY";
 
 fn main() {
     ensure_external_bin_placeholders();
+    ensure_bridge_bundle_placeholder();
     embed_windows_manifest();
 
     println!("cargo:rerun-if-changed=build.rs");
@@ -106,6 +107,38 @@ fn ensure_external_bin_placeholders() {
                 .join(format!("helmor-sidecar-{target}{exe}")),
         );
     }
+}
+
+/// Guarantee `dist/bridge-bundle.js` exists so `browser/bridge.rs`'s
+/// `include_str!("../../../dist/bridge-bundle.js")` always resolves and a
+/// fresh-checkout `cargo build` succeeds WITHOUT a prior `bun run build:bridge`.
+///
+/// The bundle is a Vite build artifact (`dist/` is gitignored), so it is absent
+/// on a clean clone. We write a minimal but VALID placeholder IIFE that installs
+/// a no-op `window.__helmorBridge` — enough to satisfy `include_str!` and the
+/// `bridge_bundle_is_non_empty_and_exports_handle` unit test. The real bundle is
+/// produced by `bun run build:bridge` (wired into `dev:prepare` + `build`) and
+/// OVERWRITES this placeholder, so dev/prod always ship the live bridge.
+///
+/// We only write when the file is ABSENT — never clobber a real Vite build.
+fn ensure_bridge_bundle_placeholder() {
+    let manifest_dir =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR should be set"));
+    let Some(repo_root) = manifest_dir.parent() else {
+        return;
+    };
+    let bundle = repo_root.join("dist").join("bridge-bundle.js");
+    if bundle.exists() {
+        return;
+    }
+    if let Some(parent) = bundle.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    // Mirrors the `__helmorBridge.handleMsg` contract of the real bundle so the
+    // injected page never throws if it loads the placeholder; `handleMsg` is a
+    // no-op until the real bundle replaces this file.
+    let placeholder = "/* helmor bridge placeholder — run `bun run build:bridge` for the real bundle */\n(function(){window.__helmorBridge={handleMsg:function(){}};})();\n";
+    let _ = fs::write(&bundle, placeholder);
 }
 
 fn ensure_executable_placeholder(path: PathBuf) {
