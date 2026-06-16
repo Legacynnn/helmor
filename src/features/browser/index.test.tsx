@@ -31,6 +31,7 @@ function renderSurface(
 		onOpenUrl: vi.fn(),
 		onExit: vi.fn(),
 		layout: "split",
+		shown: true,
 		onToggleExpand: vi.fn(),
 		...props,
 	};

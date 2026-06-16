@@ -65,6 +65,12 @@ type WorkspaceBrowserSurfaceProps = {
 	onOpenUrl: (url: string) => void;
 	onExit: () => void;
 	layout: BrowserLayoutState;
+	/**
+	 * Whether this surface is actually visible (the split/expanded panel is open,
+	 * not collapsed). Threaded to {@link ContentHost} so the native content
+	 * webview lazy-mounts only on first show (PRD §6).
+	 */
+	shown: boolean;
 	onToggleExpand: () => void;
 	/** Retry the tab over plain http after an auto-upgraded https load failed. */
 	onFallbackToHttp?: (tabId: string, httpUrl: string) => void;
@@ -87,6 +93,7 @@ export function WorkspaceBrowserSurface({
 	onOpenUrl,
 	onExit,
 	layout,
+	shown,
 	onToggleExpand,
 	onAttachFlow,
 }: WorkspaceBrowserSurfaceProps) {
@@ -299,6 +306,7 @@ export function WorkspaceBrowserSurface({
 					<ContentHost
 						workspaceId={workspaceId}
 						url={current?.url ?? null}
+						shown={shown}
 						viewport={activePreset}
 						reloadNonce={reloadNonce}
 					/>

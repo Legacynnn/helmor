@@ -29,6 +29,12 @@ type ContentHostProps = {
 	/** Owning workspace; scopes the agent-control surface registration. */
 	workspaceId: string;
 	url: string | null;
+	/**
+	 * Whether the surface is actually visible. The native webview is created
+	 * only on the first render where this is true (PRD §6 lazy-mount), so a host
+	 * that is mounted-but-hidden never spawns a webview until first shown.
+	 */
+	shown: boolean;
 	/** Active device preset; when fixed-size, the webview is constrained. */
 	viewport?: ViewportPreset | null;
 	/** Bumped by the bridge store on dev-server reload to force a refresh. */
@@ -40,6 +46,7 @@ const BOUNDS_DEBOUNCE_MS = 50;
 export function ContentHost({
 	workspaceId,
 	url,
+	shown,
 	viewport,
 	reloadNonce,
 }: ContentHostProps) {
@@ -55,13 +62,15 @@ export function ContentHost({
 	const viewportRef = useRef(viewport);
 	viewportRef.current = viewport;
 
-	// Create on mount (when a URL is present) + tear down on unmount. Reads the
-	// URL through a ref so this effect runs exactly once per mount.
+	// Lazy create: only once the surface is first shown WITH a url. Reads the
+	// url/workspace through refs so this effect re-runs only on `shown` change,
+	// and the `createdRef` guard makes it idempotent across re-shows (PRD §6 —
+	// exactly one live child-webview, created on first use).
 	useEffect(() => {
 		const host = hostRef.current;
 		const initialUrl = urlRef.current;
 		const wsId = workspaceIdRef.current;
-		if (!host || !initialUrl) return;
+		if (!host || !shown || !initialUrl || createdRef.current) return;
 
 		void (async () => {
 			try {
@@ -72,8 +81,12 @@ export function ContentHost({
 				// No-op under jsdom / when the Tauri bridge is unavailable.
 			}
 		})();
+	}, [shown]);
 
+	// Tear down on unmount (independent of `shown`), fully releasing the webview.
+	useEffect(() => {
 		return () => {
+			const wsId = workspaceIdRef.current;
 			createdRef.current = false;
 			void (async () => {
 				try {

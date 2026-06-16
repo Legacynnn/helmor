@@ -260,6 +260,7 @@ export function WorkspacePaneSurface({
 							tabs={browserSession.state.tabs}
 							activeTabId={browserSession.state.activeTabId}
 							layout={browserLayout}
+							shown={browserExpanded || browserSplit}
 							onNavigate={browserSession.actions.navigate}
 							onSelectTab={browserSession.actions.selectTab}
 							onCloseTab={browserSession.actions.closeTab}
