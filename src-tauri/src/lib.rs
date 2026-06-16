@@ -31,6 +31,7 @@ pub mod service;
 mod shell_env;
 pub mod sidecar;
 pub mod sidecar_host;
+pub mod simulator;
 pub mod slack;
 mod system_limits;
 pub mod terminal;
