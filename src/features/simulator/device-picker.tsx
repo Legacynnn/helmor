@@ -23,6 +23,9 @@ export function DevicePicker({
 	onSelect,
 }: DevicePickerProps) {
 	const [devices, setDevices] = useState<SimDevice[]>([]);
+	// Distinguishes "still loading" from "loaded, but empty" so the empty state
+	// only shows once a list (or a rejection) has actually resolved.
+	const [loaded, setLoaded] = useState(false);
 
 	const refresh = useCallback(() => {
 		void (async () => {
@@ -31,7 +34,10 @@ export function DevicePicker({
 				const list = await simulatorListDevices(kind);
 				setDevices(sortDevices(list));
 			} catch {
-				// No-op under jsdom / when the Tauri bridge is unavailable.
+				// Tooling missing / no bridge: treat as no devices, never throw.
+				setDevices([]);
+			} finally {
+				setLoaded(true);
 			}
 		})();
 	}, [kind]);
@@ -39,6 +45,14 @@ export function DevicePicker({
 	useEffect(() => {
 		refresh();
 	}, [refresh]);
+
+	// With no pre-selected device, make the surface live immediately by
+	// auto-selecting the first booted device once the list resolves.
+	useEffect(() => {
+		if (selectedUdid) return;
+		const firstBooted = devices.find((d) => d.booted);
+		if (firstBooted) onSelect(firstBooted.udid);
+	}, [devices, selectedUdid, onSelect]);
 
 	const boot = useCallback(
 		(udid: string) => {
@@ -54,6 +68,14 @@ export function DevicePicker({
 		},
 		[refresh],
 	);
+
+	if (loaded && devices.length === 0) {
+		return (
+			<span className="text-muted-foreground text-sm">
+				No simulators found — boot a device
+			</span>
+		);
+	}
 
 	return (
 		<div className="flex items-center gap-2">

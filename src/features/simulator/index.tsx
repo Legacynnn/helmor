@@ -33,16 +33,22 @@ export function WorkspaceSimulatorSurface({
 }: WorkspaceSimulatorSurfaceProps) {
 	const [selectedUdid, setSelectedUdid] = useState<string>(udid);
 
-	// Open the surface on mount (registers the broker driver) + close on unmount.
+	// Open the surface once a real device is selected (registers the broker
+	// driver) + close on unmount. With no pre-selected device the surface still
+	// renders its chrome + picker; it only goes live once a udid exists, so the
+	// surface is reachable (and the picker can auto-select a booted device)
+	// without an up-front device id.
 	useEffect(() => {
-		void (async () => {
-			try {
-				const { simulatorOpenSurface } = await import("@/lib/api");
-				await simulatorOpenSurface(workspaceId, kind, selectedUdid);
-			} catch {
-				// No-op under jsdom / when the Tauri bridge is unavailable.
-			}
-		})();
+		if (selectedUdid) {
+			void (async () => {
+				try {
+					const { simulatorOpenSurface } = await import("@/lib/api");
+					await simulatorOpenSurface(workspaceId, kind, selectedUdid);
+				} catch {
+					// No-op under jsdom / when the Tauri bridge is unavailable.
+				}
+			})();
+		}
 		return () => {
 			void (async () => {
 				try {
