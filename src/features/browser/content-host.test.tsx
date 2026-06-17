@@ -75,7 +75,7 @@ describe("ContentHost bounds tracking", () => {
 
 		vi.clearAllMocks();
 		// Simulate a resize: the observer fires, scheduling an rAF push.
-		resizeCallback?.();
+		(resizeCallback as (() => void) | null)?.();
 		flushRaf();
 		await flush();
 		expect(browserSetBounds).toHaveBeenCalled();
