@@ -102,6 +102,14 @@ function handleUiMutation(
 				queryKey: helmorQueryKeys.sessionPlanState(event.sessionId),
 			});
 			return;
+		case "planFileChanged":
+			void queryClient.invalidateQueries({
+				queryKey: helmorQueryKeys.plan(event.sessionId, event.slug),
+			});
+			void queryClient.invalidateQueries({
+				queryKey: helmorQueryKeys.planList(event.sessionId),
+			});
+			return;
 		case "sessionMessagesAppended":
 			void queryClient.invalidateQueries({
 				queryKey: helmorQueryKeys.sessionMessages(event.sessionId),

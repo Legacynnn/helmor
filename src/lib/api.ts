@@ -2539,6 +2539,7 @@ export type UiMutationEvent =
 	| { type: "contextUsageChanged"; sessionId: string }
 	| { type: "codexGoalChanged"; sessionId: string }
 	| { type: "sessionPlanChanged"; sessionId: string }
+	| { type: "planFileChanged"; sessionId: string; slug: string }
 	| { type: "sessionMessagesAppended"; sessionId: string }
 	| { type: "sessionTurnPersisted"; sessionId: string }
 	| { type: "workspaceFilesChanged"; workspaceId: string }
@@ -4797,6 +4798,69 @@ export async function getSessionPlanState(
 	return invoke<SessionPlanState | null>("get_session_plan_state", {
 		sessionId,
 	});
+}
+
+// ---------------------------------------------------------------------------
+// MDX plan documents — per-session, persisted as files in the workspace. Mirror
+// of the Rust `commands::plan` surface (Task 6). Status travels on the wire in
+// kebab-case to match the Rust `PlanLifecycle` serde rename.
+// ---------------------------------------------------------------------------
+
+/** Mirror of the Rust `PlanLifecycle` enum. Kebab-case on the wire. */
+export type PlanLifecycle = "draft" | "approved" | "handed-off";
+
+/** Lightweight plan header — the list + write/status return shape. */
+export type PlanSummary = {
+	slug: string;
+	title: string;
+	status: PlanLifecycle;
+	path: string;
+};
+
+/** Full plan document — summary header plus the MDX body. */
+export type PlanDoc = {
+	summary: PlanSummary;
+	content: string;
+};
+
+/** Create a new plan document for a session. Returns its summary. */
+export async function createPlan(
+	sessionId: string,
+	slug: string,
+	title: string,
+): Promise<PlanSummary> {
+	return invoke<PlanSummary>("create_plan", { sessionId, slug, title });
+}
+
+/** Read a single plan document (summary + MDX body). */
+export async function readPlan(
+	sessionId: string,
+	slug: string,
+): Promise<PlanDoc> {
+	return invoke<PlanDoc>("read_plan", { sessionId, slug });
+}
+
+/** List every plan document for a session. */
+export async function listPlans(sessionId: string): Promise<PlanSummary[]> {
+	return invoke<PlanSummary[]>("list_plans", { sessionId });
+}
+
+/** Overwrite a plan's MDX body. Broadcasts `planFileChanged`. */
+export async function writePlan(
+	sessionId: string,
+	slug: string,
+	content: string,
+): Promise<PlanSummary> {
+	return invoke<PlanSummary>("write_plan", { sessionId, slug, content });
+}
+
+/** Transition a plan's lifecycle status. Broadcasts `planFileChanged`. */
+export async function setPlanStatus(
+	sessionId: string,
+	slug: string,
+	status: PlanLifecycle,
+): Promise<PlanSummary> {
+	return invoke<PlanSummary>("set_plan_status", { sessionId, slug, status });
 }
 
 /** Read the active Codex `/goal` for one session. Null when no goal. */

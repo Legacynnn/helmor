@@ -94,6 +94,8 @@ export const helmorQueryKeys = {
 		["sessionCodexGoal", sessionId] as const,
 	sessionPlanState: (sessionId: string) =>
 		["sessionPlanState", sessionId] as const,
+	plan: (sessionId: string, slug: string) => ["plan", sessionId, slug] as const,
+	planList: (sessionId: string) => ["planList", sessionId] as const,
 	codexRateLimits: ["codexRateLimits"] as const,
 	claudeRateLimits: ["claudeRateLimits"] as const,
 	claudeRichContextUsage: (
