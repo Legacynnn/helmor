@@ -1,9 +1,10 @@
-import { Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { FlaskConical, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Switch } from "@/components/ui/switch";
 import { devResetAllData, loadDataInfo } from "@/lib/api";
-import { saveSettings } from "@/lib/settings";
+import { saveSettings, useSettings } from "@/lib/settings";
 import {
 	SettingsGroup,
 	SettingsNotice,
@@ -11,6 +12,7 @@ import {
 } from "../components/settings-row";
 
 export function DevToolsPanel() {
+	const { settings, updateSettings } = useSettings();
 	const [dataDir, setDataDir] = useState<string | null>(null);
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const [resetting, setResetting] = useState(false);
@@ -73,6 +75,28 @@ export function DevToolsPanel() {
 					<Button variant="outline" size="sm" onClick={handleResetOnboarding}>
 						Reset Onboarding
 					</Button>
+				</SettingsRow>
+
+				<SettingsRow
+					align="start"
+					title={
+						<span className="flex items-center gap-1.5">
+							<FlaskConical
+								className="size-3.5 text-muted-foreground"
+								strokeWidth={1.8}
+							/>
+							<span>MDX planning (experimental)</span>
+						</span>
+					}
+					description="Plan mode writes a rich .mdx plan to .helmor/plans/ and opens it as an interactive tab."
+				>
+					<Switch
+						checked={settings.mdxPlanningEnabled}
+						onCheckedChange={(checked) =>
+							updateSettings({ mdxPlanningEnabled: checked })
+						}
+						aria-label="MDX planning (experimental)"
+					/>
 				</SettingsRow>
 
 				<SettingsRow
