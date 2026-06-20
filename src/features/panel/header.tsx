@@ -84,7 +84,12 @@ export type PlanTab = {
 
 /** Tab value prefix for a plan tab. The slug is appended so the existing
  *  `onValueChange` handler can decode which plan was selected — mirroring the
- *  hardcoded `__context_preview__` context-preview tab value. */
+ *  hardcoded `__context_preview__` context-preview tab value.
+ *
+ *  Invariant: plan slugs are backend-generated and filesystem-safe — they never
+ *  start with `__` and never collide with session UUIDs — so stripping this
+ *  prefix (`value.slice(PLAN_TAB_PREFIX.length)`) decodes the slug
+ *  unambiguously, with no risk of a session id masquerading as a plan tab. */
 const PLAN_TAB_PREFIX = "__plan__:";
 
 type WorkspacePanelHeaderProps = {

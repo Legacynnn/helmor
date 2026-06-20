@@ -19,7 +19,15 @@ export function PlanViewContainer({
 	onRequestChanges: () => void;
 	onHandoff: () => void;
 }) {
-	const { data } = usePlan(sessionId, slug);
+	const { data, isError } = usePlan(sessionId, slug);
+
+	if (isError) {
+		return (
+			<div className="flex h-full items-center justify-center text-muted-foreground text-small">
+				Failed to load plan.
+			</div>
+		);
+	}
 
 	if (!data) {
 		return (
