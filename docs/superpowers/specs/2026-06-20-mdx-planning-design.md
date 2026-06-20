@@ -105,11 +105,15 @@ block: X") rather than failing the whole document.
    `src/features/plan-viewer/` with the renderer, the component implementations,
    and the surface). Prose delegates to `streamdown`.
 
-5. **Plan view surface.** A dedicated view mounted in the workspace pane.
-   Preferred integration: extend the editor session model with a `plan` kind
-   (reuses tabs/breadcrumbs/preview infra) OR a new `plan` shell view mode —
-   to be finalized in the implementation plan. Renders the `.mdx`, watches the
-   file for external edits (agent revisions), and re-renders.
+5. **Plan view surface.** A dedicated Plan surface opened as its **own
+   conversation tab** — alongside the chat thread, NOT inside the Monaco editor.
+   This keeps the plan next to the conversation where review/handoff actions
+   belong, and makes it a first-class surface rather than "a file you open."
+   The surface is a self-contained Plan view with its own toolbar of controls
+   (request changes / comment, approve, handoff, status badge) above the
+   rendered MDX. It renders the `.mdx`, watches the file for external edits
+   (agent revisions), and re-renders. The `.mdx` is still openable raw in Monaco
+   as a fallback, but that is not the primary path.
 
 6. **Feedback loop ("request changes").** Per-block comments (top-level
    component = block, with a stable id derived from position/explicit id). On
@@ -161,8 +165,9 @@ Handoff
 
 ## Open Questions (for implementation-plan stage)
 
-- Plan view mounting: editor-tab `kind: "plan"` vs new shell `plan` view mode.
-  (Lean: editor-tab kind, to reuse tab infra.)
+- Plan view mounting: **decided** — opens as its own conversation tab (not the
+  editor). Implementation detail to finalize: how a new tab *kind* is added to
+  the conversation tab system and how it carries the plan path + lifecycle.
 - Plan slug/naming: derived from session title vs explicit.
 - Whether "request changes" reuses the current session's agent or always spawns
   a dedicated revision agent.
