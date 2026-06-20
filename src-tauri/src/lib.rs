@@ -19,6 +19,7 @@ pub mod maintenance;
 pub mod mcp;
 pub mod models;
 pub mod pipeline;
+pub mod plans;
 pub(crate) mod platform;
 pub mod provider;
 pub mod quick_panel;
