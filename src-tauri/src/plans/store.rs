@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 
-use crate::git_ops;
 use crate::plans::types::{PlanDoc, PlanLifecycle, PlanSummary};
+use crate::workspace::agent_contexts::resolve_git_exclude_path;
 
 /// Workspace-relative directory holding plan `.mdx` files.
 const PLANS_SUBDIR: &str = ".helmor/plans";
@@ -23,33 +23,6 @@ const EXCLUDE_RULE: &str = "/.helmor/";
 /// Comment line written above the rule, so anyone inspecting
 /// `info/exclude` knows why it's there.
 const EXCLUDE_COMMENT: &str = "# Helmor: local plan files (.helmor/plans).";
-
-/// Resolve the exact `info/exclude` path Git reads for `workspace_dir`,
-/// honouring linked worktrees.
-fn resolve_git_exclude_path(workspace_dir: &Path) -> Result<PathBuf> {
-    let raw = git_ops::run_git(
-        [
-            "rev-parse",
-            "--path-format=absolute",
-            "--git-path",
-            "info/exclude",
-        ],
-        Some(workspace_dir),
-    )
-    .with_context(|| {
-        format!(
-            "run `git rev-parse --git-path info/exclude` in {}",
-            workspace_dir.display()
-        )
-    })?;
-    if raw.is_empty() {
-        anyhow::bail!(
-            "git returned an empty exclude path for {}",
-            workspace_dir.display()
-        );
-    }
-    Ok(PathBuf::from(raw))
-}
 
 /// Idempotently append the `/.helmor/` rule to the repo-local git exclude
 /// for `workspace_dir`. Running twice does not duplicate the rule, and any
@@ -234,8 +207,10 @@ pub fn create_plan(workspace_dir: &Path, slug: &str, title: &str) -> Result<Plan
 
     let path = plan_path(workspace_dir, slug);
     if !path.exists() {
-        let content =
-            format!("---\ntitle: \"{title}\"\nstatus: draft\nsummary: \"\"\n---\n\n# {title}\n\n");
+        let content = format!(
+            "---\ntitle: \"{title}\"\nstatus: {}\nsummary: \"\"\n---\n\n# {title}\n\n",
+            PlanLifecycle::Draft.as_str()
+        );
         std::fs::write(&path, &content).with_context(|| format!("write {}", path.display()))?;
     }
 
@@ -256,6 +231,8 @@ pub fn read_plan(workspace_dir: &Path, slug: &str) -> Result<PlanDoc> {
 /// Overwrite a plan's `.mdx` content, returning the summary parsed from
 /// the new content.
 pub fn write_plan(workspace_dir: &Path, slug: &str, content: &str) -> Result<PlanSummary> {
+    ensure_excluded(workspace_dir)?;
+
     let dir = plans_dir(workspace_dir);
     std::fs::create_dir_all(&dir).with_context(|| format!("create {}", dir.display()))?;
 

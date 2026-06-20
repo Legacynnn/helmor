@@ -114,6 +114,14 @@ fn write_plan_to_fresh_workspace_creates_file() {
     assert!(tmp.path().join(".helmor/plans/fresh.mdx").is_file());
     let doc = store::read_plan(tmp.path(), "fresh").unwrap();
     assert_eq!(doc.content, body);
+
+    // write_plan self-excludes: the git-exclude rule must exist even though
+    // create_plan was never called for this fresh workspace.
+    let exclude = std::fs::read_to_string(tmp.path().join(".git/info/exclude")).unwrap();
+    assert!(
+        exclude.contains("/.helmor/"),
+        "write_plan must ensure the /.helmor/ git-exclude rule exists"
+    );
 }
 
 /// `set_status` rewrites the frontmatter `status:` line and `read_plan`
