@@ -1,25 +1,42 @@
+import { useCallback } from "react";
 import { setPlanStatus } from "@/lib/api";
+import {
+	type BlockComment,
+	buildFeedbackPrompt,
+	dispatchSubmitPlanFeedback,
+} from "./feedback";
 import { PlanView } from "./plan-view";
 import { usePlan } from "./use-plan";
 
 /**
  * Data container for a single plan document. Reads (sessionId, slug) via
  * {@link usePlan} and renders {@link PlanView}, wiring Approve to the
- * `set_plan_status` mutation. Request-changes / handoff are passed through as
- * callbacks so later tasks can implement them at the call site.
+ * `set_plan_status` mutation. Request-changes builds a structured prompt from
+ * the user's block-anchored comments and dispatches the
+ * `helmor:submit-plan-feedback` window event — the conversation container
+ * listens and routes it through the composer's submit path, staying in plan
+ * mode. Handoff is passed through for a later task.
  */
 export function PlanViewContainer({
 	sessionId,
 	slug,
-	onRequestChanges,
 	onHandoff,
 }: {
 	sessionId: string;
 	slug: string;
-	onRequestChanges: () => void;
 	onHandoff: () => void;
 }) {
 	const { data, isError } = usePlan(sessionId, slug);
+
+	const handleRequestChanges = useCallback(
+		(comments: BlockComment[]) => {
+			dispatchSubmitPlanFeedback({
+				sessionId,
+				prompt: buildFeedbackPrompt(slug, comments),
+			});
+		},
+		[sessionId, slug],
+	);
 
 	if (isError) {
 		return (
@@ -41,7 +58,7 @@ export function PlanViewContainer({
 		<PlanView
 			content={data.content}
 			status={data.summary.status}
-			onRequestChanges={onRequestChanges}
+			onRequestChanges={handleRequestChanges}
 			onApprove={() => void setPlanStatus(sessionId, slug, "approved")}
 			onHandoff={onHandoff}
 		/>

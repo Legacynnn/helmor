@@ -13,6 +13,10 @@ import { WorkspacePanelContainer } from "@/features/panel/container";
 import { FileLinkProvider } from "@/features/panel/message-components/file-link-context";
 import type { SessionCloseRequest } from "@/features/panel/use-confirm-session-close";
 import {
+	SUBMIT_PLAN_FEEDBACK_EVENT,
+	type SubmitPlanFeedbackEventDetail,
+} from "@/features/plan-viewer/feedback";
+import {
 	type ActiveStreamSummary,
 	type AgentModelSection,
 	type AgentProvider,
@@ -694,6 +698,34 @@ export const WorkspaceConversationContainer = memo(
 				unlisten?.();
 			};
 		}, [handleChangeFastMode, clearFastPrelude]);
+
+		// Plan-view "Request changes": the Plan tab dispatches a
+		// `helmor:submit-plan-feedback` window event (see plan-viewer/feedback.ts)
+		// carrying the structured revision prompt. Route it through the same
+		// programmatic prompt channel the inspector uses, pinning plan mode so the
+		// revision turn stays in plan/review (mirrors the composer's
+		// `handlePlanRequestChanges`). The `pendingPromptForSession` channel only
+		// carries `{ sessionId, prompt }`, so plan mode is set on the session's
+		// contextKey here; the composer reads its effective permission mode off
+		// that key at submit time.
+		useEffect(() => {
+			if (typeof window === "undefined") return;
+			const handler = (event: Event) => {
+				const detail = (event as CustomEvent<SubmitPlanFeedbackEventDetail>)
+					.detail;
+				if (!detail?.sessionId || !detail.prompt) return;
+				handleChangePermissionMode(`session:${detail.sessionId}`, "plan");
+				onQueuePendingPromptForSession?.({
+					sessionId: detail.sessionId,
+					prompt: detail.prompt,
+					permissionMode: "plan",
+				});
+			};
+			window.addEventListener(SUBMIT_PLAN_FEEDBACK_EVENT, handler);
+			return () => {
+				window.removeEventListener(SUBMIT_PLAN_FEEDBACK_EVENT, handler);
+			};
+		}, [handleChangePermissionMode, onQueuePendingPromptForSession]);
 
 		const handleComposerSubmitWrapper = useCallback(
 			(payload: Parameters<typeof handleComposerSubmit>[0]) => {

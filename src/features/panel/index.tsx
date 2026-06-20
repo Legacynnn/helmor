@@ -225,7 +225,6 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 						<PlanViewContainer
 							sessionId={planSessionId}
 							slug={activePlanSlug}
-							onRequestChanges={() => {}}
 							onHandoff={() => {}}
 						/>
 					) : contextPreviewActive && contextPreviewCard ? (
