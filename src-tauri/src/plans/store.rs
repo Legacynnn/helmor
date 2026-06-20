@@ -101,7 +101,7 @@ fn parse_frontmatter(content: &str) -> (Option<String>, PlanLifecycle) {
     let mut status = PlanLifecycle::Draft;
 
     if let Some(rest) = content.strip_prefix("---\n") {
-        if let Some(end) = rest.find("\n---") {
+        if let Some(end) = find_closing_fence(rest) {
             for line in rest[..end].lines() {
                 let line = line.trim();
                 if let Some(value) = line.strip_prefix("title:") {
@@ -122,6 +122,34 @@ fn parse_frontmatter(content: &str) -> (Option<String>, PlanLifecycle) {
     }
 
     (title, status)
+}
+
+/// Find the byte offset of the closing `---` frontmatter fence within
+/// `rest` (the content *after* the opening `---\n`).
+///
+/// Only a `\n---` that is itself followed by a line break (`\n`/`\r`) or
+/// end-of-string counts as the fence. A `\n---` followed by other text on
+/// the same line is a Markdown horizontal rule or a `---`-prefixed value,
+/// not a fence, so we skip past it and keep scanning. Returns the offset of
+/// the leading `\n` (so `rest[..end]` is the frontmatter body).
+fn find_closing_fence(rest: &str) -> Option<usize> {
+    let mut from = 0;
+    while let Some(rel) = rest[from..].find("\n---") {
+        let at = from + rel;
+        // Char immediately after the `\n---`.
+        let after = at + "\n---".len();
+        let is_fence = match rest[after..].chars().next() {
+            None => true,                    // end-of-string
+            Some('\n') | Some('\r') => true, // line break -> real fence
+            _ => false,                      // trailing text -> HR/value
+        };
+        if is_fence {
+            return Some(at);
+        }
+        // Advance past this `\n` so the next search can find a later fence.
+        from = at + 1;
+    }
+    None
 }
 
 /// Build a [`PlanSummary`] from on-disk content for `slug`.
@@ -168,6 +196,9 @@ pub fn read_plan(workspace_dir: &Path, slug: &str) -> Result<PlanDoc> {
 /// Overwrite a plan's `.mdx` content, returning the summary parsed from
 /// the new content.
 pub fn write_plan(workspace_dir: &Path, slug: &str, content: &str) -> Result<PlanSummary> {
+    let dir = plans_dir(workspace_dir);
+    std::fs::create_dir_all(&dir).with_context(|| format!("create {}", dir.display()))?;
+
     let path = plan_path(workspace_dir, slug);
     std::fs::write(&path, content).with_context(|| format!("write {}", path.display()))?;
     Ok(summary_for(slug, content))
@@ -188,7 +219,17 @@ pub fn list_plans(workspace_dir: &Path) -> Result<Vec<PlanSummary>> {
             let Some(slug) = path.file_stem().and_then(|s| s.to_str()) else {
                 continue;
             };
-            let content = std::fs::read_to_string(&path).unwrap_or_default();
+            let content = match std::fs::read_to_string(&path) {
+                Ok(content) => content,
+                Err(error) => {
+                    tracing::warn!(
+                        path = %path.display(),
+                        error = %error,
+                        "Failed to read plan file while listing — skipping"
+                    );
+                    continue;
+                }
+            };
             out.push(summary_for(slug, &content));
         }
     }

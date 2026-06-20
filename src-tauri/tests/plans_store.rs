@@ -7,14 +7,21 @@ use helmor_lib::plans::store;
 use helmor_lib::plans::PlanLifecycle;
 
 /// Initialise a throwaway git repo so `git rev-parse --git-path info/exclude`
-/// resolves to a real `.git/info/exclude`.
+/// resolves to a real `.git/info/exclude`. Configures identity + disables
+/// gpg signing so any commit a test makes succeeds in CI sandboxes.
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    Command::new("git")
-        .arg("init")
-        .current_dir(tmp.path())
-        .output()
-        .expect("git init");
+    let run = |args: &[&str]| {
+        Command::new("git")
+            .args(args)
+            .current_dir(tmp.path())
+            .output()
+            .unwrap_or_else(|error| panic!("git {args:?} failed: {error}"));
+    };
+    run(&["init"]);
+    run(&["config", "user.email", "helmor@example.com"]);
+    run(&["config", "user.name", "Helmor Test"]);
+    run(&["config", "commit.gpgsign", "false"]);
     tmp
 }
 
@@ -69,6 +76,44 @@ fn write_then_list_reflects_status_from_frontmatter() {
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].slug, "p1");
     assert_eq!(list[0].status, PlanLifecycle::Approved);
+}
+
+/// A Markdown horizontal rule (`---`) in the body after the real closing
+/// fence must not be mistaken for the frontmatter close: title + status
+/// must still parse from the actual frontmatter block.
+#[test]
+fn frontmatter_parse_ignores_horizontal_rule_in_body() {
+    let tmp = init_repo();
+
+    store::create_plan(tmp.path(), "hr", "HR Test").unwrap();
+    // A frontmatter line begins with `---` followed by other text on the same
+    // line. A naive `rest.find("\n---")` mistakes this `\n---...` for the
+    // closing fence and stops there — cutting off `status:` which sits *after*
+    // it, before the real `\n---\n` close. The body also has a real `---`
+    // horizontal rule between paragraphs.
+    let body = "---\ntitle: \"HR Test\"\n--- divider in notes ---\nstatus: approved\n---\n\n# HR Test\n\nFirst paragraph.\n\n---\n\nSecond paragraph.\n";
+    store::write_plan(tmp.path(), "hr", body).unwrap();
+
+    let doc = store::read_plan(tmp.path(), "hr").unwrap();
+    assert_eq!(doc.summary.title, "HR Test");
+    assert_eq!(doc.summary.status, PlanLifecycle::Approved);
+}
+
+/// `write_plan` is self-contained: it works against a fresh workspace with
+/// no prior `create_plan` (the plans dir does not yet exist) and creates
+/// the file on disk.
+#[test]
+fn write_plan_to_fresh_workspace_creates_file() {
+    let tmp = init_repo();
+
+    let body = "---\ntitle: \"Fresh\"\nstatus: draft\n---\n\n# Fresh\n";
+    let summary = store::write_plan(tmp.path(), "fresh", body).unwrap();
+    assert_eq!(summary.slug, "fresh");
+    assert_eq!(summary.title, "Fresh");
+
+    assert!(tmp.path().join(".helmor/plans/fresh.mdx").is_file());
+    let doc = store::read_plan(tmp.path(), "fresh").unwrap();
+    assert_eq!(doc.content, body);
 }
 
 /// `set_status` rewrites the frontmatter `status:` line and `read_plan`
