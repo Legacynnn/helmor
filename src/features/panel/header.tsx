@@ -4,6 +4,7 @@ import {
 	ArrowRight,
 	Check,
 	ChevronDown,
+	ClipboardList,
 	Clock3,
 	Copy,
 	GitBranch,
@@ -75,6 +76,17 @@ import { useSessionActions } from "./header/use-session-actions";
 import { isSessionRunningStatus } from "./session-running";
 import type { SessionCloseRequest } from "./use-confirm-session-close";
 
+/** Minimal plan descriptor the header needs to render a plan tab. */
+export type PlanTab = {
+	slug: string;
+	title: string;
+};
+
+/** Tab value prefix for a plan tab. The slug is appended so the existing
+ *  `onValueChange` handler can decode which plan was selected — mirroring the
+ *  hardcoded `__context_preview__` context-preview tab value. */
+const PLAN_TAB_PREFIX = "__plan__:";
+
 type WorkspacePanelHeaderProps = {
 	workspace: WorkspaceDetail | null;
 	changeRequest?: ChangeRequestInfo | null;
@@ -87,9 +99,16 @@ type WorkspacePanelHeaderProps = {
 	loadingWorkspace: boolean;
 	contextPreviewCard?: ContextCard | null;
 	contextPreviewActive?: boolean;
+	/** Plan documents for the active session (MDX planning). Each surfaces an
+	 *  extra conversation tab, mirroring the context-preview tab pattern. */
+	planTabs?: PlanTab[];
+	/** Slug of the plan whose tab is currently active, or null when a session
+	 *  / context-preview tab is selected. */
+	activePlanSlug?: string | null;
 	headerActions?: React.ReactNode;
 	headerLeading?: React.ReactNode;
 	onSelectSession?: (sessionId: string) => void;
+	onSelectPlan?: (slug: string) => void;
 	onSelectContextPreview?: () => void;
 	onCloseContextPreview?: () => void;
 	onPrefetchSession?: (sessionId: string) => void;
@@ -122,9 +141,12 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 	loadingWorkspace,
 	contextPreviewCard = null,
 	contextPreviewActive = false,
+	planTabs = [],
+	activePlanSlug = null,
 	headerActions,
 	headerLeading,
 	onSelectSession,
+	onSelectPlan,
 	onSelectContextPreview,
 	onCloseContextPreview,
 	onPrefetchSession,
@@ -142,9 +164,12 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 		changeRequest,
 	});
 	const contextTabValue = "__context_preview__";
+	const planTabValue = (slug: string) => `${PLAN_TAB_PREFIX}${slug}`;
 	const tabsValue = contextPreviewActive
 		? contextTabValue
-		: (selectedSessionId ?? sessions[0]?.id);
+		: activePlanSlug
+			? planTabValue(activePlanSlug)
+			: (selectedSessionId ?? sessions[0]?.id);
 	const pushToast = useWorkspaceToast();
 	const queryClient = useQueryClient();
 	const branchesQuery = useQuery({
@@ -503,12 +528,18 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 								<Clock3 className="size-3 animate-pulse" strokeWidth={1.8} />
 								Loading
 							</div>
-						) : sessions.length > 0 || contextPreviewCard ? (
+						) : sessions.length > 0 ||
+							contextPreviewCard ||
+							planTabs.length > 0 ? (
 							<Tabs
 								value={tabsValue}
 								onValueChange={(value) => {
 									if (value === contextTabValue) {
 										onSelectContextPreview?.();
+										return;
+									}
+									if (value.startsWith(PLAN_TAB_PREFIX)) {
+										onSelectPlan?.(value.slice(PLAN_TAB_PREFIX.length));
 										return;
 									}
 									onSelectSession?.(value);
@@ -709,6 +740,36 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 											</Tooltip>
 										);
 									})}
+									{planTabs.map((plan) => (
+										<Tooltip key={plan.slug}>
+											<TooltipTrigger asChild>
+												<TabsTrigger
+													value={planTabValue(plan.slug)}
+													aria-label={`Plan: ${plan.title}`}
+													className="group/tab relative h-full w-auto min-w-[6.5rem] max-w-[14rem] shrink-0 flex-none justify-start gap-1.5 overflow-hidden pr-3 text-ui text-muted-foreground data-[state=active]:text-foreground"
+												>
+													<span className="tab-content-fade flex min-w-0 flex-1 items-center gap-1.5">
+														<ClipboardList
+															className="size-3.5"
+															strokeWidth={1.8}
+														/>
+														<span className="truncate font-medium">
+															{plan.title}
+														</span>
+													</span>
+												</TabsTrigger>
+											</TooltipTrigger>
+											<TooltipContent
+												side="bottom"
+												sideOffset={4}
+												className={SESSION_TITLE_TOOLTIP_CLASS}
+											>
+												<span className={SESSION_TITLE_TOOLTIP_TEXT_CLASS}>
+													{displayTooltipTitle(plan.title)}
+												</span>
+											</TooltipContent>
+										</Tooltip>
+									))}
 								</TabsList>
 							</Tabs>
 						) : (

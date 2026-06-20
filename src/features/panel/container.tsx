@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { enqueueComposerPrefill } from "@/features/composer/prefill-queue";
+import { usePlanList } from "@/features/plan-viewer/use-plan";
 import { getShortcut } from "@/features/shortcuts/registry";
 import type {
 	AgentModelSection,
@@ -344,6 +345,40 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 		);
 	}, [modelSelections, queryClient, sessions, settings.defaultModel]);
 
+	// --- MDX planning -------------------------------------------------------
+	// When the feature flag is on, surface each plan document for the active
+	// session as an extra conversation tab (mirroring the context-preview tab).
+	// Selecting a plan tab is local panel state — distinct from the session
+	// selection so switching back to a session is a single click.
+	const planListQuery = usePlanList(
+		settings.mdxPlanningEnabled ? threadSessionId : null,
+	);
+	const planTabs = useMemo(
+		() =>
+			(planListQuery.data ?? []).map((plan) => ({
+				slug: plan.slug,
+				title: plan.title,
+			})),
+		[planListQuery.data],
+	);
+	const [activePlanSlug, setActivePlanSlug] = useState<string | null>(null);
+	// Clear the plan selection whenever the session changes or the selected
+	// plan disappears from the list (deleted / feature toggled off).
+	useEffect(() => {
+		if (
+			activePlanSlug &&
+			!planTabs.some((plan) => plan.slug === activePlanSlug)
+		) {
+			setActivePlanSlug(null);
+		}
+	}, [activePlanSlug, planTabs]);
+	useEffect(() => {
+		setActivePlanSlug(null);
+	}, [threadSessionId]);
+	const handleSelectPlan = useCallback((slug: string) => {
+		setActivePlanSlug(slug);
+	}, []);
+
 	// The router's session intent only applies once the workspace selection
 	// has converged onto the paint track. During a deferred flip / cold hold
 	// the router already points at the incoming workspace, whose session
@@ -542,6 +577,9 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	const onSelectSessionRef = useRef(onSelectSession);
 	onSelectSessionRef.current = onSelectSession;
 	const handleSelectSession = useCallback((sessionId: string) => {
+		// Selecting a session tab drops any active plan selection so the thread
+		// viewport renders instead of the plan surface.
+		setActivePlanSlug(null);
 		onSelectSessionRef.current(sessionId);
 	}, []);
 	const onSelectWorkspaceRef = useRef(onSelectWorkspace);
@@ -671,8 +709,12 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			interactionRequiredSessionIds={interactionRequiredSessionIds}
 			contextPreviewCard={contextPreviewCard}
 			contextPreviewActive={contextPreviewActive}
+			planTabs={planTabs}
+			activePlanSlug={activePlanSlug}
+			planSessionId={threadSessionId}
 			onSelectSession={handleSelectSession}
 			onSelectWorkspace={handleSelectWorkspace}
+			onSelectPlan={handleSelectPlan}
 			onSelectContextPreview={onSelectContextPreview}
 			onCloseContextPreview={onCloseContextPreview}
 			onPrefetchSession={handlePrefetchSession}

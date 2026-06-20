@@ -1,4 +1,5 @@
 import { memo, type ReactNode, useEffect, useState } from "react";
+import { PlanViewContainer } from "@/features/plan-viewer";
 import { SourceDetailView } from "@/features/source-detail";
 import { TerminalSessionPanel } from "@/features/terminal/terminal-session-panel";
 import type {
@@ -11,7 +12,7 @@ import { HelmorProfiler } from "@/lib/dev-react-profiler";
 import type { ContextCard } from "@/lib/sources/types";
 import { cn } from "@/lib/utils";
 import type { WorkspaceScriptType } from "@/lib/workspace-script-actions";
-import { WorkspacePanelHeader } from "./header";
+import { type PlanTab, WorkspacePanelHeader } from "./header";
 import { EmptyState, preloadStreamdown } from "./message-components";
 import {
 	ActiveThreadViewport,
@@ -42,8 +43,12 @@ type WorkspacePanelProps = {
 	interactionRequiredSessionIds?: Set<string>;
 	contextPreviewCard?: ContextCard | null;
 	contextPreviewActive?: boolean;
+	planTabs?: PlanTab[];
+	activePlanSlug?: string | null;
+	planSessionId?: string | null;
 	onSelectSession?: (sessionId: string) => void;
 	onSelectWorkspace?: (workspaceId: string) => void;
+	onSelectPlan?: (slug: string) => void;
 	onSelectContextPreview?: () => void;
 	onCloseContextPreview?: () => void;
 	onPrefetchSession?: (sessionId: string) => void;
@@ -75,8 +80,12 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	interactionRequiredSessionIds,
 	contextPreviewCard = null,
 	contextPreviewActive = false,
+	planTabs = [],
+	activePlanSlug = null,
+	planSessionId = null,
 	onSelectSession,
 	onSelectWorkspace,
+	onSelectPlan,
 	onSelectContextPreview,
 	onCloseContextPreview,
 	onPrefetchSession,
@@ -91,6 +100,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	missingScriptTypes = [],
 	onInitializeScript,
 }: WorkspacePanelProps) {
+	const planActive = activePlanSlug != null && !contextPreviewActive;
 	const selectedSession =
 		sessions.find((session) => session.id === selectedSessionId) ?? null;
 	const activePane =
@@ -104,7 +114,9 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	// fresh screen / different size corrupt the layout. Track every terminal
 	// session the user has visited; it unmounts only when its session closes.
 	const visibleTerminalId =
-		!contextPreviewActive && selectedSession?.sessionKind === "terminal"
+		!contextPreviewActive &&
+		!planActive &&
+		selectedSession?.sessionKind === "terminal"
 			? selectedSession.id
 			: null;
 	const [visitedTerminalIds, setVisitedTerminalIds] = useState<
@@ -169,10 +181,13 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 					loadingWorkspace={loadingWorkspace}
 					contextPreviewCard={contextPreviewCard}
 					contextPreviewActive={contextPreviewActive}
+					planTabs={planTabs}
+					activePlanSlug={activePlanSlug}
 					headerActions={headerActions}
 					headerLeading={headerLeading}
 					onSelectSession={onSelectSession}
 					onSelectWorkspace={onSelectWorkspace}
+					onSelectPlan={onSelectPlan}
 					onSelectContextPreview={onSelectContextPreview}
 					onCloseContextPreview={onCloseContextPreview}
 					onPrefetchSession={onPrefetchSession}
@@ -206,7 +221,14 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 							/>
 						</div>
 					))}
-					{contextPreviewActive && contextPreviewCard ? (
+					{planActive && activePlanSlug && planSessionId ? (
+						<PlanViewContainer
+							sessionId={planSessionId}
+							slug={activePlanSlug}
+							onRequestChanges={() => {}}
+							onHandoff={() => {}}
+						/>
+					) : contextPreviewActive && contextPreviewCard ? (
 						<div className="min-h-0 flex-1 overflow-hidden px-0 pt-4 pb-3">
 							<SourceDetailView card={contextPreviewCard} />
 						</div>
