@@ -300,6 +300,7 @@ pub fn send_message(
         Some(&session_id),
         Some(&workspace_id),
         std::path::Path::new(&cwd),
+        params.permission_mode.as_deref(),
     );
     let wire_prompt = match helmor_prefix.as_deref() {
         Some(helmor) => format!("{helmor}\n\nUser request:\n{}", params.prompt),

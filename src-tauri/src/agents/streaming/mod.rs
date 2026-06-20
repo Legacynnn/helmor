@@ -124,6 +124,7 @@ pub(super) fn stream_via_sidecar(
             .as_ref()
             .and_then(|(_, _, workspace_id)| workspace_id.as_deref()),
         working_directory,
+        request.permission_mode.as_deref(),
     );
 
     // Combine the optional hidden preamble with the user's prompt. Only
@@ -1459,6 +1460,7 @@ pub(crate) fn build_helmor_system_prompt_for_workspace(
     helmor_session_id: Option<&str>,
     workspace_id: Option<&str>,
     working_directory: &std::path::Path,
+    permission_mode: Option<&str>,
 ) -> Option<String> {
     use crate::agents::system_prompt::{
         build_helmor_chat_prompt, build_helmor_system_prompt, HelmorChatPromptContext,
@@ -1535,6 +1537,17 @@ pub(crate) fn build_helmor_system_prompt_for_workspace(
             })
         });
 
+    // Experimental MDX-planning contract. Only fires when the turn is
+    // running under plan mode AND the user has flipped the experimental
+    // setting on; reading it here keeps the gating in one place. A
+    // missing/unreadable row degrades to "off" — the feature stays
+    // opt-in and a broken DB never forces MDX authoring on the agent.
+    let mdx_planning = permission_mode == Some("plan")
+        && matches!(
+            crate::models::settings::load_setting_value("app.mdx_planning_enabled"),
+            Ok(Some(ref v)) if v == "true"
+        );
+
     let ctx = HelmorSystemPromptContext {
         workspace_label,
         workspace_root_path: working_directory.display().to_string(),
@@ -1543,6 +1556,8 @@ pub(crate) fn build_helmor_system_prompt_for_workspace(
         linked_directories,
         cli_command_name,
         stack,
+        permission_mode: permission_mode.map(str::to_string),
+        mdx_planning,
     };
     Some(build_helmor_system_prompt(&ctx))
 }

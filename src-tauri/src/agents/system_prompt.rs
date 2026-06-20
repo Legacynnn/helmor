@@ -87,6 +87,15 @@ pub struct HelmorSystemPromptContext {
     /// belongs to a multi-layer stack; drives the stack block in the preamble.
     /// Computed by the caller (it needs DB access to walk the chain).
     pub stack: Option<StackContext>,
+    /// The permission mode this turn is running under (`"plan"`, `"auto"`,
+    /// `"accept-edits"`, etc.). Drives the MDX plan-authoring block, which
+    /// only applies in `"plan"` mode. `None` is treated as "not plan mode".
+    pub permission_mode: Option<String>,
+    /// Whether the experimental `app.mdx_planning_enabled` setting is on.
+    /// When `true` AND `permission_mode == "plan"`, the preamble appends the
+    /// MDX plan-authoring contract so the agent writes its plan as an MDX
+    /// file under `.helmor/plans/` instead of an inline plan.
+    pub mdx_planning: bool,
 }
 
 /// Lightweight stacked-PR context injected into the workspace preamble so the
@@ -196,9 +205,47 @@ pub fn build_helmor_system_prompt(ctx: &HelmorSystemPromptContext) -> String {
         "\nIf the user asks for help with Helmor itself, point them at the feedback button at the bottom of Helmor's sidebar.\n",
     );
 
+    if ctx.permission_mode.as_deref() == Some("plan") && ctx.mdx_planning {
+        out.push_str(MDX_PLAN_AUTHORING_BLOCK);
+    }
+
     out.push_str("</helmor_context>");
     out
 }
+
+/// Plan-mode + experimental-MDX-planning contract. Appended to the
+/// preamble only when the turn runs under `permission_mode == "plan"`
+/// AND `app.mdx_planning_enabled` is on. The agent authors its plan as
+/// an MDX file with its OWN file tools (Write/Edit) — there is no
+/// special tool — then calls ExitPlanMode pointing at the file so the
+/// user reviews it in the Plan tab.
+///
+/// The block-element rule is load-bearing: Helmor's MDX parser only
+/// recognises components whose opening/closing tags sit on their own
+/// lines. Inline JSX is rendered as plain text, so the contract
+/// emphasises it repeatedly.
+const MDX_PLAN_AUTHORING_BLOCK: &str = r#"
+You are in plan mode with Helmor's MDX planning enabled. Do NOT reply with an inline plan. Instead, author the implementation plan as an MDX document and save it to `.helmor/plans/<slug>.mdx`, where `<slug>` is a short kebab-case slug derived from the task (create the `.helmor/plans/` directory first if it does not exist). Write the file with your normal file tools (Write/Edit) — there is no special plan tool.
+
+Begin the file with YAML frontmatter delimited by `---` lines, containing exactly:
+  - `title:` a quoted one-line title.
+  - `status: draft`
+  - `summary:` a quoted one-line summary.
+
+In the body, use ONLY the components listed below for structured content, and use normal markdown prose for everything else. CRITICAL: write every component as a BLOCK element — its opening and closing tags must each sit on their OWN line, never inline within a paragraph. Helmor's MDX parser renders inline JSX as plain text, so a component written inline will NOT render. All props must be plain string literals; never use `{expressions}`.
+
+Allowed components:
+  - `<RiskCard severity="low|medium|high">` … markdown … `</RiskCard>` — a risk or gotcha callout.
+  - `<Steps>` containing a markdown ordered list (`1. …`, `2. …`) of implementation steps. Do NOT nest a `<Step>` tag — just the markdown list. Each step should name what it reuses before what it adds.
+  - `<FileMap>` whose contents are lines of the form `create path/to/file`, `modify path/to/file`, or `delete path/to/file`.
+  - `<OpenQuestions>` containing a markdown list of decisions that need the user's input.
+  - `<AnnotatedCode code="…" lang="…" note="…" />` for an annotated snippet (the code may instead be passed as the component's children).
+  - `<Diagram>` containing mermaid diagram source (no code fences) for architecture or data flow.
+
+Keep explanatory prose between the components so the document reads as a coherent plan.
+
+After writing the file, call ExitPlanMode and reference the plan file path (`.helmor/plans/<slug>.mdx`) so the user can review it in the Plan tab.
+"#;
 
 /// Render the "Just Chat" variant of the preamble. Used for
 /// `WorkspaceMode::Chat` sessions that have no repo / no worktree /
@@ -242,6 +289,8 @@ mod tests {
             linked_directories: Vec::new(),
             cli_command_name: "helmor".to_string(),
             stack: None,
+            permission_mode: None,
+            mdx_planning: false,
         }
     }
 
@@ -449,6 +498,57 @@ mod tests {
         let prompt = build_helmor_system_prompt(&ctx_with_defaults());
         assert!(prompt.starts_with("<helmor_context>"));
         assert!(prompt.ends_with("</helmor_context>"));
+    }
+
+    /// Plan mode + the experimental `mdx_planning` flag → the agent is
+    /// handed the MDX plan-authoring contract: where to write the file,
+    /// the frontmatter shape, the allowed components, and the
+    /// block-element rule the MDX parser depends on. Pin the load-bearing
+    /// markers so a copy drift that breaks the contract surfaces here.
+    #[test]
+    fn plan_mode_with_mdx_planning_injects_authoring_contract() {
+        let mut ctx = ctx_with_defaults();
+        ctx.permission_mode = Some("plan".to_string());
+        ctx.mdx_planning = true;
+        let prompt = build_helmor_system_prompt(&ctx);
+        assert!(prompt.contains(".helmor/plans/"));
+        assert!(prompt.contains("RiskCard"));
+        assert!(prompt.contains("Steps"));
+        assert!(prompt.contains("FileMap"));
+        assert!(prompt.contains("OpenQuestions"));
+        assert!(prompt.contains("AnnotatedCode"));
+        assert!(prompt.contains("Diagram"));
+        assert!(prompt.contains("ExitPlanMode"));
+        // The block-element rule is the one the MDX parser actually
+        // depends on — inline JSX renders as plain text.
+        assert!(prompt.contains("OWN line"));
+        assert!(prompt.contains("BLOCK element"));
+        // Frontmatter contract.
+        assert!(prompt.contains("status: draft"));
+    }
+
+    /// The MDX contract is gated on BOTH plan mode AND the experimental
+    /// flag. Flag off → no contract, even in plan mode.
+    #[test]
+    fn plan_mode_without_mdx_planning_flag_omits_contract() {
+        let mut ctx = ctx_with_defaults();
+        ctx.permission_mode = Some("plan".to_string());
+        ctx.mdx_planning = false;
+        let prompt = build_helmor_system_prompt(&ctx);
+        assert!(!prompt.contains(".helmor/plans/"));
+        assert!(!prompt.contains("RiskCard"));
+    }
+
+    /// The MDX contract is gated on plan mode. Flag on but a non-plan
+    /// permission mode → no contract.
+    #[test]
+    fn non_plan_mode_with_mdx_planning_flag_omits_contract() {
+        let mut ctx = ctx_with_defaults();
+        ctx.permission_mode = Some("auto".to_string());
+        ctx.mdx_planning = true;
+        let prompt = build_helmor_system_prompt(&ctx);
+        assert!(!prompt.contains(".helmor/plans/"));
+        assert!(!prompt.contains("RiskCard"));
     }
 
     // ── Chat-mode preamble ────────────────────────────────────────────
