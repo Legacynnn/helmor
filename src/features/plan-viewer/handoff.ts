@@ -1,3 +1,5 @@
+import { CREATE_PREFILLED_SESSION_EVENT } from "@/lib/session-events";
+
 /**
  * Build the first prompt for a fresh agent that picks up an approved plan and
  * implements it. The prompt always references the plan file by its
@@ -18,17 +20,9 @@ export function buildHandoffPrompt(slug: string): string {
 
 /** Short intro line seeding the handoff session's composer. The full
  *  implementation guidance from {@link buildHandoffPrompt} is supplied as the
- *  prefill body below the intro. */
-const HANDOFF_INTRO = "Implementing the approved plan: ";
-
-/**
- * Window event used to create a fresh, prefilled session. Shared with the
- * inspector's "create run action" flow (and consumed by
- * `features/panel/container.tsx`), so the plan surface stays decoupled from
- * session-creation plumbing. The detail shape is
- * `{ workspaceId, intro, body }`.
- */
-const CREATE_PREFILLED_SESSION_EVENT = "helmor:create-prefilled-session";
+ *  prefill body below the intro. The trailing space is intentional: the caret
+ *  lands after it so the user can continue typing straight away. */
+export const HANDOFF_INTRO = "Implementing the approved plan: ";
 
 /**
  * Hand an approved plan to a fresh agent: dispatch the shared

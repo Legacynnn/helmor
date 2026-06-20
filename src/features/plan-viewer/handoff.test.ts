@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { buildHandoffPrompt } from "./handoff";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { CREATE_PREFILLED_SESSION_EVENT } from "@/lib/session-events";
+import {
+	buildHandoffPrompt,
+	dispatchHandoffSession,
+	HANDOFF_INTRO,
+} from "./handoff";
 
 describe("buildHandoffPrompt", () => {
 	it("references the plan file path", () => {
@@ -21,5 +26,24 @@ describe("buildHandoffPrompt", () => {
 		const prompt = buildHandoffPrompt("my-feature").toLowerCase();
 		expect(prompt).toContain("keep");
 		expect(prompt).toContain("updated");
+	});
+});
+
+describe("dispatchHandoffSession", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("fires the create-prefilled-session event with the handoff payload", () => {
+		const spy = vi.spyOn(window, "dispatchEvent");
+
+		dispatchHandoffSession("ws1", "demo");
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		const event = spy.mock.calls[0][0] as CustomEvent;
+		expect(event.type).toBe(CREATE_PREFILLED_SESSION_EVENT);
+		expect(event.detail.workspaceId).toBe("ws1");
+		expect(event.detail.intro).toBe(HANDOFF_INTRO);
+		expect(event.detail.body).toBe(buildHandoffPrompt("demo"));
 	});
 });

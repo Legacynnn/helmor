@@ -16,6 +16,7 @@ import {
 } from "@/lib/api";
 import type { ActiveEditorTarget, DiffOpenOptions } from "@/lib/editor-session";
 import { helmorQueryKeys } from "@/lib/query-client";
+import { CREATE_PREFILLED_SESSION_EVENT } from "@/lib/session-events";
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useWorkspaceInspectorSidebar } from "./hooks/use-inspector";
@@ -260,7 +261,7 @@ export function WorkspaceInspectorSidebar({
 		// hit send — see the matching listener in
 		// `features/panel/container.tsx`.
 		window.dispatchEvent(
-			new CustomEvent("helmor:create-prefilled-session", {
+			new CustomEvent(CREATE_PREFILLED_SESSION_EVENT, {
 				detail: {
 					workspaceId,
 					intro: CREATE_RUN_ACTION_PREFILL.intro,

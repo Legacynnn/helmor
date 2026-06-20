@@ -20,6 +20,7 @@ import {
 	workspaceDetailQueryOptions,
 	workspaceSessionsQueryOptions,
 } from "@/lib/query-client";
+import { CREATE_PREFILLED_SESSION_EVENT } from "@/lib/session-events";
 import { type ModelRef, useSettings } from "@/lib/settings";
 import { requestSidebarReconcile } from "@/lib/sidebar-mutation-gate";
 import type { ContextCard } from "@/lib/sources/types";
@@ -716,9 +717,9 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 				onSelectSessionLatest.current(sessionId);
 			});
 		};
-		window.addEventListener("helmor:create-prefilled-session", handler);
+		window.addEventListener(CREATE_PREFILLED_SESSION_EVENT, handler);
 		return () =>
-			window.removeEventListener("helmor:create-prefilled-session", handler);
+			window.removeEventListener(CREATE_PREFILLED_SESSION_EVENT, handler);
 	}, [displayedWorkspaceId, queryClient]);
 
 	return (

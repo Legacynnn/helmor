@@ -59,6 +59,13 @@ export function PlanViewContainer({
 		})();
 	}, [sessionId, workspaceId, slug]);
 
+	// Fire-and-forget with error logging, mirroring handleHandoff.
+	const handleApprove = useCallback(() => {
+		void setPlanStatus(sessionId, slug, "approved").catch((error) => {
+			console.error("[helmor] plan approve failed", error);
+		});
+	}, [sessionId, slug]);
+
 	if (isError) {
 		return (
 			<div className="flex h-full items-center justify-center text-muted-foreground text-small">
@@ -80,7 +87,7 @@ export function PlanViewContainer({
 			content={data.content}
 			status={data.summary.status}
 			onRequestChanges={handleRequestChanges}
-			onApprove={() => void setPlanStatus(sessionId, slug, "approved")}
+			onApprove={handleApprove}
 			onHandoff={handleHandoff}
 		/>
 	);
