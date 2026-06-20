@@ -308,6 +308,14 @@ pub fn run() {
                 Err(e) => tracing::warn!("Failed to repair .agent-contexts/ excludes: {e:#}"),
             }
 
+            // Backfill the `/.helmor/` git-exclude for existing worktree
+            // workspaces created before plan storage shipped. Best-effort —
+            // a missing exclude never blocks startup.
+            match plans::store::ensure_existing_worktree_plans_excluded() {
+                Ok(_) => {}
+                Err(e) => tracing::warn!("Failed to backfill .helmor/ excludes: {e:#}"),
+            }
+
             // Clear rows stuck in `initializing` state past the cutoff —
             // happens when the app is force-quit mid-create (Phase 2 never
             // gets to flip the state to ready/setup_pending). Five minutes
@@ -778,6 +786,11 @@ pub fn run() {
             commands::system_commands::drain_pending_cli_sends,
             commands::editor_commands::read_editor_file,
             commands::editor_commands::read_file_at_ref,
+            commands::plans::create_plan,
+            commands::plans::read_plan,
+            commands::plans::list_plans,
+            commands::plans::write_plan,
+            commands::plans::set_plan_status,
             commands::workspace_commands::set_workspace_status,
             commands::workspace_commands::move_workspace_in_sidebar,
             commands::workspace_commands::list_workspace_linked_directories,

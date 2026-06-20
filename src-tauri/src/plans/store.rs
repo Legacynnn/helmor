@@ -83,6 +83,66 @@ pub fn ensure_excluded(workspace_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Backfill the `/.helmor/` git-exclude rule for existing operational
+/// worktree workspaces. New workspace creation reaches `ensure_excluded`
+/// via [`create_plan`]/[`write_plan`]; this startup repair path covers
+/// workspaces created before plan storage shipped, so a pre-existing
+/// `.helmor/` never leaks into the user's tracked tree. Mirrors
+/// [`crate::workspace::agent_contexts::ensure_existing_worktree_contexts`].
+/// Best-effort: per-workspace failures are logged and skipped.
+pub fn ensure_existing_worktree_plans_excluded() -> Result<usize> {
+    let connection = crate::db::read_conn()?;
+    let mut stmt = connection.prepare(&format!(
+        "SELECT w.id, r.name, w.directory_name
+         FROM workspaces w
+         JOIN repos r ON r.id = w.repository_id
+         WHERE w.state {} AND COALESCE(w.mode, 'worktree') = 'worktree'",
+        crate::workspace_state::OPERATIONAL_FILTER
+    ))?;
+    let workspaces: Vec<(String, String, String)> = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?
+        .filter_map(|row| row.ok())
+        .collect();
+    drop(stmt);
+    drop(connection);
+
+    let mut ensured = 0;
+    for (workspace_id, repo_name, directory_name) in workspaces {
+        let workspace_dir = match crate::data_dir::workspace_dir(&repo_name, &directory_name) {
+            Ok(path) => path,
+            Err(error) => {
+                tracing::warn!(
+                    workspace_id = %workspace_id,
+                    error = %format!("{error:#}"),
+                    "Failed to resolve workspace dir while backfilling .helmor/ exclude"
+                );
+                continue;
+            }
+        };
+        if !workspace_dir.is_dir() {
+            continue;
+        }
+        match ensure_excluded(&workspace_dir) {
+            Ok(()) => ensured += 1,
+            Err(error) => {
+                tracing::warn!(
+                    workspace_id = %workspace_id,
+                    path = %workspace_dir.display(),
+                    error = %format!("{error:#}"),
+                    "Failed to backfill .helmor/ exclude — workspace still usable"
+                );
+            }
+        }
+    }
+    Ok(ensured)
+}
+
 /// Absolute path to the plans directory for `workspace_dir`.
 fn plans_dir(workspace_dir: &Path) -> PathBuf {
     workspace_dir.join(PLANS_SUBDIR)

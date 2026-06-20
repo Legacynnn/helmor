@@ -143,6 +143,11 @@ pub enum UiMutationEvent {
         workspace_id: String,
         session_id: Option<String>,
     },
+    /// A plan file under `.helmor/plans/` was created or changed.
+    PlanFileChanged {
+        session_id: String,
+        slug: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -251,6 +256,10 @@ mod tests {
             UiMutationEvent::FastModeUnavailable {
                 session_id: "s".into(),
                 reason: "extra usage not enabled".into(),
+            },
+            UiMutationEvent::PlanFileChanged {
+                session_id: "s".into(),
+                slug: "my-plan".into(),
             },
         ];
         for event in cases {
