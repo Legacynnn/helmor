@@ -2,9 +2,10 @@ import { CodeBlock, CodeBlockCopyButton } from "@/components/ai/code-block";
 import { PlanMarkdown } from "./plan-markdown";
 
 /**
- * `AnnotatedCode` renders a code block beside an explanatory note. The code can
- * come from the `code` prop or, failing that, from the component's children
- * text. The optional `note` prop (or remaining children) renders as markdown.
+ * `AnnotatedCode` renders a code block beside an explanatory note. The code
+ * comes from the `code` prop or, failing that, from the component's children
+ * text (the `code` prop wins when both are present). The annotation comes from
+ * the optional `note` prop only and renders as markdown.
  */
 export function AnnotatedCode({
 	code,

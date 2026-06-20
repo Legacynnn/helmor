@@ -90,13 +90,20 @@ function parseFrontmatter(yaml: string): PlanFrontmatter {
 function attributesToProps(node: MdastNode): Record<string, string> {
 	const props: Record<string, string> = {};
 	for (const attr of node.attributes ?? []) {
-		if (
-			attr.type === "mdxJsxAttribute" &&
-			typeof attr.name === "string" &&
-			typeof attr.value === "string"
-		) {
-			props[attr.name] = attr.value;
+		if (attr.type !== "mdxJsxAttribute" || typeof attr.name !== "string") {
+			continue;
 		}
+		if (typeof attr.value === "string") {
+			props[attr.name] = attr.value;
+			continue;
+		}
+		// Boolean/valueless attribute (e.g. `<FileMap compact />`): MDX reports
+		// `value == null`. Follow the HTML boolean-attribute convention.
+		if (attr.value == null) {
+			props[attr.name] = "true";
+		}
+		// Expression-valued attributes (e.g. `severity={x}`) are intentionally
+		// ignored: the parser never evaluates JS, so there is no value to read.
 	}
 	return props;
 }

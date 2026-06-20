@@ -48,6 +48,22 @@ This is **risky** stuff.
 		expect(comp.children).toBe("");
 	});
 
+	it("treats a boolean/valueless attribute as the string 'true'", () => {
+		const parsed = parsePlanMdx("<FileMap compact />");
+		const comp = parsed.blocks.find((b) => b.kind === "component");
+		if (comp?.kind !== "component") throw new Error("expected component");
+		expect(comp.name).toBe("FileMap");
+		expect(comp.props.compact).toBe("true");
+	});
+
+	it("drops expression-valued attributes (no JS evaluation)", () => {
+		const parsed = parsePlanMdx("<RiskCard severity={x} />");
+		const comp = parsed.blocks.find((b) => b.kind === "component");
+		if (comp?.kind !== "component") throw new Error("expected component");
+		expect(comp.name).toBe("RiskCard");
+		expect(comp.props.severity).toBeUndefined();
+	});
+
 	it("does not let a body horizontal rule break frontmatter", () => {
 		const src = `---
 title: Has Rule
