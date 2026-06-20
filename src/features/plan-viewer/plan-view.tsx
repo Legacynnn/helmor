@@ -114,17 +114,15 @@ export function PlanView({
 			</div>
 			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
 				{blocks.map((block) => {
+					const Cmp =
+						block.kind === "component" ? PLAN_COMPONENTS[block.name] : null;
 					const body =
 						block.kind === "prose" ? (
 							<PlanMarkdown>{block.markdown}</PlanMarkdown>
+						) : Cmp ? (
+							<Cmp {...block.props}>{block.children}</Cmp>
 						) : (
-							(() => {
-								const Cmp = PLAN_COMPONENTS[block.name];
-								if (!Cmp) {
-									return <UnsupportedBlock name={block.name} />;
-								}
-								return <Cmp {...block.props}>{block.children}</Cmp>;
-							})()
+							<UnsupportedBlock name={block.name} />
 						);
 					const isOpen = Boolean(openInputs[block.id]);
 					const hasNote = (comments[block.id] ?? "").trim().length > 0;

@@ -16,6 +16,10 @@ import { usePlan } from "./use-plan";
  * `helmor:submit-plan-feedback` window event — the conversation container
  * listens and routes it through the composer's submit path, staying in plan
  * mode. Handoff is passed through for a later task.
+ *
+ * NOTE: the agent revises the plan file with its own tools, which does NOT emit
+ * a `planFileChanged` event (see {@link usePlan}), so this view won't live-update
+ * during the revision turn — it refreshes on tab re-select / refetch.
  */
 export function PlanViewContainer({
 	sessionId,

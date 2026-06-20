@@ -6,6 +6,12 @@ import { helmorQueryKeys } from "@/lib/query-client";
  * Read a single MDX plan document for a session, keyed by (sessionId, slug).
  * Disabled until both ids are present so callers can pass nullable values
  * straight through. The `planFileChanged` ui-sync event invalidates this key.
+ *
+ * NOTE: `planFileChanged` only fires for host-side plan writes (e.g.
+ * `set_plan_status`). When the AGENT edits the plan file with its own tools
+ * during a request-changes revision turn, no event fires, so the rendered plan
+ * won't auto-refresh — it only updates on tab re-select / refetch (hence
+ * `staleTime: 0`, so any re-mount or window refocus pulls the latest content).
  */
 export function usePlan(sessionId: string | null, slug: string | null) {
 	return useQuery({

@@ -714,11 +714,17 @@ export const WorkspaceConversationContainer = memo(
 				const detail = (event as CustomEvent<SubmitPlanFeedbackEventDetail>)
 					.detail;
 				if (!detail?.sessionId || !detail.prompt) return;
+				// Effective plan mode is set via `handleChangePermissionMode` on the
+				// session contextKey — the composer reads `composerPermissionModes` at
+				// submit time. The queued prompt itself does NOT carry a mode: the
+				// `pendingPromptForSession` channel only forwards
+				// `{ sessionId, prompt, forceQueue }` (see `PendingPromptForSession` in
+				// use-commit-lifecycle.ts and its consumer in composer/container.tsx),
+				// so any `permissionMode` passed here would be silently dropped.
 				handleChangePermissionMode(`session:${detail.sessionId}`, "plan");
 				onQueuePendingPromptForSession?.({
 					sessionId: detail.sessionId,
 					prompt: detail.prompt,
-					permissionMode: "plan",
 				});
 			};
 			window.addEventListener(SUBMIT_PLAN_FEEDBACK_EVENT, handler);

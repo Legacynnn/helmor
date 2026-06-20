@@ -30,7 +30,9 @@ export function dispatchSubmitPlanFeedback(
  * path and instructs targeted edits using only the approved MDX components,
  * so unrelated sections are left untouched. Each non-empty {@link BlockComment}
  * is rendered as `- [block <id> · <name>] <comment>`. When no comments are
- * supplied a general "revise the plan" instruction is returned instead.
+ * supplied a general "revise the plan" instruction is returned instead — the
+ * "Request changes" button is gated on at least one non-empty note, so this
+ * empty fallback is purely defensive.
  */
 export function buildFeedbackPrompt(
 	slug: string,
