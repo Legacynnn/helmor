@@ -221,11 +221,11 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 							/>
 						</div>
 					))}
-					{planActive && activePlanSlug && planSessionId ? (
+					{planActive && activePlanSlug && planSessionId && workspace ? (
 						<PlanViewContainer
 							sessionId={planSessionId}
+							workspaceId={workspace.id}
 							slug={activePlanSlug}
-							onHandoff={() => {}}
 						/>
 					) : contextPreviewActive && contextPreviewCard ? (
 						<div className="min-h-0 flex-1 overflow-hidden px-0 pt-4 pb-3">
