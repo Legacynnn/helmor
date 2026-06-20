@@ -224,6 +224,11 @@ pub fn build_helmor_system_prompt(ctx: &HelmorSystemPromptContext) -> String {
 /// recognises components whose opening/closing tags sit on their own
 /// lines. Inline JSX is rendered as plain text, so the contract
 /// emphasises it repeatedly.
+///
+/// IMPORTANT: the component names in this block MUST stay in sync with the
+/// `PLAN_COMPONENTS` allowlist in `src/features/plan-viewer/mdx/registry.tsx`
+/// (SYNC-WITH). A component listed here but absent there renders as
+/// `<UnsupportedBlock>` with no error.
 const MDX_PLAN_AUTHORING_BLOCK: &str = r#"
 You are in plan mode with Helmor's MDX planning enabled. Do NOT reply with an inline plan. Instead, author the implementation plan as an MDX document and save it to `.helmor/plans/<slug>.mdx`, where `<slug>` is a short kebab-case slug derived from the task (create the `.helmor/plans/` directory first if it does not exist). Write the file with your normal file tools (Write/Edit) — there is no special plan tool.
 
@@ -236,7 +241,7 @@ In the body, use ONLY the components listed below for structured content, and us
 
 Allowed components:
   - `<RiskCard severity="low|medium|high">` … markdown … `</RiskCard>` — a risk or gotcha callout.
-  - `<Steps>` containing a markdown ordered list (`1. …`, `2. …`) of implementation steps. Do NOT nest a `<Step>` tag — just the markdown list. Each step should name what it reuses before what it adds.
+  - `<Steps>` containing a markdown ordered list (`1. …`, `2. …`) of implementation steps. There is NO `<Step>` component — do NOT nest a `<Step>` tag; put a `1. …` markdown ordered list directly inside `<Steps>`. Each step should name what it reuses before what it adds.
   - `<FileMap>` whose contents are lines of the form `create path/to/file`, `modify path/to/file`, or `delete path/to/file`.
   - `<OpenQuestions>` containing a markdown list of decisions that need the user's input.
   - `<AnnotatedCode code="…" lang="…" note="…" />` for an annotated snippet (the code may instead be passed as the component's children).
