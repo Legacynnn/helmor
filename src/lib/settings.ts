@@ -350,6 +350,8 @@ export type AppSettings = {
 	 *  exactly once at the merged-edge; skipped if the workspace has an
 	 *  active agent session or fails archive validation. */
 	autoArchiveOnMerge: boolean;
+	/** Experimental: when true, plan mode writes `.mdx` plan files. */
+	mdxPlanningEnabled: boolean;
 	/** Days after which log files are pruned by the daily auto-cleanup
 	 *  pass. `0` disables log pruning. */
 	autoCleanLogsDays: number;
@@ -458,6 +460,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 	alwaysShowContextUsage: true,
 	showUsageStats: true,
 	autoArchiveOnMerge: false,
+	mdxPlanningEnabled: false,
 	autoCleanLogsDays: 0,
 	autoDeleteDeadWorkspaceFiles: false,
 	onboardingCompleted: false,
@@ -621,7 +624,7 @@ export function getPreloadedSettings(): AppSettings {
 
 // localStorage-backed fields (sync read for flash-free boot) live in
 // `LOCALSTORAGE_KEYS` above. Everything else goes through SQLite.
-const SETTINGS_KEY_MAP: Record<
+export const SETTINGS_KEY_MAP: Record<
 	Exclude<keyof AppSettings, LocalStorageKey>,
 	string
 > = {
@@ -652,6 +655,7 @@ const SETTINGS_KEY_MAP: Record<
 	alwaysShowContextUsage: "app.always_show_context_usage",
 	showUsageStats: "app.show_usage_stats",
 	autoArchiveOnMerge: "app.auto_archive_on_merge",
+	mdxPlanningEnabled: "app.mdx_planning_enabled",
 	autoCleanLogsDays: "app.auto_clean_logs_days",
 	autoDeleteDeadWorkspaceFiles: "app.auto_delete_dead_workspace_files",
 	onboardingCompleted: "app.onboarding_completed",
@@ -1449,6 +1453,10 @@ export async function loadSettings(): Promise<AppSettings> {
 				raw[SETTINGS_KEY_MAP.autoArchiveOnMerge] !== undefined
 					? raw[SETTINGS_KEY_MAP.autoArchiveOnMerge] === "true"
 					: DEFAULT_SETTINGS.autoArchiveOnMerge,
+			mdxPlanningEnabled:
+				raw[SETTINGS_KEY_MAP.mdxPlanningEnabled] !== undefined
+					? raw[SETTINGS_KEY_MAP.mdxPlanningEnabled] === "true"
+					: DEFAULT_SETTINGS.mdxPlanningEnabled,
 			autoCleanLogsDays: readClampedInt(
 				raw[SETTINGS_KEY_MAP.autoCleanLogsDays],
 				{ min: 0, max: 365, fallback: DEFAULT_SETTINGS.autoCleanLogsDays },

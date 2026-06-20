@@ -1,11 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	DEFAULT_SETTINGS,
 	DEFAULT_START_SURFACE_PREFERENCES,
 	getPreloadedSettings,
 	LEGACY_SETTING_KEYS,
 	loadSettings,
 	readRepoPreference,
+	SETTINGS_KEY_MAP,
 	saveSettings,
 	writeRepoPreference,
 } from "./settings";
@@ -606,5 +608,12 @@ describe("settings", () => {
 			"medium",
 			"high",
 		]);
+	});
+
+	it("mdxPlanningEnabled defaults to false and maps to a db key", () => {
+		expect(DEFAULT_SETTINGS.mdxPlanningEnabled).toBe(false);
+		expect(SETTINGS_KEY_MAP.mdxPlanningEnabled).toBe(
+			"app.mdx_planning_enabled",
+		);
 	});
 });
