@@ -30,6 +30,7 @@ import {
 } from "@/lib/plan-review";
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
+import { useFileLinkContext } from "./file-link-context";
 
 export function TodoList({ part }: { part: TodoListPart }) {
 	if (part.items.length === 0) {
@@ -173,6 +174,7 @@ export function WorkflowCard({ part }: { part: WorkflowPart }) {
 
 export function PlanReviewCard({ part }: { part: PlanReviewPart }) {
 	const { settings } = useSettings();
+	const { sessionId } = useFileLinkContext();
 
 	// MDX plans live in the Plan tab, not inline. When the feature is on and the
 	// ExitPlanMode call references a `.helmor/plans/<slug>.mdx` file, render a
@@ -193,7 +195,7 @@ export function PlanReviewCard({ part }: { part: PlanReviewPart }) {
 				{slug ? (
 					<button
 						type="button"
-						onClick={() => dispatchOpenPlan({ slug })}
+						onClick={() => dispatchOpenPlan({ slug, sessionId })}
 						className="shrink-0 cursor-pointer rounded-md border border-border/70 bg-background px-2.5 py-1 text-small font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
 					>
 						Open plan

@@ -270,11 +270,17 @@ export const WorkspaceConversationContainer = memo(
 		// every file-link consumer in the thread. Memoize by hand.
 		const fileLinkValue = useMemo(
 			() => ({
+				sessionId: displayedSessionId,
 				openInEditor: onOpenFileReference,
 				openDiff: onOpenFileDiff,
 				workspaceRootPath,
 			}),
-			[onOpenFileReference, onOpenFileDiff, workspaceRootPath],
+			[
+				displayedSessionId,
+				onOpenFileReference,
+				onOpenFileDiff,
+				workspaceRootPath,
+			],
 		);
 		const composerContextKey =
 			composerContextKeyOverride ??

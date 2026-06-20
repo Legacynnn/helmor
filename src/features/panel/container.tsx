@@ -13,6 +13,7 @@ import type {
 	WorkspaceSessionSummary,
 } from "@/lib/api";
 import { createSession, loadRepoScripts } from "@/lib/api";
+import { OPEN_PLAN_EVENT } from "@/lib/plan-review";
 import {
 	helmorQueryKeys,
 	sessionThreadMessagesQueryOptions,
@@ -402,8 +403,8 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			});
 			setActivePlanSlug(detail.slug);
 		};
-		window.addEventListener("helmor:open-plan", handler);
-		return () => window.removeEventListener("helmor:open-plan", handler);
+		window.addEventListener(OPEN_PLAN_EVENT, handler);
+		return () => window.removeEventListener(OPEN_PLAN_EVENT, handler);
 	}, [queryClient, settings.mdxPlanningEnabled]);
 
 	// The router's session intent only applies once the workspace selection
