@@ -10,8 +10,12 @@ import { helmorQueryKeys } from "@/lib/query-client";
 export function usePlan(sessionId: string | null, slug: string | null) {
 	return useQuery({
 		queryKey: helmorQueryKeys.plan(sessionId ?? "", slug ?? ""),
-		queryFn: () => readPlan(sessionId as string, slug as string),
-		enabled: Boolean(sessionId) && Boolean(slug),
+		queryFn: () => {
+			if (!sessionId || !slug)
+				return Promise.reject(new Error("usePlan disabled"));
+			return readPlan(sessionId, slug);
+		},
+		enabled: !!sessionId && !!slug,
 		staleTime: 0,
 	});
 }
@@ -23,8 +27,11 @@ export function usePlan(sessionId: string | null, slug: string | null) {
 export function usePlanList(sessionId: string | null) {
 	return useQuery({
 		queryKey: helmorQueryKeys.planList(sessionId ?? ""),
-		queryFn: () => listPlans(sessionId as string),
-		enabled: Boolean(sessionId),
+		queryFn: () => {
+			if (!sessionId) return Promise.reject(new Error("usePlanList disabled"));
+			return listPlans(sessionId);
+		},
+		enabled: !!sessionId,
 		staleTime: 0,
 	});
 }
