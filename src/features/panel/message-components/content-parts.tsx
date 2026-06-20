@@ -23,6 +23,12 @@ import {
 	type WorkflowPart,
 } from "@/lib/api";
 import { convertFileSrc } from "@/lib/ipc";
+import {
+	dispatchOpenPlan,
+	isMdxPlanPath,
+	planSlugFromPath,
+} from "@/lib/plan-review";
+import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 export function TodoList({ part }: { part: TodoListPart }) {
@@ -166,6 +172,37 @@ export function WorkflowCard({ part }: { part: WorkflowPart }) {
 }
 
 export function PlanReviewCard({ part }: { part: PlanReviewPart }) {
+	const { settings } = useSettings();
+
+	// MDX plans live in the Plan tab, not inline. When the feature is on and the
+	// ExitPlanMode call references a `.helmor/plans/<slug>.mdx` file, render a
+	// compact pointer instead of dumping the full markdown into the thread — the
+	// agent wrote the document with its own file tools, so the real content is
+	// already on disk and surfaced through the Plan tab.
+	if (settings.mdxPlanningEnabled && isMdxPlanPath(part.planFilePath)) {
+		const slug = planSlugFromPath(part.planFilePath);
+		return (
+			<div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-border/70 bg-background/60 px-3.5 py-3">
+				<ClipboardList
+					className="size-4 shrink-0 text-muted-foreground"
+					strokeWidth={1.8}
+				/>
+				<span className="min-w-0 flex-1 text-ui leading-5 text-foreground">
+					Plan ready — open the Plan tab to review.
+				</span>
+				{slug ? (
+					<button
+						type="button"
+						onClick={() => dispatchOpenPlan({ slug })}
+						className="shrink-0 cursor-pointer rounded-md border border-border/70 bg-background px-2.5 py-1 text-small font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
+					>
+						Open plan
+					</button>
+				) : null}
+			</div>
+		);
+	}
+
 	return (
 		<div className="rounded-xl border-[1.5px] border-border/70 bg-background/60 px-3.5 py-3">
 			<div className="flex items-center gap-1.5 text-mini font-medium uppercase tracking-[0.06em] text-muted-foreground">

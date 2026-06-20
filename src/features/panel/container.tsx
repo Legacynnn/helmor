@@ -379,6 +379,33 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 		setActivePlanSlug(slug);
 	}, []);
 
+	// Cross-component "open this plan tab" signal. Fired by the compact
+	// plan-review card's "Open plan" button and by the conversation's
+	// auto-open-on-fresh-MDX-plan effect. The agent writes plan files with its
+	// own tools, so no `planFileChanged` ui-sync event fires — we invalidate the
+	// plan list here so the new tab appears, then select it.
+	const threadSessionIdRef = useRef(threadSessionId);
+	threadSessionIdRef.current = threadSessionId;
+	useEffect(() => {
+		if (!settings.mdxPlanningEnabled) return;
+		const handler = (event: Event) => {
+			const detail = (event as CustomEvent).detail as
+				| { slug: string; sessionId?: string | null }
+				| undefined;
+			if (!detail?.slug) return;
+			const sessionId = threadSessionIdRef.current;
+			if (!sessionId) return;
+			// Ignore stale events targeting a different session's thread.
+			if (detail.sessionId && detail.sessionId !== sessionId) return;
+			void queryClient.invalidateQueries({
+				queryKey: helmorQueryKeys.planList(sessionId),
+			});
+			setActivePlanSlug(detail.slug);
+		};
+		window.addEventListener("helmor:open-plan", handler);
+		return () => window.removeEventListener("helmor:open-plan", handler);
+	}, [queryClient, settings.mdxPlanningEnabled]);
+
 	// The router's session intent only applies once the workspace selection
 	// has converged onto the paint track. During a deferred flip / cold hold
 	// the router already points at the incoming workspace, whose session

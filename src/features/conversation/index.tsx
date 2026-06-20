@@ -24,7 +24,11 @@ import {
 import type { ResolvedComposerInsertRequest } from "@/lib/composer-insert";
 import { insertRequestMatchesComposer } from "@/lib/composer-insert";
 import type { DiffOpenOptions } from "@/lib/editor-session";
-import { hasUnresolvedPlanReview } from "@/lib/plan-review";
+import {
+	dispatchOpenPlan,
+	hasUnresolvedPlanReview,
+	latestUnresolvedMdxPlanSlug,
+} from "@/lib/plan-review";
 import {
 	agentModelSectionsQueryOptions,
 	sessionThreadMessagesQueryOptions,
@@ -458,6 +462,15 @@ export const WorkspaceConversationContainer = memo(
 			() => hasUnresolvedPlanReview(threadQuery.data ?? []),
 			[threadQuery.data],
 		);
+		// Slug of the latest unresolved plan-review iff it's an MDX plan (and the
+		// feature is on). Drives auto-opening the Plan tab — null for normal plans.
+		const unresolvedMdxPlanSlug = useMemo(
+			() =>
+				settings.mdxPlanningEnabled
+					? latestUnresolvedMdxPlanSlug(threadQuery.data ?? [])
+					: null,
+			[settings.mdxPlanningEnabled, threadQuery.data],
+		);
 
 		// True while the freshly-created workspace's first send is queued
 		// (we've shown the optimistic user bubble, but
@@ -518,6 +531,27 @@ export const WorkspaceConversationContainer = memo(
 			}
 			prevPlanReviewRef.current = hasPlanReview;
 		}, [hasPlanReview, composerContextKey]);
+
+		// Auto-open the Plan tab when a fresh MDX plan-review arrives. The agent
+		// writes the plan file with its own tools (no `planFileChanged` event), so
+		// the panel container's `helmor:open-plan` listener also invalidates the
+		// plan list to surface the new tab. Best-effort: keyed on the slug, fires
+		// once per distinct slug becoming the latest unresolved plan.
+		const prevAutoOpenedPlanSlugRef = useRef<string | null>(null);
+		useEffect(() => {
+			if (!unresolvedMdxPlanSlug) {
+				prevAutoOpenedPlanSlugRef.current = null;
+				return;
+			}
+			if (prevAutoOpenedPlanSlugRef.current === unresolvedMdxPlanSlug) {
+				return;
+			}
+			prevAutoOpenedPlanSlugRef.current = unresolvedMdxPlanSlug;
+			dispatchOpenPlan({
+				slug: unresolvedMdxPlanSlug,
+				sessionId: displayedSessionId,
+			});
+		}, [unresolvedMdxPlanSlug, displayedSessionId]);
 
 		// Carry the StartPage composer config (model / effort / permission /
 		// fast) into the new workspace's session contextKey. The start surface

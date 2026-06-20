@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadMessageLike } from "./api";
-import { hasUnresolvedPlanReview } from "./plan-review";
+import {
+	hasUnresolvedPlanReview,
+	isMdxPlanPath,
+	planSlugFromPath,
+} from "./plan-review";
 
 function msg(
 	role: "assistant" | "user",
@@ -64,5 +68,34 @@ describe("hasUnresolvedPlanReview", () => {
 
 	it("ignores assistant messages after plan-review (only user resolves)", () => {
 		expect(hasUnresolvedPlanReview([planMsg(), msg("assistant")])).toBe(true);
+	});
+});
+
+describe("isMdxPlanPath / planSlugFromPath", () => {
+	it("matches a relative .helmor/plans/<slug>.mdx path", () => {
+		expect(isMdxPlanPath(".helmor/plans/foo.mdx")).toBe(true);
+		expect(planSlugFromPath(".helmor/plans/foo.mdx")).toBe("foo");
+	});
+
+	it("matches an absolute .helmor/plans/<slug>.mdx path", () => {
+		expect(isMdxPlanPath("/repo/.helmor/plans/my-plan.mdx")).toBe(true);
+		expect(planSlugFromPath("/repo/.helmor/plans/my-plan.mdx")).toBe("my-plan");
+	});
+
+	it("rejects non-plan paths", () => {
+		expect(isMdxPlanPath("src/foo.mdx")).toBe(false);
+		expect(planSlugFromPath("src/foo.mdx")).toBeNull();
+		expect(isMdxPlanPath(".helmor/plans/foo.md")).toBe(false);
+		expect(planSlugFromPath(".helmor/plans/foo.md")).toBeNull();
+		expect(isMdxPlanPath(".helmor/notplans/foo.mdx")).toBe(false);
+		expect(planSlugFromPath(".helmor/plans/sub/foo.mdx")).toBeNull();
+	});
+
+	it("returns false / null for empty or nullish input", () => {
+		expect(isMdxPlanPath(undefined)).toBe(false);
+		expect(isMdxPlanPath(null)).toBe(false);
+		expect(isMdxPlanPath("")).toBe(false);
+		expect(planSlugFromPath(undefined)).toBeNull();
+		expect(planSlugFromPath(null)).toBeNull();
 	});
 });
