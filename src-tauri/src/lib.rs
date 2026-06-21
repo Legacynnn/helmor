@@ -199,6 +199,7 @@ pub fn run() {
             local_llm::CatalogAssetProvider,
         )))
         .manage(git_watcher::GitWatcherManager::new())
+        .manage(plans::watcher::PlanWatcherManager::new())
         .manage(workspace::scripts::ScriptProcessManager::new())
         .manage(std::sync::Arc::new(
             resources::sampler::ResourceSampler::default(),
@@ -492,6 +493,10 @@ pub fn run() {
                     let manager = watcher_handle.state::<git_watcher::GitWatcherManager>();
                     if let Err(e) = manager.sync_from_db(watcher_handle.clone()) {
                         tracing::error!("Failed to initialize git watchers: {e:#}");
+                    }
+                    let plan_manager = watcher_handle.state::<plans::watcher::PlanWatcherManager>();
+                    if let Err(e) = plan_manager.sync_from_db(watcher_handle.clone()) {
+                        tracing::error!("Failed to initialize plan watchers: {e:#}");
                     }
                 })
             {

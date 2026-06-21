@@ -815,6 +815,10 @@ pub fn notify_workspace_changed<R: Runtime>(app: &AppHandle<R>) {
     if let Err(e) = manager.sync_from_db(app.clone()) {
         tracing::warn!("Failed to sync git watchers after workspace change: {e:#}");
     }
+    let plan_manager = app.state::<crate::plans::watcher::PlanWatcherManager>();
+    if let Err(e) = plan_manager.sync_from_db(app.clone()) {
+        tracing::warn!("Failed to sync plan watchers after workspace change: {e:#}");
+    }
 }
 
 #[cfg(test)]

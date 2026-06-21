@@ -2675,6 +2675,8 @@ pub async fn request_quit(app: tauri::AppHandle, force: bool) {
 pub fn cleanup_before_exit(app: &tauri::AppHandle, force: bool) {
     // 1. Stop filesystem watchers so no new events arrive.
     app.state::<git_watcher::GitWatcherManager>().shutdown();
+    app.state::<crate::plans::watcher::PlanWatcherManager>()
+        .shutdown();
 
     // 2. If tasks are in flight, gracefully stop every active stream.
     if force {
@@ -2791,6 +2793,8 @@ pub async fn dev_reset_all_data(app: tauri::AppHandle) -> CmdResult<DevResetResu
     {
         let manager = app.state::<git_watcher::GitWatcherManager>();
         manager.shutdown();
+        app.state::<crate::plans::watcher::PlanWatcherManager>()
+            .shutdown();
     }
 
     run_blocking(move || {
