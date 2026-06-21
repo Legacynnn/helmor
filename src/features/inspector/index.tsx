@@ -511,6 +511,7 @@ export function WorkspaceInspectorSidebar({
 						activeEditor={activeEditor}
 						onOpenEditorFile={onOpenEditorFile}
 						onOpenFileReference={onOpenFileReference}
+						currentSessionId={currentSessionId ?? null}
 					/>
 				}
 				gitPage={

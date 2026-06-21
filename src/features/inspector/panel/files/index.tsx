@@ -14,6 +14,11 @@ import type {
 	DiffOpenOptions,
 	InspectorFileItem,
 } from "@/lib/editor-session";
+import {
+	dispatchOpenPlan,
+	isMdxPlanPath,
+	planSlugFromPath,
+} from "@/lib/plan-review";
 import { cn } from "@/lib/utils";
 import {
 	DIFF_ROW_RENDER_STYLE,
@@ -58,6 +63,8 @@ type FilesTabProps = {
 		column?: number,
 		options?: { preview?: boolean },
 	) => void;
+	/** Displayed thread session, used to route plan files to the plan view. */
+	currentSessionId?: string | null;
 };
 
 function FilesTabImpl({
@@ -67,6 +74,7 @@ function FilesTabImpl({
 	activeEditor,
 	onOpenEditorFile,
 	onOpenFileReference,
+	currentSessionId,
 }: FilesTabProps) {
 	const [showIgnored, setShowIgnored] = useState(readShowIgnored);
 	useEffect(() => {
@@ -102,6 +110,16 @@ function FilesTabImpl({
 		(relativePath: string) => {
 			if (!workspaceRootPath) return;
 			const absolutePath = `${workspaceRootPath}/${relativePath}`;
+			// A Helmor MDX plan opens as the formatted plan view in the thread,
+			// not as raw MDX in the editor — but only when we know which session's
+			// plan list it belongs to.
+			if (currentSessionId && isMdxPlanPath(absolutePath)) {
+				const slug = planSlugFromPath(absolutePath);
+				if (slug) {
+					dispatchOpenPlan({ slug, sessionId: currentSessionId });
+					return;
+				}
+			}
 			// File-tree click = "look at the file", not "review a diff" — open
 			// in plain editor mode as a preview tab when the action exists.
 			if (onOpenFileReference) {
@@ -112,7 +130,12 @@ function FilesTabImpl({
 			}
 			onOpenEditorFile(absolutePath);
 		},
-		[workspaceRootPath, onOpenEditorFile, onOpenFileReference],
+		[
+			workspaceRootPath,
+			currentSessionId,
+			onOpenEditorFile,
+			onOpenFileReference,
+		],
 	);
 
 	if (!workspaceRootPath) {
