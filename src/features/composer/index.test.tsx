@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { PendingPermission } from "@/features/conversation/hooks/use-streaming";
 import type { PendingUserInput } from "@/features/conversation/pending-user-input";
+import { buildImplementPrompt } from "@/features/plan-viewer/handoff";
 import { createHelmorQueryClient } from "@/lib/query-client";
 import {
 	__resetDraftCacheForTests,
@@ -1340,6 +1341,48 @@ describe("WorkspaceComposer", () => {
 			[],
 			{ permissionModeOverride: "bypassPermissions" },
 		);
+	});
+
+	it("submits the MDX implement prompt when an unresolved plan slug is set", async () => {
+		const queryClient = createHelmorQueryClient();
+		const onSubmit = vi.fn();
+
+		render(
+			<QueryClientProvider client={queryClient}>
+				<WorkspaceComposer
+					contextKey="session:session-1"
+					onSubmit={onSubmit}
+					disabled={false}
+					submitDisabled={false}
+					sending={false}
+					selectedModelId="opus-1m"
+					modelSections={MODEL_SECTIONS}
+					onSelectModel={vi.fn()}
+					provider="claude"
+					effortLevel="high"
+					onSelectEffort={vi.fn()}
+					permissionMode="plan"
+					onChangePermissionMode={vi.fn()}
+					restoreImages={[]}
+					restoreFiles={[]}
+					restoreCustomTags={[]}
+					hasPlanReview
+					unresolvedMdxPlanSlug="my-feature"
+				/>
+			</QueryClientProvider>,
+		);
+
+		await userEvent.click(screen.getByRole("button", { name: "Implement" }));
+
+		expect(onSubmit).toHaveBeenCalledWith(
+			buildImplementPrompt("my-feature"),
+			[],
+			[],
+			[],
+			{ permissionModeOverride: "bypassPermissions" },
+		);
+		const submittedPrompt = onSubmit.mock.calls[0]?.[0] as string;
+		expect(submittedPrompt).toContain(".helmor/plans/my-feature.mdx");
 	});
 
 	it("disables Request Changes when input is empty", () => {
