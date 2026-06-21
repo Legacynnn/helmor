@@ -56,6 +56,7 @@ import {
 	type WorkspaceSessionSummary,
 } from "@/lib/api";
 import { initialsFor } from "@/lib/initials";
+import { dispatchClosePlan } from "@/lib/plan-review";
 import {
 	helmorQueryKeys,
 	workspaceAccountProfileQueryOptions,
@@ -751,7 +752,18 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 												<TabsTrigger
 													value={planTabValue(plan.slug)}
 													aria-label={`Plan: ${plan.title}`}
-													className="group/tab relative h-full w-auto min-w-[6.5rem] max-w-[14rem] shrink-0 flex-none justify-start gap-1.5 overflow-hidden pr-3 text-ui text-muted-foreground data-[state=active]:text-foreground"
+													onKeyDownCapture={(event) => {
+														if (
+															event.key.toLowerCase() !== "w" ||
+															(!event.metaKey && !event.ctrlKey)
+														) {
+															return;
+														}
+														event.preventDefault();
+														event.stopPropagation();
+														dispatchClosePlan();
+													}}
+													className="group/tab relative h-full w-auto min-w-[6.5rem] max-w-[14rem] shrink-0 flex-none justify-start gap-1.5 overflow-hidden pr-5 text-ui text-muted-foreground data-[state=active]:text-foreground"
 												>
 													<span className="tab-content-fade flex min-w-0 flex-1 items-center gap-1.5">
 														<ClipboardList
@@ -762,6 +774,23 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 															{plan.title}
 														</span>
 													</span>
+													{plan.slug === activePlanSlug ? (
+														<span className="pointer-events-none invisible absolute inset-y-0 right-0 flex items-center pr-1 group-hover/tab:pointer-events-auto group-hover/tab:visible">
+															<span
+																role="button"
+																aria-label="Close plan"
+																onPointerDown={stopTabActionPointerDown}
+																onClick={(event) => {
+																	event.preventDefault();
+																	event.stopPropagation();
+																	dispatchClosePlan();
+																}}
+																className="flex cursor-interactive items-center justify-center rounded-sm p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+															>
+																<X className="size-3" strokeWidth={2} />
+															</span>
+														</span>
+													) : null}
 												</TabsTrigger>
 											</TooltipTrigger>
 											<TooltipContent
