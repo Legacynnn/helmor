@@ -56,4 +56,28 @@ describe("buildCanvasGraph", () => {
 		]);
 		expect(nodes[0].data.bodyBlocks).toEqual([body]);
 	});
+
+	it("deduplicates nodes that share an id", () => {
+		const { nodes } = buildCanvasGraph([
+			node("b0", { id: "a", title: "First" }),
+			node("b1", { id: "a", title: "Second" }),
+		]);
+		expect(nodes).toHaveLength(1);
+		expect(nodes[0].data.title).toBe("First");
+	});
+
+	it("deduplicates repeated edge targets", () => {
+		const { edges } = buildCanvasGraph([
+			node("b0", { id: "a", title: "A", connects: "b,b" }),
+			node("b1", { id: "b", title: "B" }),
+		]);
+		expect(edges).toHaveLength(1);
+	});
+
+	it("drops self-loop edges", () => {
+		const { edges } = buildCanvasGraph([
+			node("b0", { id: "a", title: "A", connects: "a" }),
+		]);
+		expect(edges).toHaveLength(0);
+	});
 });

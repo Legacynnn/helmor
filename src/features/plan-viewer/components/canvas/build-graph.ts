@@ -60,6 +60,7 @@ export function buildCanvasGraph(childBlocks: PlanBlock[]): CanvasGraph {
 	}
 
 	const edges: CanvasGraphEdge[] = [];
+	const seenEdgeIds = new Set<string>();
 	for (const block of childBlocks) {
 		if (block.kind !== "component" || block.name !== "CanvasNode") {
 			continue;
@@ -67,7 +68,11 @@ export function buildCanvasGraph(childBlocks: PlanBlock[]): CanvasGraph {
 		const source = block.props.id?.trim() || block.id;
 		for (const target of splitConnects(block.props.connects)) {
 			if (!ids.has(target)) continue; // drop dangling edges
-			edges.push({ id: `${source}->${target}`, source, target });
+			if (target === source) continue; // drop self-loops (degenerate layout)
+			const id = `${source}->${target}`;
+			if (seenEdgeIds.has(id)) continue; // dedupe repeated targets (e.g. "b,b")
+			seenEdgeIds.add(id);
+			edges.push({ id, source, target });
 		}
 	}
 
