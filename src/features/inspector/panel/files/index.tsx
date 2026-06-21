@@ -111,12 +111,14 @@ function FilesTabImpl({
 			if (!workspaceRootPath) return;
 			const absolutePath = `${workspaceRootPath}/${relativePath}`;
 			// A Helmor MDX plan opens as the formatted plan view in the thread,
-			// not as raw MDX in the editor — but only when we know which session's
-			// plan list it belongs to.
-			if (currentSessionId && isMdxPlanPath(absolutePath)) {
+			// not as raw MDX in the editor. `currentSessionId` is only a hint: the
+			// conversation panel's open-plan listener resolves the session itself
+			// (falling back to its own thread session when the event omits one), so
+			// we route plan files even when the inspector doesn't know the session.
+			if (isMdxPlanPath(absolutePath)) {
 				const slug = planSlugFromPath(absolutePath);
 				if (slug) {
-					dispatchOpenPlan({ slug, sessionId: currentSessionId });
+					dispatchOpenPlan({ slug, sessionId: currentSessionId ?? undefined });
 					return;
 				}
 			}
