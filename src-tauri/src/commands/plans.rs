@@ -5,7 +5,7 @@
 //! (the surface a plan is opened from) + `slug`; these handlers resolve the
 //! owning workspace directory from the session row and delegate to the store.
 //! Mutating handlers broadcast [`UiMutationEvent::PlanFileChanged`] so any
-//! frontend watching that session re-fetches.
+//! frontend watching that workspace/slug re-fetches.
 
 use std::path::PathBuf;
 
@@ -69,21 +69,16 @@ pub async fn write_plan(
     slug: String,
     content: String,
 ) -> CmdResult<PlanSummary> {
-    let summary = run_blocking({
-        let session_id = session_id.clone();
+    let (workspace_id, summary) = run_blocking({
         let slug = slug.clone();
         move || {
-            let workspace_dir = workspace_dir_for_session(&session_id)?;
-            store::write_plan(&workspace_dir, &slug, &content)
-        }
-    })
-    .await?;
-
-    let workspace_id = run_blocking({
-        let session_id = session_id.clone();
-        move || {
-            crate::models::sessions::workspace_id_for_session(&session_id)?
-                .with_context(|| format!("No workspace bound to session {session_id}"))
+            let workspace_id = sessions::workspace_id_for_session(&session_id)?
+                .with_context(|| format!("No workspace bound to session {session_id}"))?;
+            let record = workspace_models::load_workspace_record_by_id(&workspace_id)?
+                .with_context(|| format!("Workspace not found: {workspace_id}"))?;
+            let workspace_dir = crate::workspace::helpers::workspace_path(&record)?;
+            let summary = store::write_plan(&workspace_dir, &slug, &content)?;
+            Ok::<_, anyhow::Error>((workspace_id, summary))
         }
     })
     .await?;
@@ -102,21 +97,16 @@ pub async fn set_plan_status(
     slug: String,
     status: PlanLifecycle,
 ) -> CmdResult<PlanSummary> {
-    let summary = run_blocking({
-        let session_id = session_id.clone();
+    let (workspace_id, summary) = run_blocking({
         let slug = slug.clone();
         move || {
-            let workspace_dir = workspace_dir_for_session(&session_id)?;
-            store::set_status(&workspace_dir, &slug, status)
-        }
-    })
-    .await?;
-
-    let workspace_id = run_blocking({
-        let session_id = session_id.clone();
-        move || {
-            crate::models::sessions::workspace_id_for_session(&session_id)?
-                .with_context(|| format!("No workspace bound to session {session_id}"))
+            let workspace_id = sessions::workspace_id_for_session(&session_id)?
+                .with_context(|| format!("No workspace bound to session {session_id}"))?;
+            let record = workspace_models::load_workspace_record_by_id(&workspace_id)?
+                .with_context(|| format!("Workspace not found: {workspace_id}"))?;
+            let workspace_dir = crate::workspace::helpers::workspace_path(&record)?;
+            let summary = store::set_status(&workspace_dir, &slug, status)?;
+            Ok::<_, anyhow::Error>((workspace_id, summary))
         }
     })
     .await?;
