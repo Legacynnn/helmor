@@ -2539,7 +2539,7 @@ export type UiMutationEvent =
 	| { type: "contextUsageChanged"; sessionId: string }
 	| { type: "codexGoalChanged"; sessionId: string }
 	| { type: "sessionPlanChanged"; sessionId: string }
-	| { type: "planFileChanged"; sessionId: string; slug: string }
+	| { type: "planFileChanged"; workspaceId: string; slug: string }
 	| { type: "sessionMessagesAppended"; sessionId: string }
 	| { type: "sessionTurnPersisted"; sessionId: string }
 	| { type: "workspaceFilesChanged"; workspaceId: string }

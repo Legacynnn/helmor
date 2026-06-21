@@ -7,11 +7,9 @@ import { helmorQueryKeys } from "@/lib/query-client";
  * Disabled until both ids are present so callers can pass nullable values
  * straight through. The `planFileChanged` ui-sync event invalidates this key.
  *
- * NOTE: `planFileChanged` only fires for host-side plan writes (e.g.
- * `set_plan_status`). When the AGENT edits the plan file with its own tools
- * during a request-changes revision turn, no event fires, so the rendered plan
- * won't auto-refresh — it only updates on tab re-select / refetch (hence
- * `staleTime: 0`, so any re-mount or window refocus pulls the latest content).
+ * A workspace-scoped filesystem watcher publishes `planFileChanged` whenever a
+ * `.helmor/plans/*.mdx` file changes — including the agent's own in-place edits
+ * during a request-changes turn — so the rendered plan auto-refreshes live.
  */
 export function usePlan(sessionId: string | null, slug: string | null) {
 	return useQuery({

@@ -103,11 +103,17 @@ function handleUiMutation(
 			});
 			return;
 		case "planFileChanged":
+			// Plan files are workspace-global on disk but queried per active
+			// session (`["plan", sessionId, slug]`). Invalidate by slug across
+			// every session so the open plan refreshes regardless of which
+			// session opened it, and refresh all plan lists so a new plan's tab
+			// appears.
 			void queryClient.invalidateQueries({
-				queryKey: helmorQueryKeys.plan(event.sessionId, event.slug),
+				predicate: (query) =>
+					query.queryKey[0] === "plan" && query.queryKey[2] === event.slug,
 			});
 			void queryClient.invalidateQueries({
-				queryKey: helmorQueryKeys.planList(event.sessionId),
+				predicate: (query) => query.queryKey[0] === "planList",
 			});
 			return;
 		case "sessionMessagesAppended":
