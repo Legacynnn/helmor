@@ -891,7 +891,14 @@ pub(super) fn stream_via_sidecar(
                         .unwrap_or_default()
                         .to_string();
                     let plan_value = event.raw.get("plan").cloned().unwrap_or(Value::Null);
-                    let tool_input = json!({ "plan": plan_value });
+                    let plan_file_path_value = event
+                        .raw
+                        .get("planFilePath")
+                        .filter(|value| value.is_string())
+                        .cloned()
+                        .unwrap_or(Value::Null);
+                    let tool_input =
+                        json!({ "plan": plan_value, "planFilePath": plan_file_path_value });
                     tracing::debug!(rid = %rid, tool_use_id = %tool_use_id, "Plan captured");
 
                     if let Some(pipeline_state) = pipeline.as_mut() {

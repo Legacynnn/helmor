@@ -1,0 +1,18 @@
+---
+source: tests/pipeline_scenarios.rs
+expression: rendered
+---
+- role: assistant
+  id: msg-1
+  content_length: 1
+  content:
+    - type: plan-review
+      tool_use_id: tool-mdx-1
+      tool_name: ExitPlanMode
+      plan_length: 36
+      plan_preview: "1. Author the plan\n2. Exit plan mode"
+      plan_file_path: ".helmor/plans/add-streaming.mdx"
+      allowed_prompt_tools:
+        - Read
+  status: ~
+  streaming: ~

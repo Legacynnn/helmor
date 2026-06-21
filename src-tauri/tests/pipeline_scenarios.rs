@@ -1228,6 +1228,38 @@ fn exit_plan_mode_empty_allowed_prompts_serializes_as_empty_array() {
 }
 
 #[test]
+fn exit_plan_mode_mdx_plan_path_survives_to_plan_review_part() {
+    // Regression: the live planCaptured seam must thread the
+    // `.helmor/plans/<slug>.mdx` path through `tool_input.planFilePath`
+    // into the plan-review part. If the path is dropped (as it was when
+    // the sidecar event omitted planFilePath), the frontend's
+    // `isMdxPlanPath()` never fires and the Plan tab never auto-opens.
+    let path = ".helmor/plans/add-streaming.mdx";
+    let msgs = vec![exit_plan_mode(
+        "a1",
+        "tool-mdx-1",
+        "1. Author the plan\n2. Exit plan mode",
+        Some(path),
+        &[("Read", "Open the plan file")],
+    )];
+    let rendered = run_normalized(msgs);
+    let plan_file_path = rendered
+        .iter()
+        .flat_map(|message| message.content.iter())
+        .find_map(|part| match part {
+            NormPart::PlanReview { plan_file_path, .. } => Some(plan_file_path.clone()),
+            _ => None,
+        })
+        .expect("a plan-review part should be present");
+    assert_eq!(
+        plan_file_path.as_deref(),
+        Some(path),
+        "the MDX plan file path must survive into the plan-review part"
+    );
+    assert_yaml_snapshot!(rendered);
+}
+
+#[test]
 fn exit_plan_mode_missing_plan_file_path() {
     let msgs = vec![exit_plan_mode(
         "a1",

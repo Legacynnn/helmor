@@ -147,6 +147,7 @@ export type PlanCapturedEvent = {
 	readonly type: "planCaptured";
 	readonly toolUseId: string;
 	readonly plan: string | null;
+	readonly planFilePath?: string | null;
 };
 
 export type ModelsListedEvent = {
@@ -288,7 +289,12 @@ export interface SidecarEmitter {
 		action: "submit" | "decline",
 	): void;
 	permissionModeChanged(requestId: string, permissionMode: string): void;
-	planCaptured(requestId: string, toolUseId: string, plan: string | null): void;
+	planCaptured(
+		requestId: string,
+		toolUseId: string,
+		plan: string | null,
+		planFilePath?: string | null,
+	): void;
 	modelsListed(
 		requestId: string,
 		provider: string,
@@ -411,8 +417,14 @@ export function createSidecarEmitter(
 				type: "permissionModeChanged",
 				permissionMode,
 			}),
-		planCaptured: (requestId, toolUseId, plan) =>
-			write({ id: requestId, type: "planCaptured", toolUseId, plan }),
+		planCaptured: (requestId, toolUseId, plan, planFilePath = null) =>
+			write({
+				id: requestId,
+				type: "planCaptured",
+				toolUseId,
+				plan,
+				planFilePath,
+			}),
 		modelsListed: (requestId, provider, models) =>
 			write({ id: requestId, type: "modelsListed", provider, models }),
 		contextUsageUpdated: (requestId, sessionId, meta) =>

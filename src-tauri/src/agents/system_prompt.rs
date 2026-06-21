@@ -249,7 +249,7 @@ Allowed components:
 
 Keep explanatory prose between the components so the document reads as a coherent plan.
 
-After writing the file, call ExitPlanMode and reference the plan file path (`.helmor/plans/<slug>.mdx`) so the user can review it in the Plan tab.
+After writing the file, call ExitPlanMode and pass the plan file path as the `filePath` argument (the workspace-relative path `.helmor/plans/<slug>.mdx`) so Helmor can open it in the Plan tab. The `filePath` argument is required — without it the plan will not surface.
 "#;
 
 /// Render the "Just Chat" variant of the preamble. Used for

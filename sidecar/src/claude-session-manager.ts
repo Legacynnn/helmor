@@ -609,7 +609,16 @@ export class ClaudeSessionManager implements SessionManager {
 					if (_toolName === "ExitPlanMode") {
 						const plan = extractExitPlanContent(input);
 						if (plan) {
-							emitter.planCaptured(requestId, options.toolUseID, plan);
+							const planFilePath =
+								typeof input.filePath === "string" && input.filePath.trim()
+									? input.filePath
+									: null;
+							emitter.planCaptured(
+								requestId,
+								options.toolUseID,
+								plan,
+								planFilePath,
+							);
 						}
 						return {
 							behavior: "deny" as const,
