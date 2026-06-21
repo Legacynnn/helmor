@@ -19,9 +19,10 @@ import { usePlan } from "./use-plan";
  * (in the same workspace) with an implementation prompt via the shared
  * `helmor:create-prefilled-session` mechanism.
  *
- * NOTE: the agent revises the plan file with its own tools, which does NOT emit
- * a `planFileChanged` event (see {@link usePlan}), so this view won't live-update
- * during the revision turn — it refreshes on tab re-select / refetch.
+ * NOTE: a workspace-scoped filesystem watcher publishes `planFileChanged` on any
+ * `.helmor/plans/*.mdx` change, including the agent's own in-place edits, so this
+ * view live-updates during the revision turn (it also still refreshes on tab
+ * re-select / refetch).
  */
 export function PlanViewContainer({
 	sessionId,

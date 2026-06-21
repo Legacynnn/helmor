@@ -542,11 +542,12 @@ export const WorkspaceConversationContainer = memo(
 			prevPlanReviewRef.current = hasPlanReview;
 		}, [hasPlanReview, composerContextKey]);
 
-		// Auto-open the Plan tab when a fresh MDX plan-review arrives. The agent
-		// writes the plan file with its own tools (no `planFileChanged` event), so
-		// the panel container's `helmor:open-plan` listener also invalidates the
-		// plan list to surface the new tab. Best-effort: keyed on the slug, fires
-		// once per distinct slug becoming the latest unresolved plan.
+		// Auto-open the Plan tab when a fresh MDX plan-review arrives. A
+		// workspace-scoped filesystem watcher publishes `planFileChanged` on any
+		// `.helmor/plans/*.mdx` change (including the agent's own edits), but the
+		// panel container's `helmor:open-plan` listener also invalidates the plan
+		// list to surface the new tab immediately. Best-effort: keyed on the slug,
+		// fires once per distinct slug becoming the latest unresolved plan.
 		const prevAutoOpenedPlanSlugRef = useRef<string | null>(null);
 		useEffect(() => {
 			if (!unresolvedMdxPlanSlug) {

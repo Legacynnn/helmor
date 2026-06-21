@@ -383,9 +383,11 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 
 	// Cross-component "open this plan tab" signal. Fired by the compact
 	// plan-review card's "Open plan" button and by the conversation's
-	// auto-open-on-fresh-MDX-plan effect. The agent writes plan files with its
-	// own tools, so no `planFileChanged` ui-sync event fires — we invalidate the
-	// plan list here so the new tab appears, then select it.
+	// auto-open-on-fresh-MDX-plan effect. A workspace-scoped filesystem watcher
+	// also publishes `planFileChanged` on any `.helmor/plans/*.mdx` change
+	// (including the agent's own edits), but we invalidate the plan list here so
+	// the new tab appears immediately without waiting for the watcher, then
+	// select it.
 	const threadSessionIdRef = useRef(threadSessionId);
 	threadSessionIdRef.current = threadSessionId;
 	useEffect(() => {
