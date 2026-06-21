@@ -13,7 +13,7 @@ export function PlanCanvas({ childBlocks = [], direction }: PlanCanvasProps) {
 	return (
 		<Suspense
 			fallback={
-				<div className="my-4 h-[460px] w-full animate-pulse rounded-xl border border-border bg-background" />
+				<div className="h-[460px] w-full animate-pulse border-border border-b bg-background" />
 			}
 		>
 			<PlanCanvasSurface childBlocks={childBlocks} direction={direction} />

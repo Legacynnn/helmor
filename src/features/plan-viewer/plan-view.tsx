@@ -43,6 +43,19 @@ export function PlanView({
 	onHandoff: () => void;
 }) {
 	const { blocks } = useMemo(() => parsePlanMdx(content), [content]);
+	// Hoist the plan canvas (if any) so it always renders first and full-bleed,
+	// above the padded plan content.
+	const canvasBlock = useMemo(
+		() =>
+			blocks.find((b) => b.kind === "component" && b.name === "PlanCanvas") ??
+			null,
+		[blocks],
+	);
+	const bodyBlocks = useMemo(
+		() =>
+			canvasBlock ? blocks.filter((b) => b.id !== canvasBlock.id) : blocks,
+		[blocks, canvasBlock],
+	);
 	// Note text keyed by block id. A block is "commented" once its entry is a
 	// non-empty trimmed string.
 	const [comments, setComments] = useState<Record<string, string>>({});
@@ -105,43 +118,59 @@ export function PlanView({
 					</Button>
 				</div>
 			</div>
-			<div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-				{blocks.map((block) => {
-					const body = renderBlock(block);
-					const isOpen = Boolean(openInputs[block.id]);
-					const hasNote = (comments[block.id] ?? "").trim().length > 0;
-					return (
-						<div key={block.id} className="group relative">
-							<div className="flex items-start gap-2">
-								<div className="min-w-0 flex-1">{body}</div>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									aria-label={`Comment on ${labelById[block.id]}`}
-									title={`Comment on ${labelById[block.id]}`}
-									className={cn(
-										"shrink-0 cursor-pointer opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100",
-										(isOpen || hasNote) && "opacity-100",
-										hasNote && "text-primary",
-									)}
-									onClick={() => toggleInput(block.id)}
-								>
-									<MessageSquarePlusIcon className="size-4" />
-								</Button>
+			<div className="min-h-0 flex-1 overflow-y-auto">
+				{canvasBlock ? (
+					// The plan canvas is always the first thing in the body and renders
+					// full-bleed (no padding), flush under the header. The rest of the
+					// plan content sits in the padded column below it.
+					<div className="w-full">{renderBlock(canvasBlock)}</div>
+				) : null}
+				<div className="px-6 py-5">
+					{bodyBlocks.map((block) => {
+						const body = renderBlock(block);
+						const isOpen = Boolean(openInputs[block.id]);
+						const hasNote = (comments[block.id] ?? "").trim().length > 0;
+						return (
+							<div key={block.id} className="group relative">
+								<div className="flex items-start gap-2">
+									<div className="min-w-0 flex-1">{body}</div>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										aria-label={`Comment on ${labelById[block.id]}`}
+										title={`Comment on ${labelById[block.id]}`}
+										className={cn(
+											"shrink-0 cursor-pointer opacity-0 transition-opacity group-hover:opacity-100",
+											(isOpen || hasNote) && "opacity-100",
+											hasNote && "text-primary",
+										)}
+										// Blur after click so the button doesn't retain focus and
+										// stay visible after the pointer leaves (WebKit treats a
+										// click as focus-visible). On open, the textarea autofocuses.
+										onClick={(event) => {
+											toggleInput(block.id);
+											event.currentTarget.blur();
+										}}
+									>
+										<MessageSquarePlusIcon className="size-4" />
+									</Button>
+								</div>
+								{isOpen ? (
+									<Textarea
+										autoFocus
+										value={comments[block.id] ?? ""}
+										placeholder={`Comment on “${labelById[block.id]}”…`}
+										className="mt-1 mb-2 min-h-16 text-small"
+										onChange={(event) =>
+											setComment(block.id, event.target.value)
+										}
+									/>
+								) : null}
 							</div>
-							{isOpen ? (
-								<Textarea
-									autoFocus
-									value={comments[block.id] ?? ""}
-									placeholder={`Comment on “${labelById[block.id]}”…`}
-									className="mt-1 mb-2 min-h-16 text-small"
-									onChange={(event) => setComment(block.id, event.target.value)}
-								/>
-							) : null}
-						</div>
-					);
-				})}
+						);
+					})}
+				</div>
 			</div>
 		</div>
 	);

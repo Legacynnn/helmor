@@ -46,7 +46,7 @@ export default function PlanCanvasSurface({
 	}
 
 	return (
-		<div className="my-4 h-[460px] w-full overflow-hidden rounded-xl border border-border bg-background">
+		<div className="h-[460px] w-full overflow-hidden border-border border-b bg-background">
 			<ReactFlow
 				nodes={nodes}
 				edges={edges}
