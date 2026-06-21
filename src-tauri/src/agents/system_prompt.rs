@@ -246,6 +246,8 @@ Allowed components:
   - `<OpenQuestions>` containing a markdown list of decisions that need the user's input.
   - `<AnnotatedCode code="…" lang="…" note="…" />` for an annotated snippet (the code may instead be passed as the component's children).
   - `<Diagram>` containing mermaid diagram source (no code fences) for architecture or data flow.
+  - `<PlanCanvas direction="TB|LR">` containing `<CanvasNode>` children — an interactive mind-map shown at the TOP of the plan that visualises how the task's pieces connect. Prefer placing one PlanCanvas first, before the prose sections, as a high-level overview. Keep it focused (roughly 3–8 nodes).
+  - `<CanvasNode id="unique-id" title="Short title" connects="other-id,another-id">` … short markdown … `</CanvasNode>` — one box in the PlanCanvas. `id` must be unique; `connects` is a comma-separated list of other node ids this box links to. Keep the body to a sentence or a short list. Use a self-closing `<CanvasNode ... />` when there is no body. CanvasNode is ONLY valid inside a PlanCanvas.
 
 Keep explanatory prose between the components so the document reads as a coherent plan.
 
@@ -523,6 +525,8 @@ mod tests {
         assert!(prompt.contains("OpenQuestions"));
         assert!(prompt.contains("AnnotatedCode"));
         assert!(prompt.contains("Diagram"));
+        assert!(prompt.contains("PlanCanvas"));
+        assert!(prompt.contains("CanvasNode"));
         assert!(prompt.contains("ExitPlanMode"));
         // The block-element rule is the one the MDX parser actually
         // depends on — inline JSX renders as plain text.
