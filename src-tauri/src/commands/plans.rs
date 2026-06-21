@@ -91,6 +91,29 @@ pub async fn write_plan(
 }
 
 #[tauri::command]
+pub async fn delete_plan(app: AppHandle, session_id: String, slug: String) -> CmdResult<()> {
+    let (workspace_id, slug) = run_blocking({
+        let slug = slug.clone();
+        move || {
+            let workspace_id = sessions::workspace_id_for_session(&session_id)?
+                .with_context(|| format!("No workspace bound to session {session_id}"))?;
+            let record = workspace_models::load_workspace_record_by_id(&workspace_id)?
+                .with_context(|| format!("Workspace not found: {workspace_id}"))?;
+            let workspace_dir = crate::workspace::helpers::workspace_path(&record)?;
+            store::delete_plan(&workspace_dir, &slug)?;
+            Ok::<_, anyhow::Error>((workspace_id, slug))
+        }
+    })
+    .await?;
+
+    crate::ui_sync::publish(
+        &app,
+        crate::ui_sync::UiMutationEvent::PlanFileChanged { workspace_id, slug },
+    );
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn set_plan_status(
     app: AppHandle,
     session_id: String,

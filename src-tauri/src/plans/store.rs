@@ -241,6 +241,17 @@ pub fn write_plan(workspace_dir: &Path, slug: &str, content: &str) -> Result<Pla
     Ok(summary_for(slug, content))
 }
 
+/// Delete a plan's `.mdx` file. Idempotent: a missing file is treated as
+/// already deleted. The `.helmor/plans/` directory is left in place.
+pub fn delete_plan(workspace_dir: &Path, slug: &str) -> Result<()> {
+    let path = plan_path(workspace_dir, slug);
+    match std::fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err).with_context(|| format!("delete {}", path.display())),
+    }
+}
+
 /// List all `*.mdx` plans in `.helmor/plans/`, sorted by slug. A missing
 /// or empty directory yields an empty vec.
 pub fn list_plans(workspace_dir: &Path) -> Result<Vec<PlanSummary>> {

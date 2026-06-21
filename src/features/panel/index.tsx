@@ -49,6 +49,7 @@ type WorkspacePanelProps = {
 	onSelectSession?: (sessionId: string) => void;
 	onSelectWorkspace?: (workspaceId: string) => void;
 	onSelectPlan?: (slug: string) => void;
+	onDeletePlan?: (slug: string) => void;
 	onSelectContextPreview?: () => void;
 	onCloseContextPreview?: () => void;
 	onPrefetchSession?: (sessionId: string) => void;
@@ -86,6 +87,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	onSelectSession,
 	onSelectWorkspace,
 	onSelectPlan,
+	onDeletePlan,
 	onSelectContextPreview,
 	onCloseContextPreview,
 	onPrefetchSession,
@@ -188,6 +190,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 					onSelectSession={onSelectSession}
 					onSelectWorkspace={onSelectWorkspace}
 					onSelectPlan={onSelectPlan}
+					onDeletePlan={onDeletePlan}
 					onSelectContextPreview={onSelectContextPreview}
 					onCloseContextPreview={onCloseContextPreview}
 					onPrefetchSession={onPrefetchSession}

@@ -139,3 +139,19 @@ fn set_status_updates_frontmatter_and_read_reflects_it() {
     assert_eq!(doc.summary.status, PlanLifecycle::Approved);
     assert_eq!(doc.summary.title, "P2");
 }
+
+/// `delete_plan` removes the `.mdx` file so `read_plan` then errors, and a
+/// second delete is still Ok (idempotent: a missing file is fine).
+#[test]
+fn delete_plan_removes_file_and_is_idempotent() {
+    let tmp = init_repo();
+
+    store::create_plan(tmp.path(), "foo", "Foo").unwrap();
+    assert!(store::read_plan(tmp.path(), "foo").is_ok());
+
+    store::delete_plan(tmp.path(), "foo").unwrap();
+    assert!(store::read_plan(tmp.path(), "foo").is_err());
+
+    // Second delete on the now-missing file is idempotent.
+    store::delete_plan(tmp.path(), "foo").unwrap();
+}

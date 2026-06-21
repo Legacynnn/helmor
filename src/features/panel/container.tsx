@@ -12,7 +12,7 @@ import type {
 	WorkspaceDetail,
 	WorkspaceSessionSummary,
 } from "@/lib/api";
-import { createSession, loadRepoScripts } from "@/lib/api";
+import { createSession, deletePlan, loadRepoScripts } from "@/lib/api";
 import { CLOSE_PLAN_EVENT, OPEN_PLAN_EVENT } from "@/lib/plan-review";
 import {
 	helmorQueryKeys,
@@ -391,6 +391,26 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	// select it.
 	const threadSessionIdRef = useRef(threadSessionId);
 	threadSessionIdRef.current = threadSessionId;
+
+	const handleDeletePlan = useCallback(
+		(slug: string) => {
+			const sessionId = threadSessionIdRef.current;
+			if (!sessionId) return;
+			// Leave the plan surface immediately if we're deleting the open one.
+			setActivePlanSlug((current) => (current === slug ? null : current));
+			void deletePlan(sessionId, slug)
+				.then(() =>
+					queryClient.invalidateQueries({
+						queryKey: helmorQueryKeys.planList(sessionId),
+					}),
+				)
+				.catch((error) => {
+					console.error("[panel] deletePlan failed", error);
+				});
+		},
+		[queryClient],
+	);
+
 	useEffect(() => {
 		if (!settings.mdxPlanningEnabled) return;
 		const handler = (event: Event) => {
@@ -767,6 +787,7 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			onSelectSession={handleSelectSession}
 			onSelectWorkspace={handleSelectWorkspace}
 			onSelectPlan={handleSelectPlan}
+			onDeletePlan={handleDeletePlan}
 			onSelectContextPreview={onSelectContextPreview}
 			onCloseContextPreview={onCloseContextPreview}
 			onPrefetchSession={handlePrefetchSession}

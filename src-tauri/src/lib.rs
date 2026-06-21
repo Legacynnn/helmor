@@ -796,6 +796,7 @@ pub fn run() {
             commands::plans::list_plans,
             commands::plans::write_plan,
             commands::plans::set_plan_status,
+            commands::plans::delete_plan,
             commands::workspace_commands::set_workspace_status,
             commands::workspace_commands::move_workspace_in_sidebar,
             commands::workspace_commands::list_workspace_linked_directories,

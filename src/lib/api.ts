@@ -4863,6 +4863,14 @@ export async function setPlanStatus(
 	return invoke<PlanSummary>("set_plan_status", { sessionId, slug, status });
 }
 
+/** Delete a plan's MDX file. Idempotent. Broadcasts `planFileChanged`. */
+export async function deletePlan(
+	sessionId: string,
+	slug: string,
+): Promise<void> {
+	return invoke<void>("delete_plan", { sessionId, slug });
+}
+
 /** Read the active Codex `/goal` for one session. Null when no goal. */
 export async function getSessionCodexGoal(
 	sessionId: string,

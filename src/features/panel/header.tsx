@@ -115,6 +115,7 @@ type WorkspacePanelHeaderProps = {
 	headerLeading?: React.ReactNode;
 	onSelectSession?: (sessionId: string) => void;
 	onSelectPlan?: (slug: string) => void;
+	onDeletePlan?: (slug: string) => void;
 	onSelectContextPreview?: () => void;
 	onCloseContextPreview?: () => void;
 	onPrefetchSession?: (sessionId: string) => void;
@@ -153,6 +154,7 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 	headerLeading,
 	onSelectSession,
 	onSelectPlan,
+	onDeletePlan,
 	onSelectContextPreview,
 	onCloseContextPreview,
 	onPrefetchSession,
@@ -783,7 +785,7 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 																onClick={(event) => {
 																	event.preventDefault();
 																	event.stopPropagation();
-																	dispatchClosePlan();
+																	onDeletePlan?.(plan.slug);
 																}}
 																className="flex cursor-interactive items-center justify-center rounded-sm p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
 															>
