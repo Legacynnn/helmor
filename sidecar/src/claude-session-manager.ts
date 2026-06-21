@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { basename, dirname, extname, join } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import {
 	type ElicitationResult,
 	type PermissionUpdate,
@@ -607,12 +607,18 @@ export class ClaudeSessionManager implements SessionManager {
 					// Intercept ExitPlanMode: capture plan content and deny to
 					// end the turn cleanly. The user starts a new turn to act.
 					if (_toolName === "ExitPlanMode") {
-						const plan = extractExitPlanContent(input);
-						if (plan) {
-							const planFilePath =
-								typeof input.filePath === "string" && input.filePath.trim()
-									? input.filePath
-									: null;
+						const plan = extractExitPlanContent(input, cwd);
+						// Emit the path verbatim (relative or absolute, exactly
+						// as the agent provided it) — only the local read below
+						// resolves it against the workspace cwd.
+						const planFilePath =
+							typeof input.filePath === "string" && input.filePath.trim()
+								? input.filePath
+								: null;
+						// Decouple path from text: emit whenever EITHER the plan
+						// text was read OR a path is present, so a failed read
+						// still surfaces the path to the frontend.
+						if (plan || planFilePath) {
 							emitter.planCaptured(
 								requestId,
 								options.toolUseID,
@@ -1325,8 +1331,9 @@ function describeFastModeUnavailable(
  * Extract plan text from ExitPlanMode input.
  * Supports both inline `plan` (v1) and file-based `filePath` (v2).
  */
-function extractExitPlanContent(
+export function extractExitPlanContent(
 	input: Record<string, unknown> | undefined,
+	cwd?: string,
 ): string | null {
 	if (!input) return null;
 	if (typeof input.plan === "string" && input.plan.trim()) {
@@ -1334,7 +1341,11 @@ function extractExitPlanContent(
 	}
 	if (typeof input.filePath === "string" && input.filePath.trim()) {
 		try {
-			const content = readFileSync(input.filePath, "utf-8").trim();
+			// Resolve relative paths (e.g. `.helmor/plans/foo.mdx`) against the
+			// request's workspace cwd, not the sidecar process cwd. If filePath
+			// is already absolute, resolve returns it unchanged.
+			const path = cwd ? resolve(cwd, input.filePath) : input.filePath;
+			const content = readFileSync(path, "utf-8").trim();
 			return content || null;
 		} catch {
 			return null;
