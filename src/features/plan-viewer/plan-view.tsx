@@ -3,12 +3,10 @@ import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { UnsupportedBlock } from "./components/placeholder";
-import { PlanMarkdown } from "./components/plan-markdown";
 import type { BlockComment } from "./feedback";
 import type { PlanBlock } from "./mdx/parse";
 import { parsePlanMdx } from "./mdx/parse";
-import { PLAN_COMPONENTS } from "./mdx/registry";
+import { renderBlock } from "./render-blocks";
 
 /** Human-readable label for a block, used in the comment affordance and the
  *  feedback prompt. Component blocks use their MDX name; prose blocks fall back
@@ -26,8 +24,8 @@ function blockLabel(block: PlanBlock): string {
 
 /**
  * Presentational plan surface. Parses MDX content into ordered blocks and
- * renders prose via {@link PlanMarkdown} and components via the allowlisted
- * {@link PLAN_COMPONENTS} map (falling back to {@link UnsupportedBlock}). Each
+ * renders each top-level block via {@link renderBlock} (prose as markdown,
+ * components via the allowlisted registry, falling back to a placeholder). Each
  * block carries a comment affordance: clicking it opens an inline input that
  * collects a block-anchored note. The toolbar's "Request changes" gathers the
  * non-empty notes into {@link BlockComment}[] and hands them to
@@ -109,16 +107,7 @@ export function PlanView({
 			</div>
 			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
 				{blocks.map((block) => {
-					const Cmp =
-						block.kind === "component" ? PLAN_COMPONENTS[block.name] : null;
-					const body =
-						block.kind === "prose" ? (
-							<PlanMarkdown>{block.markdown}</PlanMarkdown>
-						) : Cmp ? (
-							<Cmp {...block.props}>{block.children}</Cmp>
-						) : (
-							<UnsupportedBlock name={block.name} />
-						);
+					const body = renderBlock(block);
 					const isOpen = Boolean(openInputs[block.id]);
 					const hasNote = (comments[block.id] ?? "").trim().length > 0;
 					return (

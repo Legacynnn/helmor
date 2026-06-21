@@ -1,17 +1,16 @@
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { PlanMarkdown } from "./plan-markdown";
 
 /**
- * `Steps` wraps step-by-step plan content. The flat MDX parser does not
- * recurse into nested components, so `Steps` simply renders its raw markdown
- * children. Nested `<Step>` components are a v2 follow-up; for v1 put a
- * markdown (ordered/numbered) list inside `<Steps>`.
+ * `Steps` wraps step-by-step plan content. Children are rendered plan blocks
+ * (prose, or — under the recursive renderer — nested components). For a simple
+ * step list, put a markdown (ordered/numbered) list inside `<Steps>`.
  */
 export function Steps({
-	children = "",
+	children,
 	className,
 }: {
-	children?: string;
+	children?: ReactNode;
 	className?: string;
 }) {
 	return (
@@ -21,7 +20,7 @@ export function Steps({
 				className,
 			)}
 		>
-			<PlanMarkdown>{children}</PlanMarkdown>
+			{children}
 		</div>
 	);
 }

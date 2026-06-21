@@ -1,6 +1,7 @@
 import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
+import { planChildMode } from "./registry";
 
 export type PlanBlock =
 	| { kind: "prose"; id: string; markdown: string }
@@ -9,7 +10,13 @@ export type PlanBlock =
 			id: string;
 			name: string;
 			props: Record<string, string>;
-			children: string;
+			/** Verbatim inner source text — always captured; used by raw-mode components. */
+			rawText: string;
+			/**
+			 * Recursively parsed nested blocks. Populated ONLY when the component is
+			 * known AND its `childMode` is `"blocks"`; empty otherwise.
+			 */
+			childBlocks: PlanBlock[];
 	  };
 
 export type PlanFrontmatter = {
@@ -141,35 +148,87 @@ export function parsePlanMdx(src: string): ParsedPlan {
 		.use(remarkMdx)
 		.parse(body) as unknown as MdastNode;
 
-	const blocks: PlanBlock[] = [];
+	// A single counter keeps ids unique and stable in document order, including
+	// nested blocks (the counter is shared across recursion).
 	let index = 0;
 	const nextId = () => `b${index++}`;
 
-	for (const node of tree.children ?? []) {
-		if (node.type === "mdxJsxFlowElement") {
-			blocks.push({
-				kind: "component",
-				id: nextId(),
-				name: node.name ?? "Unknown",
-				props: attributesToProps(node),
-				children: childrenText(node, body),
-			});
-			continue;
+	/** True when a paragraph's only meaningful children are JSX elements (so it is
+	 * really a wrapper around nested components, not prose). A nested component on
+	 * its own line inside a flow element parses as a `paragraph` holding
+	 * `mdxJsxTextElement`s; we unwrap those into component blocks. */
+	function isComponentWrapperParagraph(node: MdastNode): boolean {
+		if (node.type !== "paragraph") {
+			return false;
 		}
-		// Ignore bare JSX expression nodes (`{...}`) — no runtime evaluation.
-		if (
-			node.type === "mdxFlowExpression" ||
-			node.type === "mdxjsEsm" ||
-			node.type === "mdxTextExpression"
-		) {
-			continue;
+		const children = node.children ?? [];
+		let sawElement = false;
+		for (const child of children) {
+			if (child.type === "mdxJsxTextElement") {
+				sawElement = true;
+				continue;
+			}
+			if (child.type === "text") {
+				const raw = nodeSource(child, body);
+				if (raw.trim().length === 0) {
+					continue;
+				}
+			}
+			return false;
 		}
-		const markdown = nodeSource(node, body).trim();
-		if (markdown.length === 0) {
-			continue;
-		}
-		blocks.push({ kind: "prose", id: nextId(), markdown });
+		return sawElement;
 	}
 
-	return { frontmatter, blocks };
+	/** Convert a flat list of mdast nodes into plan blocks, recursing into the
+	 * children of known `childMode: "blocks"` components. */
+	function walk(nodes: MdastNode[]): PlanBlock[] {
+		const blocks: PlanBlock[] = [];
+		for (const node of nodes) {
+			// Unwrap a paragraph that only wraps nested JSX elements: walk its
+			// element children directly so they become component blocks.
+			if (isComponentWrapperParagraph(node)) {
+				const elements = (node.children ?? []).filter(
+					(c) => c.type === "mdxJsxTextElement",
+				);
+				blocks.push(...walk(elements));
+				continue;
+			}
+			if (
+				node.type === "mdxJsxFlowElement" ||
+				node.type === "mdxJsxTextElement"
+			) {
+				const name = node.name ?? "Unknown";
+				const id = nextId();
+				const props = attributesToProps(node);
+				const rawText = childrenText(node, body);
+				const childBlocks =
+					planChildMode(name) === "blocks" ? walk(node.children ?? []) : [];
+				blocks.push({
+					kind: "component",
+					id,
+					name,
+					props,
+					rawText,
+					childBlocks,
+				});
+				continue;
+			}
+			// Ignore bare JSX expression nodes (`{...}`) — no runtime evaluation.
+			if (
+				node.type === "mdxFlowExpression" ||
+				node.type === "mdxjsEsm" ||
+				node.type === "mdxTextExpression"
+			) {
+				continue;
+			}
+			const markdown = nodeSource(node, body).trim();
+			if (markdown.length === 0) {
+				continue;
+			}
+			blocks.push({ kind: "prose", id: nextId(), markdown });
+		}
+		return blocks;
+	}
+
+	return { frontmatter, blocks: walk(tree.children ?? []) };
 }

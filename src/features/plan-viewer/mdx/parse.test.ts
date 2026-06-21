@@ -26,7 +26,7 @@ Body text.`;
 		expect(parsed.blocks[0]?.id).toBe("b0");
 	});
 
-	it("parses a known component block with props and children text", () => {
+	it("parses a known component block with props and raw text", () => {
 		const src = `<RiskCard severity="high">
 This is **risky** stuff.
 </RiskCard>`;
@@ -36,16 +36,74 @@ This is **risky** stuff.
 		if (comp?.kind !== "component") throw new Error("expected component");
 		expect(comp.name).toBe("RiskCard");
 		expect(comp.props.severity).toBe("high");
-		expect(comp.children).toContain("This is **risky** stuff.");
+		expect(comp.rawText).toContain("This is **risky** stuff.");
 	});
 
-	it("parses an unknown component as a component block", () => {
+	it("recursively parses children of a blocks-mode component", () => {
+		const src = `<RiskCard severity="high">
+Some **prose** inside.
+
+<RiskCard severity="low">Nested note.</RiskCard>
+</RiskCard>`;
+		const parsed = parsePlanMdx(src);
+		const comp = parsed.blocks[0];
+		if (comp?.kind !== "component") throw new Error("expected component");
+		expect(comp.name).toBe("RiskCard");
+		// Inner prose + nested RiskCard captured as recursively-parsed blocks.
+		expect(comp.childBlocks.length).toBe(2);
+		expect(comp.childBlocks[0]?.kind).toBe("prose");
+		const nested = comp.childBlocks[1];
+		if (nested?.kind !== "component")
+			throw new Error("expected nested component");
+		expect(nested.name).toBe("RiskCard");
+		expect(nested.props.severity).toBe("low");
+		expect(nested.rawText).toContain("Nested note.");
+	});
+
+	it("does not recurse into a raw-mode component (Diagram keeps mermaid as rawText)", () => {
+		const src = `<Diagram>
+graph TD; A-->B;
+</Diagram>`;
+		const parsed = parsePlanMdx(src);
+		const comp = parsed.blocks[0];
+		if (comp?.kind !== "component") throw new Error("expected component");
+		expect(comp.name).toBe("Diagram");
+		expect(comp.rawText).toContain("graph TD; A-->B;");
+		expect(comp.childBlocks).toEqual([]);
+	});
+
+	it("parses an unknown component as a component block (no recursion)", () => {
 		const parsed = parsePlanMdx('<Unknowny foo="bar" />');
 		const comp = parsed.blocks.find((b) => b.kind === "component");
 		if (comp?.kind !== "component") throw new Error("expected component");
 		expect(comp.name).toBe("Unknowny");
 		expect(comp.props.foo).toBe("bar");
-		expect(comp.children).toBe("");
+		expect(comp.rawText).toBe("");
+		expect(comp.childBlocks).toEqual([]);
+	});
+
+	it("keeps ids unique and stable across nesting", () => {
+		const src = `Intro.
+
+<RiskCard severity="high">
+Inner prose.
+
+<RiskCard severity="low">Deep.</RiskCard>
+</RiskCard>
+
+Outro.`;
+		const parsed = parsePlanMdx(src);
+		const ids: string[] = [];
+		const collect = (blocks: typeof parsed.blocks) => {
+			for (const b of blocks) {
+				ids.push(b.id);
+				if (b.kind === "component") collect(b.childBlocks);
+			}
+		};
+		collect(parsed.blocks);
+		expect(new Set(ids).size).toBe(ids.length);
+		// Outer RiskCard gets its id before its children (document order).
+		expect(parsed.blocks.map((b) => b.id)).toEqual(["b0", "b1", "b5"]);
 	});
 
 	it("treats a boolean/valueless attribute as the string 'true'", () => {
@@ -90,6 +148,8 @@ After the rule.`;
 
 Second.`;
 		const parsed = parsePlanMdx(src);
-		expect(parsed.blocks.map((b) => b.id)).toEqual(["b0", "b1", "b2"]);
+		// b0 = First, b1 = RiskCard, b2 = RiskCard's child prose ("note"),
+		// b3 = Second — the counter is shared across recursion.
+		expect(parsed.blocks.map((b) => b.id)).toEqual(["b0", "b1", "b3"]);
 	});
 });

@@ -1,6 +1,6 @@
 import { AlertTriangleIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { PlanMarkdown } from "./plan-markdown";
 
 type Severity = "low" | "medium" | "high";
 
@@ -34,10 +34,10 @@ function normalizeSeverity(value?: string): Severity {
 
 export function RiskCard({
 	severity,
-	children = "",
+	children,
 }: {
 	severity?: string;
-	children?: string;
+	children?: ReactNode;
 }) {
 	const level = normalizeSeverity(severity);
 	const style = SEVERITY_STYLES[level];
@@ -53,7 +53,7 @@ export function RiskCard({
 				<AlertTriangleIcon className="size-4 shrink-0" />
 				<span>{style.text}</span>
 			</div>
-			<PlanMarkdown>{children}</PlanMarkdown>
+			{children}
 		</div>
 	);
 }

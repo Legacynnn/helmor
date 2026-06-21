@@ -33,6 +33,49 @@ test("renders known blocks and a placeholder for unknown ones", () => {
 	expect(screen.getByText(/Plan ·/i)).toBeInTheDocument();
 });
 
+test("renders a nested blocks-mode component recursively", () => {
+	const nested = `<RiskCard severity="high">
+Outer reason.
+
+<RiskCard severity="low">Inner reason.</RiskCard>
+</RiskCard>`;
+	render(
+		<PlanView
+			content={nested}
+			status="draft"
+			onRequestChanges={() => {}}
+			onHandoff={() => {}}
+		/>,
+	);
+	// Both the outer (high) and the nested (low) RiskCard render.
+	expect(screen.getByText("High risk")).toBeInTheDocument();
+	expect(screen.getByText("Low risk")).toBeInTheDocument();
+	expect(screen.getByText(/Outer reason\./)).toBeInTheDocument();
+	expect(screen.getByText(/Inner reason\./)).toBeInTheDocument();
+});
+
+test("renders raw-mode components (Diagram + AnnotatedCode)", () => {
+	const raw = `<Diagram>
+graph TD; A-->B;
+</Diagram>
+
+<AnnotatedCode lang="ts" note="A note.">
+const x = 1;
+</AnnotatedCode>`;
+	render(
+		<PlanView
+			content={raw}
+			status="draft"
+			onRequestChanges={() => {}}
+			onHandoff={() => {}}
+		/>,
+	);
+	expect(screen.getByText(/A note\./)).toBeInTheDocument();
+	// The code body survives as raw text (syntax highlighting may split it
+	// across spans, so match against the rendered text content).
+	expect(document.body.textContent).toContain("const x = 1;");
+});
+
 test("request-changes is disabled until a comment is entered, then emits BlockComment[]", () => {
 	const onRequestChanges = vi.fn<(comments: BlockComment[]) => void>();
 	render(
