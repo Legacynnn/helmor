@@ -553,6 +553,7 @@ fn start_archive_workspace_syncs_git_fetchers_after_success() {
     let app = mock_builder()
         .manage(workspaces::ArchiveJobManager::new())
         .manage(crate::git_watcher::GitWatcherManager::new())
+        .manage(crate::plans::watcher::PlanWatcherManager::new())
         .build(mock_context(noop_assets()))
         .unwrap();
     let app_handle = app.handle().clone();

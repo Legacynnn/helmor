@@ -197,6 +197,9 @@ pub fn start_archive_workspace<R: Runtime>(
         app_handle
             .state::<git_watcher::GitWatcherManager>()
             .unwatch(&workspace_id);
+        app_handle
+            .state::<crate::plans::watcher::PlanWatcherManager>()
+            .unwatch(&workspace_id);
         tracing::debug!(
             workspace_id,
             elapsed_ms = unwatch_started.elapsed().as_millis(),

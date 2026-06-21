@@ -504,6 +504,8 @@ pub async fn permanently_delete_workspace(app: AppHandle, workspace_id: String) 
     let _lock = ws_lock.lock().await;
     let manager = app.state::<git_watcher::GitWatcherManager>();
     manager.unwatch(&workspace_id);
+    app.state::<crate::plans::watcher::PlanWatcherManager>()
+        .unwatch(&workspace_id);
     run_blocking(move || workspaces::permanently_delete_workspace(&workspace_id)).await?;
     git_watcher::notify_workspace_changed(&app);
     Ok(())
@@ -569,6 +571,8 @@ async fn cleanup_archived_workspaces_inner(
             let ws_lock = db::workspace_fs_mutation_lock(&workspace_id);
             let _lock = ws_lock.lock().await;
             app.state::<git_watcher::GitWatcherManager>()
+                .unwatch(&workspace_id);
+            app.state::<crate::plans::watcher::PlanWatcherManager>()
                 .unwatch(&workspace_id);
 
             let id_for_task = workspace_id.clone();
