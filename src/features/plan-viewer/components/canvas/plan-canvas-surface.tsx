@@ -7,7 +7,7 @@ import {
 	useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { PlanBlock } from "../../mdx/parse";
 import { buildCanvasGraph } from "./build-graph";
 import { CanvasNode } from "./canvas-node";
@@ -29,8 +29,17 @@ export default function PlanCanvasSurface({
 		return layoutCanvasGraph(built, parseDirection(direction));
 	}, [childBlocks, direction]);
 
-	const [nodes, , onNodesChange] = useNodesState(graph.nodes);
-	const [edges, , onEdgesChange] = useEdgesState(graph.edges);
+	const [nodes, setNodes, onNodesChange] = useNodesState(graph.nodes);
+	const [edges, setEdges, onEdgesChange] = useEdgesState(graph.edges);
+
+	// `useNodesState`/`useEdgesState` only seed initial state, so re-sync when the
+	// authored graph changes (e.g. the agent edits the plan and the watcher pushes
+	// a fresh parse, or content streams in). Ephemeral user drags are intentionally
+	// reset to the authored layout on such updates.
+	useEffect(() => {
+		setNodes(graph.nodes);
+		setEdges(graph.edges);
+	}, [graph, setNodes, setEdges]);
 
 	if (nodes.length === 0) {
 		return null;
