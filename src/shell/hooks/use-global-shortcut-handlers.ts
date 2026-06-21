@@ -35,6 +35,8 @@ const SESSION_ORDINAL_SHORTCUTS: { id: ShortcutId; ordinal: number }[] = [
 export function useGlobalShortcutHandlers({
 	appSettings,
 	updateSettings,
+	planSurfaceActive,
+	onClosePlan,
 	contextPanelActions,
 	canEditEditorSession,
 	getCloseableCurrentSession,
@@ -69,6 +71,8 @@ export function useGlobalShortcutHandlers({
 }: {
 	appSettings: AppSettings;
 	updateSettings: (patch: Partial<AppSettings>) => void | Promise<void>;
+	planSurfaceActive: boolean;
+	onClosePlan: () => void;
 	contextPanelActions: ContextPanelActions;
 	canEditEditorSession: boolean;
 	getCloseableCurrentSession: () => unknown;
@@ -183,6 +187,10 @@ export function useGlobalShortcutHandlers({
 			{
 				id: "session.close" as const,
 				callback: () => {
+					if (planSurfaceActive) {
+						onClosePlan();
+						return;
+					}
 					if (workspacePreviewActive && workspacePreviewCard) {
 						contextPanelActions.closeWorkspaceContextPreview();
 						return;
@@ -192,7 +200,8 @@ export function useGlobalShortcutHandlers({
 				},
 				enabled:
 					workspaceViewMode === "conversation" &&
-					(Boolean(workspacePreviewCard) ||
+					(planSurfaceActive ||
+						Boolean(workspacePreviewCard) ||
 						Boolean(getCloseableCurrentSession())),
 			},
 			{
@@ -352,6 +361,8 @@ export function useGlobalShortcutHandlers({
 			workspacePreviewCard,
 			workspaceViewMode,
 			canEditEditorSession,
+			planSurfaceActive,
+			onClosePlan,
 		],
 	);
 	useAppShortcuts({

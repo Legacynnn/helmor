@@ -17,10 +17,11 @@ import type { ComposerCreateContext } from "@/features/conversation";
 import { useDockUnreadBadge } from "@/features/dock-badge";
 import type { SettingsSection } from "@/features/settings";
 import { useAppUpdater } from "@/features/updater/use-app-updater";
+import { dispatchClosePlan } from "@/lib/plan-review";
 import { useSettings } from "@/lib/settings";
 import { isQuickPanelWindow } from "@/lib/window-role";
 import { useRouterSelection } from "@/router/use-router-selection";
-import { publishShellEvent } from "@/shell/event-bus";
+import { publishShellEvent, useShellEvent } from "@/shell/event-bus";
 import { useEnsureDefaultModel } from "@/shell/hooks/use-ensure-default-model";
 import { useGlobalShortcutHandlers } from "@/shell/hooks/use-global-shortcut-handlers";
 import { useNavigationSidebar } from "@/shell/hooks/use-navigation-sidebar";
@@ -203,9 +204,14 @@ export function useAppShellState({
 		darkTheme: appSettings.darkTheme,
 	});
 
+	const [planSurfaceActive, setPlanSurfaceActive] = useState(false);
+	useShellEvent("plan-surface-changed", (e) => setPlanSurfaceActive(e.active));
+
 	useGlobalShortcutHandlers({
 		appSettings,
 		updateSettings,
+		planSurfaceActive,
+		onClosePlan: dispatchClosePlan,
 		contextPanelActions: sel.contextPanelActions,
 		canEditEditorSession: data.canEditEditorSession,
 		getCloseableCurrentSession: data.getCloseableCurrentSession,

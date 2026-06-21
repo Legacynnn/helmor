@@ -35,6 +35,13 @@ export function dispatchOpenPlan(detail: OpenPlanEventDetail): void {
 	window.dispatchEvent(new CustomEvent(OPEN_PLAN_EVENT, { detail }));
 }
 
+export const CLOSE_PLAN_EVENT = "helmor:close-plan";
+
+/** Fire the cross-component "close the active plan tab" signal (Cmd+W on a plan). */
+export function dispatchClosePlan(): void {
+	window.dispatchEvent(new CustomEvent(CLOSE_PLAN_EVENT));
+}
+
 /** True when the last plan-review card has no user message after it. */
 export function hasUnresolvedPlanReview(
 	messages: ThreadMessageLike[],

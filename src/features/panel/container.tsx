@@ -13,7 +13,7 @@ import type {
 	WorkspaceSessionSummary,
 } from "@/lib/api";
 import { createSession, loadRepoScripts } from "@/lib/api";
-import { OPEN_PLAN_EVENT } from "@/lib/plan-review";
+import { CLOSE_PLAN_EVENT, OPEN_PLAN_EVENT } from "@/lib/plan-review";
 import {
 	helmorQueryKeys,
 	sessionThreadMessagesQueryOptions,
@@ -29,6 +29,7 @@ import {
 	WORKSPACE_SCRIPT_PROMPTS,
 	type WorkspaceScriptType,
 } from "@/lib/workspace-script-actions";
+import { publishShellEvent } from "@/shell/event-bus";
 import { WorkspacePanel } from "./index";
 import type { SessionCloseRequest } from "./use-confirm-session-close";
 
@@ -409,6 +410,26 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 		window.addEventListener(OPEN_PLAN_EVENT, handler);
 		return () => window.removeEventListener(OPEN_PLAN_EVENT, handler);
 	}, [queryClient, settings.mdxPlanningEnabled]);
+
+	// Cmd+W on a plan closes the plan (not the session) — the global shortcut
+	// handler dispatches CLOSE_PLAN_EVENT; we own activePlanSlug so we clear it.
+	useEffect(() => {
+		const handler = () => setActivePlanSlug(null);
+		window.addEventListener(CLOSE_PLAN_EVENT, handler);
+		return () => window.removeEventListener(CLOSE_PLAN_EVENT, handler);
+	}, []);
+
+	// Surface "a plan is the active center surface" to the shell so the global
+	// Cmd+W handler can branch to closing the plan first.
+	useEffect(() => {
+		publishShellEvent({
+			type: "plan-surface-changed",
+			active: activePlanSlug != null,
+		});
+		return () => {
+			publishShellEvent({ type: "plan-surface-changed", active: false });
+		};
+	}, [activePlanSlug]);
 
 	// The router's session intent only applies once the workspace selection
 	// has converged onto the paint track. During a deferred flip / cold hold
