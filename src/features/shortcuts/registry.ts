@@ -230,7 +230,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		id: "action.createPr",
 		title: "Create PR",
 		group: "Actions",
-		// Unbound by default — Mod+Shift+P is reserved for composer plan mode.
+		// Unbound by default to avoid clobbering common editor chords.
 		// Users can rebind from settings if they want.
 		defaultHotkey: null,
 		scopes: ["app"],

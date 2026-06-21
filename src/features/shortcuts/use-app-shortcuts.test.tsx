@@ -266,11 +266,13 @@ describe("useAppShortcuts", () => {
 		const { getByTestId } = render(<Harness />);
 		(getByTestId("inspector-input") as HTMLInputElement).focus();
 
+		// Shift+Tab is the plan-mode toggle, but only inside the workspace
+		// composer scope — firing it from a non-composer chat surface must not
+		// toggle plan mode.
 		window.dispatchEvent(
 			new KeyboardEvent("keydown", {
-				key: "p",
-				code: "KeyP",
-				metaKey: true,
+				key: "Tab",
+				code: "Tab",
 				shiftKey: true,
 			}),
 		);

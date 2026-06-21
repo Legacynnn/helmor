@@ -207,4 +207,20 @@ describe("planModeWriteDecision", () => {
 	it("denies a write tool with no path", () => {
 		expect(planModeWriteDecision("Write", {}, cwd)).toBe("deny");
 	});
+	it("denies a `..` traversal escaping the plan dir (with cwd)", () => {
+		expect(
+			planModeWriteDecision(
+				"Write",
+				{ file_path: ".helmor/plans/../../src/x.ts" },
+				cwd,
+			),
+		).toBe("deny");
+	});
+	it("denies a `..` traversal escaping the plan dir (no cwd)", () => {
+		expect(
+			planModeWriteDecision("Write", {
+				file_path: ".helmor/plans/../../src/x.ts",
+			}),
+		).toBe("deny");
+	});
 });

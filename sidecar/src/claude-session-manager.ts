@@ -1398,6 +1398,9 @@ export function planModeWriteDecision(
 	if (!field) return "allow";
 	const raw = input[field];
 	if (typeof raw !== "string" || !raw.trim()) return "deny";
-	const resolved = cwd ? resolve(cwd, raw) : raw;
+	// Resolve unconditionally so `..` traversal is normalized away before the
+	// directory check — `.helmor/plans/../../src/x.ts` must not slip through
+	// even when no cwd is provided.
+	const resolved = cwd ? resolve(cwd, raw) : resolve(raw);
 	return PLAN_DIR_RE.test(resolved) ? "allow" : "deny";
 }
