@@ -2,6 +2,32 @@ import { describe, expect, it } from "vitest";
 import { parsePlanMdx } from "./parse";
 
 describe("parsePlanMdx", () => {
+	it("does not throw on an unparseable MDX expression and still renders content", () => {
+		// A stray `{` that isn't valid JS makes remark-mdx/acorn throw
+		// ("Could not parse expression with acorn"). The parser must degrade to
+		// plain Markdown instead of crashing the plan surface.
+		const src = [
+			"---",
+			'title: "Broken"',
+			"status: draft",
+			"---",
+			"",
+			"# Heading",
+			"",
+			"Some prose with an invalid {1 2 3} expression.",
+		].join("\n");
+
+		expect(() => parsePlanMdx(src)).not.toThrow();
+		const { frontmatter, blocks } = parsePlanMdx(src);
+		expect(frontmatter.title).toBe("Broken");
+		// The body content survived (rendered as prose blocks).
+		const text = blocks
+			.map((b) => (b.kind === "prose" ? b.markdown : ""))
+			.join("\n");
+		expect(text).toContain("Heading");
+		expect(text).toContain("invalid {1 2 3}");
+	});
+
 	it("parses frontmatter title and status", () => {
 		const src = `---
 title: My Plan
