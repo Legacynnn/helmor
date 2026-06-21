@@ -117,7 +117,7 @@ pub fn ensure_existing_worktree_plans_excluded() -> Result<usize> {
 }
 
 /// Absolute path to the plans directory for `workspace_dir`.
-fn plans_dir(workspace_dir: &Path) -> PathBuf {
+pub(crate) fn plans_dir(workspace_dir: &Path) -> PathBuf {
     workspace_dir.join(PLANS_SUBDIR)
 }
 
