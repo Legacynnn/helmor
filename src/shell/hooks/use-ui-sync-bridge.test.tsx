@@ -201,6 +201,61 @@ describe("useUiSyncBridge", () => {
 		expect(invalidateQueries).toHaveBeenCalledTimes(2);
 	});
 
+	it("planFileChanged invalidates the slug's plan across sessions and all plan lists", async () => {
+		const queryClient = makeClient();
+		queryClient.setQueryData(helmorQueryKeys.plan("session-a", "my-plan"), {
+			summary: {},
+			content: "",
+		});
+		queryClient.setQueryData(helmorQueryKeys.plan("session-b", "my-plan"), {
+			summary: {},
+			content: "",
+		});
+		queryClient.setQueryData(helmorQueryKeys.plan("session-a", "other-plan"), {
+			summary: {},
+			content: "",
+		});
+		queryClient.setQueryData(helmorQueryKeys.planList("session-a"), []);
+
+		renderHook(() =>
+			useUiSyncBridge({
+				queryClient,
+				processPendingCliSends: vi.fn(),
+				reloadSettings: vi.fn(),
+			}),
+		);
+
+		act(() => {
+			capturedSubscription?.({
+				type: "planFileChanged",
+				workspaceId: "workspace-1",
+				slug: "my-plan",
+			});
+		});
+
+		await waitFor(() => {
+			// The slug's plan is invalidated under EVERY session, not just one.
+			expect(
+				queryClient.getQueryState(helmorQueryKeys.plan("session-a", "my-plan"))
+					?.isInvalidated,
+			).toBe(true);
+			expect(
+				queryClient.getQueryState(helmorQueryKeys.plan("session-b", "my-plan"))
+					?.isInvalidated,
+			).toBe(true);
+		});
+		// A different slug is untouched.
+		expect(
+			queryClient.getQueryState(helmorQueryKeys.plan("session-a", "other-plan"))
+				?.isInvalidated,
+		).toBe(false);
+		// All plan lists refresh so a new plan's tab appears.
+		expect(
+			queryClient.getQueryState(helmorQueryKeys.planList("session-a"))
+				?.isInvalidated,
+		).toBe(true);
+	});
+
 	it("reloads settings and refreshes auto-close queries on settings changes", async () => {
 		const queryClient = makeClient();
 		const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
