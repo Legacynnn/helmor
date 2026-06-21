@@ -138,7 +138,12 @@ fn start_watcher<R: Runtime>(app: &AppHandle<R>, ws: &WatchableWorkspace) -> Res
 
     // Make sure the plans dir exists and `.helmor/` stays git-excluded, so the
     // watcher has a real path to watch even before the first plan is created.
-    store::ensure_excluded(&workspace_dir).ok();
+    if let Err(e) = store::ensure_excluded(&workspace_dir) {
+        tracing::warn!(
+            workspace_id = %ws.id,
+            "Failed to write .helmor/ git-exclude rule: {e:#}"
+        );
+    }
     let dir = store::plans_dir(&workspace_dir);
     std::fs::create_dir_all(&dir).with_context(|| format!("create {}", dir.display()))?;
 
