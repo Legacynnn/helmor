@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { LazyStreamdown } from "@/components/streamdown-loader";
 import { ShimmerText } from "@/components/ui/shimmer-text";
 import { formatTokens } from "@/features/composer/context-usage-ring/parse";
+import { usePlanList } from "@/features/plan-viewer/use-plan";
 import {
 	copyImageToClipboard,
 	type ImagePart,
@@ -249,6 +250,36 @@ export function PlanReviewCard({ part }: { part: PlanReviewPart }) {
 					))}
 				</div>
 			) : null}
+		</div>
+	);
+}
+
+export function PlanUpdatedTrigger({ planFilePath }: { planFilePath: string }) {
+	const { settings } = useSettings();
+	const { sessionId } = useFileLinkContext();
+	const planningEnabled = settings.mdxPlanningEnabled;
+	const slug = planSlugFromPath(planFilePath);
+	const { data: plans } = usePlanList(
+		planningEnabled ? (sessionId ?? null) : null,
+	);
+	if (!planningEnabled || !slug) return null;
+	const title = plans?.find((p) => p.slug === slug)?.title ?? slug;
+	return (
+		<div className="my-1 flex items-center gap-2.5 rounded-xl border-[1.5px] border-border/70 bg-background/60 px-3.5 py-2">
+			<ClipboardList
+				className="size-4 shrink-0 text-muted-foreground"
+				strokeWidth={1.8}
+			/>
+			<span className="min-w-0 flex-1 truncate text-ui leading-5 text-foreground">
+				Plan updated — {title}
+			</span>
+			<button
+				type="button"
+				onClick={() => dispatchOpenPlan({ slug, sessionId })}
+				className="shrink-0 cursor-pointer rounded-md border border-border/70 bg-background px-2.5 py-1 text-small font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
+			>
+				Open
+			</button>
 		</div>
 	);
 }

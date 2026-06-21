@@ -1,5 +1,5 @@
 import { AlertCircle, AlertTriangle, Clock3, Info } from "lucide-react";
-import { memo, Suspense } from "react";
+import { Fragment, memo, Suspense } from "react";
 import { CodeBlockStreamingContext } from "@/components/ai/code-block";
 import {
 	Reasoning,
@@ -13,11 +13,13 @@ import {
 	partKey,
 	type ToolCallPart,
 } from "@/lib/api";
+import { isMdxPlanPath } from "@/lib/plan-review";
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import {
 	ImageBlock,
 	PlanReviewCard,
+	PlanUpdatedTrigger,
 	TodoList,
 	WorkflowCard,
 } from "./content-parts";
@@ -270,20 +272,35 @@ export function ChatAssistantMessage({
 						// SubAgentSpawnGroup above.
 						return <SubAgentToolCall key={key} part={part as ToolCallPart} />;
 					}
+					const isPlanWrite =
+						(part.toolName === "Write" ||
+							part.toolName === "Edit" ||
+							part.toolName === "MultiEdit") &&
+						isMdxPlanPath(
+							typeof part.args.file_path === "string"
+								? part.args.file_path
+								: null,
+						);
 					return (
-						<AssistantToolCall
-							key={key}
-							toolName={part.toolName}
-							args={part.args}
-							result={part.result}
-							isError={
-								part.toolName === "ExitPlanMode"
-									? false
-									: (part as ToolCallPart).isError
-							}
-							streamingStatus={(part as ToolCallPart).streamingStatus}
-							childParts={(part as ToolCallPart).children}
-						/>
+						<Fragment key={key}>
+							<AssistantToolCall
+								toolName={part.toolName}
+								args={part.args}
+								result={part.result}
+								isError={
+									part.toolName === "ExitPlanMode"
+										? false
+										: (part as ToolCallPart).isError
+								}
+								streamingStatus={(part as ToolCallPart).streamingStatus}
+								childParts={(part as ToolCallPart).children}
+							/>
+							{isPlanWrite ? (
+								<PlanUpdatedTrigger
+									planFilePath={part.args.file_path as string}
+								/>
+							) : null}
+						</Fragment>
 					);
 				}
 				if (isTodoListPart(part)) {
