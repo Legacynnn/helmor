@@ -79,9 +79,18 @@ pub async fn write_plan(
     })
     .await?;
 
+    let workspace_id = run_blocking({
+        let session_id = session_id.clone();
+        move || {
+            crate::models::sessions::workspace_id_for_session(&session_id)?
+                .with_context(|| format!("No workspace bound to session {session_id}"))
+        }
+    })
+    .await?;
+
     crate::ui_sync::publish(
         &app,
-        crate::ui_sync::UiMutationEvent::PlanFileChanged { session_id, slug },
+        crate::ui_sync::UiMutationEvent::PlanFileChanged { workspace_id, slug },
     );
     Ok(summary)
 }
@@ -103,9 +112,18 @@ pub async fn set_plan_status(
     })
     .await?;
 
+    let workspace_id = run_blocking({
+        let session_id = session_id.clone();
+        move || {
+            crate::models::sessions::workspace_id_for_session(&session_id)?
+                .with_context(|| format!("No workspace bound to session {session_id}"))
+        }
+    })
+    .await?;
+
     crate::ui_sync::publish(
         &app,
-        crate::ui_sync::UiMutationEvent::PlanFileChanged { session_id, slug },
+        crate::ui_sync::UiMutationEvent::PlanFileChanged { workspace_id, slug },
     );
     Ok(summary)
 }
