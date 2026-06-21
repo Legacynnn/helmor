@@ -3,6 +3,7 @@ import type { ThreadMessageLike } from "./api";
 import {
 	hasUnresolvedPlanReview,
 	isMdxPlanPath,
+	latestMdxPlanSlug,
 	planSlugFromPath,
 } from "./plan-review";
 
@@ -97,5 +98,37 @@ describe("isMdxPlanPath / planSlugFromPath", () => {
 		expect(isMdxPlanPath("")).toBe(false);
 		expect(planSlugFromPath(undefined)).toBeNull();
 		expect(planSlugFromPath(null)).toBeNull();
+	});
+});
+
+describe("latestMdxPlanSlug", () => {
+	const planMsg = (path: string): ThreadMessageLike => ({
+		role: "assistant",
+		content: [{ type: "plan-review", planFilePath: path } as never],
+	});
+	const userMsg = (): ThreadMessageLike => ({
+		role: "user",
+		content: [{ type: "text", text: "ok" } as never],
+	});
+
+	it("returns the latest plan-review slug even when a user message follows", () => {
+		const messages = [planMsg(".helmor/plans/alpha.mdx"), userMsg()];
+		expect(latestMdxPlanSlug(messages)).toBe("alpha");
+	});
+
+	it("returns the most recent of multiple plans", () => {
+		const messages = [
+			planMsg(".helmor/plans/alpha.mdx"),
+			planMsg(".helmor/plans/beta.mdx"),
+		];
+		expect(latestMdxPlanSlug(messages)).toBe("beta");
+	});
+
+	it("returns null when there is no plan-review", () => {
+		expect(latestMdxPlanSlug([userMsg()])).toBeNull();
+	});
+
+	it("returns null when the latest plan-review path is not an MDX plan", () => {
+		expect(latestMdxPlanSlug([planMsg("/tmp/notes.txt")])).toBeNull();
 	});
 });

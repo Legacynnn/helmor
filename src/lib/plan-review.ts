@@ -76,3 +76,21 @@ export function latestUnresolvedMdxPlanSlug(
 	}
 	return planSlugFromPath(lastPlanPath);
 }
+
+/** Slug of the latest MDX plan-review part (regardless of whether the user has
+ *  replied since), or null when the latest plan-review is absent / not an MDX
+ *  plan. Used by the persistent plan-link strip, which shows whenever a plan
+ *  exists — not only while it is unresolved. */
+export function latestMdxPlanSlug(
+	messages: ThreadMessageLike[],
+): string | null {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const planPart = messages[i].content?.find(
+			(p) => p.type === "plan-review",
+		) as { planFilePath?: string | null } | undefined;
+		if (planPart) {
+			return planSlugFromPath(planPart.planFilePath ?? null);
+		}
+	}
+	return null;
+}
