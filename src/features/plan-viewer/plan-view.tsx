@@ -105,7 +105,7 @@ export function PlanView({
 					</Button>
 				</div>
 			</div>
-			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+			<div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
 				{blocks.map((block) => {
 					const body = renderBlock(block);
 					const isOpen = Boolean(openInputs[block.id]);
