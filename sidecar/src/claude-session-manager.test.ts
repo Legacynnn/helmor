@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { extractExitPlanContent } from "./claude-session-manager";
+import {
+	extractExitPlanContent,
+	planModeWriteDecision,
+} from "./claude-session-manager";
 import { createSidecarEmitter } from "./emitter";
 
 describe("extractExitPlanContent", () => {
@@ -156,5 +159,52 @@ describe("ExitPlanMode emit guard", () => {
 		emitPlanCaptured(emitter, "req-4", "tool-4", plan, input);
 
 		expect(events).toHaveLength(0);
+	});
+});
+
+describe("planModeWriteDecision", () => {
+	const cwd = "/repo";
+	it("denies Write outside .helmor/plans", () => {
+		expect(planModeWriteDecision("Write", { file_path: "src/x.ts" }, cwd)).toBe(
+			"deny",
+		);
+	});
+	it("allows Write under .helmor/plans (relative)", () => {
+		expect(
+			planModeWriteDecision(
+				"Write",
+				{ file_path: ".helmor/plans/foo.mdx" },
+				cwd,
+			),
+		).toBe("allow");
+	});
+	it("allows Edit under .helmor/plans (absolute)", () => {
+		expect(
+			planModeWriteDecision(
+				"Edit",
+				{ file_path: "/repo/.helmor/plans/foo.mdx" },
+				cwd,
+			),
+		).toBe("allow");
+	});
+	it("uses notebook_path for NotebookEdit", () => {
+		expect(
+			planModeWriteDecision(
+				"NotebookEdit",
+				{ notebook_path: ".helmor/plans/n.ipynb" },
+				cwd,
+			),
+		).toBe("allow");
+		expect(
+			planModeWriteDecision("NotebookEdit", { notebook_path: "nb.ipynb" }, cwd),
+		).toBe("deny");
+	});
+	it("allows non-write tools (Bash) to fall through", () => {
+		expect(planModeWriteDecision("Bash", { command: "rm -rf x" }, cwd)).toBe(
+			"allow",
+		);
+	});
+	it("denies a write tool with no path", () => {
+		expect(planModeWriteDecision("Write", {}, cwd)).toBe("deny");
 	});
 });

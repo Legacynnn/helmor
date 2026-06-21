@@ -634,6 +634,24 @@ export class ClaudeSessionManager implements SessionManager {
 								"The turn is over. The user will respond in a new turn.",
 						};
 					}
+					// Plan-mode read-only gate: in plan mode, deny file mutations
+					// outside `.helmor/plans/`. Bash and all other tools fall
+					// through to the normal permission request below.
+					if (
+						permissionMode === "plan" &&
+						planModeWriteDecision(
+							_toolName,
+							input as Record<string, unknown>,
+							cwd,
+						) === "deny"
+					) {
+						return {
+							behavior: "deny" as const,
+							message:
+								"Plan mode is read-only outside `.helmor/plans/`. Write the plan " +
+								"to a `.helmor/plans/<slug>.mdx` file, or exit plan mode to make changes.",
+						};
+					}
 					const permissionId = options.toolUseID;
 					emitter.permissionRequest(
 						requestId,
@@ -1352,4 +1370,34 @@ export function extractExitPlanContent(
 		}
 	}
 	return null;
+}
+
+/** File-mutating tools and the input field each uses for its target path. */
+const WRITE_TOOL_PATH_FIELDS: Record<string, string> = {
+	Write: "file_path",
+	Edit: "file_path",
+	MultiEdit: "file_path",
+	NotebookEdit: "notebook_path",
+};
+
+/** Matches `.helmor/plans/` anywhere in an absolute/relative path. */
+const PLAN_DIR_RE = /(?:^|\/)\.helmor\/plans\//;
+
+/**
+ * Plan-mode write gate. In `permissionMode === "plan"`, file-mutating tools
+ * (Write/Edit/MultiEdit/NotebookEdit) are denied unless their target path is
+ * under `.helmor/plans/`. Every other tool returns "allow" (the caller falls
+ * through to its normal permission flow — so Bash/reads are unchanged).
+ */
+export function planModeWriteDecision(
+	toolName: string,
+	input: Record<string, unknown>,
+	cwd?: string,
+): "deny" | "allow" {
+	const field = WRITE_TOOL_PATH_FIELDS[toolName];
+	if (!field) return "allow";
+	const raw = input[field];
+	if (typeof raw !== "string" || !raw.trim()) return "deny";
+	const resolved = cwd ? resolve(cwd, raw) : raw;
+	return PLAN_DIR_RE.test(resolved) ? "allow" : "deny";
 }
