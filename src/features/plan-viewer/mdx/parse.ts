@@ -201,8 +201,11 @@ export function parsePlanMdx(src: string): ParsedPlan {
 				const id = nextId();
 				const props = attributesToProps(node);
 				const rawText = childrenText(node, body);
+				const mode = planChildMode(name);
 				const childBlocks =
-					planChildMode(name) === "blocks" ? walk(node.children ?? []) : [];
+					mode === "blocks" || mode === "structured"
+						? walk(node.children ?? [])
+						: [];
 				blocks.push({
 					kind: "component",
 					id,

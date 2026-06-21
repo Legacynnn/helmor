@@ -1,10 +1,17 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { AnnotatedCode } from "../components/annotated-code";
+import { PlanCanvas } from "../components/canvas";
 import { Diagram } from "../components/diagram";
 import { FileMap } from "../components/file-map";
 import { OpenQuestions } from "../components/open-questions";
 import { RiskCard } from "../components/risk-card";
 import { Steps } from "../components/steps";
+
+/** Standalone fallback: a CanvasNode authored outside a PlanCanvas just renders
+ * its body blocks inline so content is never lost. */
+function CanvasNodeFallback({ children }: { children?: ReactNode }) {
+	return <>{children}</>;
+}
 
 /**
  * How a plan component's children are interpreted:
@@ -12,8 +19,10 @@ import { Steps } from "../components/steps";
  *   The component receives them as already-rendered `React.ReactNode`.
  * - `"raw"`: children are a verbatim text string (the component owns parsing —
  *   e.g. mermaid source, code body, a line list).
+ * - `"structured"`: children are passed as the raw parsed `PlanBlock[]` so the
+ *   component can inspect node ids/props itself (e.g. PlanCanvas).
  */
-export type PlanChildMode = "blocks" | "raw";
+export type PlanChildMode = "blocks" | "raw" | "structured";
 
 export type PlanComponentDef = {
 	// biome-ignore lint/suspicious/noExplicitAny: heterogeneous prop shapes per component
@@ -35,6 +44,8 @@ export const PLAN_COMPONENTS: Record<string, PlanComponentDef> = {
 	OpenQuestions: { render: OpenQuestions, childMode: "blocks" },
 	AnnotatedCode: { render: AnnotatedCode, childMode: "raw" },
 	Diagram: { render: Diagram, childMode: "raw" },
+	PlanCanvas: { render: PlanCanvas, childMode: "structured" },
+	CanvasNode: { render: CanvasNodeFallback, childMode: "blocks" },
 };
 
 /** Resolve a component's child mode, or `null` when the name is unknown. */

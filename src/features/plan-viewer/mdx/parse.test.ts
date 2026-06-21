@@ -153,3 +153,39 @@ Second.`;
 		expect(parsed.blocks.map((b) => b.id)).toEqual(["b0", "b1", "b3"]);
 	});
 });
+
+describe("PlanCanvas structured parsing", () => {
+	it("recurses into PlanCanvas/CanvasNode children", () => {
+		const src = [
+			"---",
+			'title: "T"',
+			"status: draft",
+			'summary: "S"',
+			"---",
+			"",
+			'<PlanCanvas direction="TB">',
+			'<CanvasNode id="a" title="A" connects="b">',
+			"Body of A",
+			"</CanvasNode>",
+			'<CanvasNode id="b" title="B" />',
+			"</PlanCanvas>",
+			"",
+		].join("\n");
+
+		const { blocks } = parsePlanMdx(src);
+		const canvas = blocks.find(
+			(b) => b.kind === "component" && b.name === "PlanCanvas",
+		);
+		expect(canvas).toBeDefined();
+		if (canvas?.kind !== "component") throw new Error("expected component");
+		const nodes = canvas.childBlocks.filter(
+			(b) => b.kind === "component" && b.name === "CanvasNode",
+		);
+		expect(nodes).toHaveLength(2);
+		const first = nodes[0];
+		if (first.kind !== "component") throw new Error("expected component");
+		expect(first.props.id).toBe("a");
+		expect(first.props.connects).toBe("b");
+		expect(first.childBlocks.some((c) => c.kind === "prose")).toBe(true);
+	});
+});

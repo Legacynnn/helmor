@@ -14,6 +14,9 @@ export function renderBlock(block: PlanBlock): ReactNode {
 		return <UnsupportedBlock name={block.name} />;
 	}
 	const Cmp = def.render;
+	if (def.childMode === "structured") {
+		return <Cmp {...block.props} childBlocks={block.childBlocks} />;
+	}
 	if (def.childMode === "blocks") {
 		return <Cmp {...block.props}>{renderBlocks(block.childBlocks)}</Cmp>;
 	}
