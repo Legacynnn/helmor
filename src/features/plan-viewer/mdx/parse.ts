@@ -13,8 +13,9 @@ export type PlanBlock =
 			/** Verbatim inner source text — always captured; used by raw-mode components. */
 			rawText: string;
 			/**
-			 * Recursively parsed nested blocks. Populated ONLY when the component is
-			 * known AND its `childMode` is `"blocks"`; empty otherwise.
+			 * Recursively parsed nested blocks. Populated when the component is
+			 * known AND its `childMode` is `"blocks"` or `"structured"`; empty
+			 * otherwise (including `"raw"` and unknown components).
 			 */
 			childBlocks: PlanBlock[];
 	  };
@@ -179,8 +180,8 @@ export function parsePlanMdx(src: string): ParsedPlan {
 		return sawElement;
 	}
 
-	/** Convert a flat list of mdast nodes into plan blocks, recursing into the
-	 * children of known `childMode: "blocks"` components. */
+	/** Convert a flat list of mdast nodes into plan blocks, recursing into
+	 * children of components whose childMode is "blocks" or "structured". */
 	function walk(nodes: MdastNode[]): PlanBlock[] {
 		const blocks: PlanBlock[] = [];
 		for (const node of nodes) {
