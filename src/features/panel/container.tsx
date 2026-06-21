@@ -391,6 +391,8 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	// select it.
 	const threadSessionIdRef = useRef(threadSessionId);
 	threadSessionIdRef.current = threadSessionId;
+	const activePlanSlugRef = useRef(activePlanSlug);
+	activePlanSlugRef.current = activePlanSlug;
 
 	const handleDeletePlan = useCallback(
 		(slug: string) => {
@@ -431,12 +433,24 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 		return () => window.removeEventListener(OPEN_PLAN_EVENT, handler);
 	}, [queryClient, settings.mdxPlanningEnabled]);
 
-	// Cmd+W on a plan closes the plan (not the session) — the global shortcut
-	// handler dispatches CLOSE_PLAN_EVENT; we own activePlanSlug so we clear it.
+	// Cmd+W on a plan removes the plan (matching the tab's X) — not the session.
+	// The global shortcut handler dispatches CLOSE_PLAN_EVENT; we own the active
+	// slug, so we delete it (which also clears the selection and refreshes the
+	// tab list). Deleting the plan — never the underlying session — is what
+	// avoids the earlier crash.
 	useEffect(() => {
-		const handler = () => setActivePlanSlug(null);
+		const handler = () => {
+			const slug = activePlanSlugRef.current;
+			if (slug) handleDeletePlan(slug);
+		};
 		window.addEventListener(CLOSE_PLAN_EVENT, handler);
 		return () => window.removeEventListener(CLOSE_PLAN_EVENT, handler);
+	}, [handleDeletePlan]);
+
+	// Non-destructive exit from the plan surface (used by the plan error
+	// boundary's "Back to conversation" — leaves the plan file intact).
+	const handleClosePlanView = useCallback(() => {
+		setActivePlanSlug(null);
 	}, []);
 
 	// Surface "a plan is the active center surface" to the shell so the global
@@ -788,6 +802,7 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			onSelectWorkspace={handleSelectWorkspace}
 			onSelectPlan={handleSelectPlan}
 			onDeletePlan={handleDeletePlan}
+			onClosePlanView={handleClosePlanView}
 			onSelectContextPreview={onSelectContextPreview}
 			onCloseContextPreview={onCloseContextPreview}
 			onPrefetchSession={handlePrefetchSession}

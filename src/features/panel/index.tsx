@@ -1,5 +1,6 @@
 import { memo, type ReactNode, useEffect, useState } from "react";
 import { PlanViewContainer } from "@/features/plan-viewer";
+import { PlanErrorBoundary } from "@/features/plan-viewer/plan-error-boundary";
 import { SourceDetailView } from "@/features/source-detail";
 import { TerminalSessionPanel } from "@/features/terminal/terminal-session-panel";
 import type {
@@ -50,6 +51,8 @@ type WorkspacePanelProps = {
 	onSelectWorkspace?: (workspaceId: string) => void;
 	onSelectPlan?: (slug: string) => void;
 	onDeletePlan?: (slug: string) => void;
+	/** Non-destructive return to the conversation (plan error-boundary exit). */
+	onClosePlanView?: () => void;
 	onSelectContextPreview?: () => void;
 	onCloseContextPreview?: () => void;
 	onPrefetchSession?: (sessionId: string) => void;
@@ -88,6 +91,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	onSelectWorkspace,
 	onSelectPlan,
 	onDeletePlan,
+	onClosePlanView,
 	onSelectContextPreview,
 	onCloseContextPreview,
 	onPrefetchSession,
@@ -225,11 +229,13 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 						</div>
 					))}
 					{planActive && activePlanSlug && planSessionId && workspace ? (
-						<PlanViewContainer
-							sessionId={planSessionId}
-							workspaceId={workspace.id}
-							slug={activePlanSlug}
-						/>
+						<PlanErrorBoundary key={activePlanSlug} onExit={onClosePlanView}>
+							<PlanViewContainer
+								sessionId={planSessionId}
+								workspaceId={workspace.id}
+								slug={activePlanSlug}
+							/>
+						</PlanErrorBoundary>
 					) : contextPreviewActive && contextPreviewCard ? (
 						<div className="min-h-0 flex-1 overflow-hidden px-0 pt-4 pb-3">
 							<SourceDetailView card={contextPreviewCard} />
