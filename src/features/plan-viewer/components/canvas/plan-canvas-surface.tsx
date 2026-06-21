@@ -7,7 +7,7 @@ import {
 	useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo } from "react";
+import { type CSSProperties, useEffect, useMemo } from "react";
 import type { PlanBlock } from "../../mdx/parse";
 import { buildCanvasGraph } from "./build-graph";
 import { CanvasNode } from "./canvas-node";
@@ -62,7 +62,20 @@ export default function PlanCanvasSurface({
 				edgesFocusable={false}
 			>
 				<Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-				<Controls showInteractive={false} />
+				<Controls
+					showInteractive={false}
+					// Theme React Flow's default light-on-white control buttons with
+					// Helmor tokens (icon uses `fill: currentColor`, driven by `color`).
+					style={
+						{
+							"--xy-controls-button-background-color": "var(--card)",
+							"--xy-controls-button-background-color-hover": "var(--accent)",
+							"--xy-controls-button-color": "var(--foreground)",
+							"--xy-controls-button-color-hover": "var(--accent-foreground)",
+							"--xy-controls-button-border-color": "var(--border)",
+						} as CSSProperties
+					}
+				/>
 			</ReactFlow>
 		</div>
 	);

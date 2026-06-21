@@ -1,5 +1,5 @@
 import { MessageSquarePlusIcon } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -61,6 +61,14 @@ export function PlanView({
 	const [comments, setComments] = useState<Record<string, string>>({});
 	// Which block ids currently show their inline comment input.
 	const [openInputs, setOpenInputs] = useState<Record<string, boolean>>({});
+	// Hover is tracked in JS (not CSS `:hover`) because WebKit leaves `:hover`
+	// stuck on a node when the plan re-renders (e.g. live refresh) under the
+	// cursor — which made the comment icon linger after the pointer left.
+	const [hoveredId, setHoveredId] = useState<string | null>(null);
+	// Backstop: clear any stuck hover when the plan content changes.
+	useEffect(() => {
+		setHoveredId(null);
+	}, [content]);
 
 	const labelById = useMemo(() => {
 		const map: Record<string, string> = {};
@@ -99,7 +107,7 @@ export function PlanView({
 	}, [comments, labelById, onRequestChanges]);
 
 	return (
-		<div className="flex h-full flex-col">
+		<div className="flex h-full flex-col pt-2">
 			<div className="flex shrink-0 items-center justify-between gap-3 border-border border-b px-4 py-2">
 				<span className="font-medium text-muted-foreground text-small">
 					Plan · {status}
@@ -130,8 +138,18 @@ export function PlanView({
 						const body = renderBlock(block);
 						const isOpen = Boolean(openInputs[block.id]);
 						const hasNote = (comments[block.id] ?? "").trim().length > 0;
+						const showComment = hoveredId === block.id || isOpen || hasNote;
 						return (
-							<div key={block.id} className="group relative">
+							<div
+								key={block.id}
+								className="relative"
+								onMouseEnter={() => setHoveredId(block.id)}
+								onMouseLeave={() =>
+									setHoveredId((current) =>
+										current === block.id ? null : current,
+									)
+								}
+							>
 								<div className="flex items-start gap-2">
 									<div className="min-w-0 flex-1">{body}</div>
 									<Button
@@ -141,17 +159,11 @@ export function PlanView({
 										aria-label={`Comment on ${labelById[block.id]}`}
 										title={`Comment on ${labelById[block.id]}`}
 										className={cn(
-											"shrink-0 cursor-pointer opacity-0 transition-opacity group-hover:opacity-100",
-											(isOpen || hasNote) && "opacity-100",
+											"shrink-0 cursor-pointer transition-opacity",
+											showComment ? "opacity-100" : "opacity-0",
 											hasNote && "text-primary",
 										)}
-										// Blur after click so the button doesn't retain focus and
-										// stay visible after the pointer leaves (WebKit treats a
-										// click as focus-visible). On open, the textarea autofocuses.
-										onClick={(event) => {
-											toggleInput(block.id);
-											event.currentTarget.blur();
-										}}
+										onClick={() => toggleInput(block.id)}
 									>
 										<MessageSquarePlusIcon className="size-4" />
 									</Button>
