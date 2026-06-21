@@ -780,7 +780,7 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 														<span className="pointer-events-none invisible absolute inset-y-0 right-0 flex items-center pr-1 group-hover/tab:pointer-events-auto group-hover/tab:visible">
 															<span
 																role="button"
-																aria-label="Close plan"
+																aria-label="Delete plan"
 																onPointerDown={stopTabActionPointerDown}
 																onClick={(event) => {
 																	event.preventDefault();
