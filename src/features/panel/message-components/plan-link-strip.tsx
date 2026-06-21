@@ -2,6 +2,7 @@ import { ClipboardList } from "lucide-react";
 import { usePlanList } from "@/features/plan-viewer/use-plan";
 import type { ThreadMessageLike } from "@/lib/api";
 import { dispatchOpenPlan, latestMdxPlanSlug } from "@/lib/plan-review";
+import { useSettings } from "@/lib/settings";
 
 /**
  * Persistent, pinned link to the session's plan. Rendered at the top of the
@@ -15,9 +16,14 @@ export function PlanLinkStrip({
 	sessionId: string;
 	messages: ThreadMessageLike[];
 }) {
-	const { data: plans } = usePlanList(sessionId);
+	const { settings } = useSettings();
+	// Mirror PlanReviewCard / the panel container: when MDX planning is off the
+	// Plan tab and the open-plan listener are disabled, so showing the strip
+	// would present a dead "Open" button. Passing null also keeps the query idle.
+	const planningEnabled = settings.mdxPlanningEnabled;
+	const { data: plans } = usePlanList(planningEnabled ? sessionId : null);
 
-	if (!plans || plans.length === 0) {
+	if (!planningEnabled || !plans || plans.length === 0) {
 		return null;
 	}
 

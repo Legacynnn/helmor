@@ -7,6 +7,11 @@ vi.mock("@/features/plan-viewer/use-plan", () => ({
 	usePlanList: () => ({ data: listPlansMock() }),
 }));
 
+let mdxPlanningEnabled = true;
+vi.mock("@/lib/settings", () => ({
+	useSettings: () => ({ settings: { mdxPlanningEnabled } }),
+}));
+
 import { PlanLinkStrip } from "./plan-link-strip";
 
 function summary(slug: string, title: string): PlanSummary {
@@ -21,6 +26,7 @@ function planMsg(path: string): ThreadMessageLike {
 
 afterEach(() => {
 	listPlansMock.mockReset();
+	mdxPlanningEnabled = true;
 });
 
 describe("PlanLinkStrip", () => {
@@ -61,5 +67,14 @@ describe("PlanLinkStrip", () => {
 		listPlansMock.mockReturnValue([summary("alpha", "Alpha plan")]);
 		render(<PlanLinkStrip sessionId="s1" messages={[]} />);
 		expect(screen.getByText("Alpha plan")).toBeInTheDocument();
+	});
+
+	it("renders nothing when MDX planning is disabled, even with plans", () => {
+		mdxPlanningEnabled = false;
+		listPlansMock.mockReturnValue([summary("alpha", "Alpha plan")]);
+		const { container } = render(
+			<PlanLinkStrip sessionId="s1" messages={[]} />,
+		);
+		expect(container.firstChild).toBeNull();
 	});
 });
