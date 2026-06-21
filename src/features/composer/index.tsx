@@ -41,6 +41,7 @@ import {
 import type { PendingPermission } from "@/features/conversation/hooks/use-streaming";
 import type { PendingUserInput } from "@/features/conversation/pending-user-input";
 import { humanizeBranch } from "@/features/navigation/shared";
+import { buildImplementPrompt } from "@/features/plan-viewer/handoff";
 import { normalizeShortcutEvent } from "@/features/shortcuts/format";
 import { InlineShortcutDisplay } from "@/features/shortcuts/shortcut-display";
 import type {
@@ -196,6 +197,10 @@ type WorkspaceComposerProps = {
 		onCancel: () => void;
 	} | null;
 	hasPlanReview?: boolean;
+	/** Slug of the latest unresolved MDX plan-review, or null. When set, the
+	 *  inline "Implement" control submits a prompt referencing the plan file so
+	 *  the same agent implements the exact plan it authored. */
+	unresolvedMdxPlanSlug?: string | null;
 	/** Provider capability table; the Plan toggle reads `supportsPlanMode`
 	 *  for the selected model's provider instead of hard-coding by id. */
 	providerCapabilities?: ProviderCapabilities[];
@@ -341,6 +346,7 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 	onPermissionResponse = noopPermissionResponse,
 	goalReplace = null,
 	hasPlanReview = false,
+	unresolvedMdxPlanSlug = null,
 	providerCapabilities,
 	alwaysShowContextUsage = false,
 	sessionId = null,
@@ -622,10 +628,21 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 		if (!hasPlanReview) return;
 		onChangePermissionMode("bypassPermissions");
 		clearPersistedDraft(contextKey);
-		onSubmit("Go ahead with the plan.", [], [], [], {
+		// For MDX plans, point the same agent at the actual plan file so it
+		// implements the exact plan it authored; otherwise keep the generic prompt.
+		const prompt = unresolvedMdxPlanSlug
+			? buildImplementPrompt(unresolvedMdxPlanSlug)
+			: "Go ahead with the plan.";
+		onSubmit(prompt, [], [], [], {
 			permissionModeOverride: "bypassPermissions",
 		});
-	}, [contextKey, hasPlanReview, onChangePermissionMode, onSubmit]);
+	}, [
+		contextKey,
+		hasPlanReview,
+		onChangePermissionMode,
+		onSubmit,
+		unresolvedMdxPlanSlug,
+	]);
 
 	const handlePlanRequestChanges = useCallback(() => {
 		if (!hasPlanReview) return;

@@ -18,6 +18,19 @@ export function buildHandoffPrompt(slug: string): string {
 	].join("\n");
 }
 
+/**
+ * Build the prompt the CURRENT agent receives when the user clicks the inline
+ * "Implement" control on an MDX plan-review. Unlike {@link buildHandoffPrompt}
+ * (a fresh sibling agent), this keeps the same agent going: it references the
+ * `.helmor/plans/<slug>.mdx` file so the agent implements the exact plan it
+ * authored, reads it first, follows it step by step, and keeps the file updated
+ * (checking off steps, recording decisions) as work progresses.
+ */
+export function buildImplementPrompt(slug: string): string {
+	const path = `.helmor/plans/${slug}.mdx`;
+	return `Implement the approved plan at ${path}. Read it first, follow it step by step, and keep the plan file updated as you go (check off steps, record decisions).`;
+}
+
 /** Short intro line seeding the handoff session's composer. The full
  *  implementation guidance from {@link buildHandoffPrompt} is supplied as the
  *  prefill body below the intro. The trailing space is intentional: the caret

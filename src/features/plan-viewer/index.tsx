@@ -11,8 +11,7 @@ import { usePlan } from "./use-plan";
 
 /**
  * Data container for a single plan document. Reads (sessionId, slug) via
- * {@link usePlan} and renders {@link PlanView}, wiring Approve to the
- * `set_plan_status` mutation. Request-changes builds a structured prompt from
+ * {@link usePlan} and renders {@link PlanView}. Request-changes builds a structured prompt from
  * the user's block-anchored comments and dispatches the
  * `helmor:submit-plan-feedback` window event — the conversation container
  * listens and routes it through the composer's submit path, staying in plan
@@ -47,7 +46,7 @@ export function PlanViewContainer({
 
 	// Mark the plan handed-off (broadcasts planFileChanged → refreshes the
 	// status badge), then create the fresh implementation session. Fire-and-
-	// forget with error logging, mirroring how onApprove calls setPlanStatus.
+	// forget with error logging.
 	const handleHandoff = useCallback(() => {
 		void (async () => {
 			try {
@@ -58,13 +57,6 @@ export function PlanViewContainer({
 			}
 		})();
 	}, [sessionId, workspaceId, slug]);
-
-	// Fire-and-forget with error logging, mirroring handleHandoff.
-	const handleApprove = useCallback(() => {
-		void setPlanStatus(sessionId, slug, "approved").catch((error) => {
-			console.error("[helmor] plan approve failed", error);
-		});
-	}, [sessionId, slug]);
 
 	if (isError) {
 		return (
@@ -87,7 +79,6 @@ export function PlanViewContainer({
 			content={data.content}
 			status={data.summary.status}
 			onRequestChanges={handleRequestChanges}
-			onApprove={handleApprove}
 			onHandoff={handleHandoff}
 		/>
 	);

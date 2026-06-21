@@ -24,7 +24,6 @@ test("renders known blocks and a placeholder for unknown ones", () => {
 			content={MDX}
 			status="draft"
 			onRequestChanges={() => {}}
-			onApprove={() => {}}
 			onHandoff={() => {}}
 		/>,
 	);
@@ -41,7 +40,6 @@ test("request-changes is disabled until a comment is entered, then emits BlockCo
 			content={MDX}
 			status="draft"
 			onRequestChanges={onRequestChanges}
-			onApprove={() => {}}
 			onHandoff={() => {}}
 		/>,
 	);

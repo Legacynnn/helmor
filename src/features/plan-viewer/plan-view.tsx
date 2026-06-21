@@ -37,13 +37,11 @@ export function PlanView({
 	content,
 	status,
 	onRequestChanges,
-	onApprove,
 	onHandoff,
 }: {
 	content: string;
 	status: string;
 	onRequestChanges: (comments: BlockComment[]) => void;
-	onApprove: () => void;
 	onHandoff: () => void;
 }) {
 	const { blocks } = useMemo(() => parsePlanMdx(content), [content]);
@@ -103,9 +101,6 @@ export function PlanView({
 						onClick={handleRequestChanges}
 					>
 						Request changes
-					</Button>
-					<Button variant="outline" size="sm" onClick={onApprove}>
-						Approve
 					</Button>
 					<Button size="sm" onClick={onHandoff}>
 						Handoff

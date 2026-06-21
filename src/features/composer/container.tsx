@@ -179,6 +179,7 @@ type WorkspaceComposerContainerProps = {
 	pendingPermission?: PendingPermission | null;
 	onPermissionResponse?: PermissionPanelProps["onResponse"];
 	hasPlanReview?: boolean;
+	unresolvedMdxPlanSlug?: string | null;
 	modelSelections: Record<string, ModelRef>;
 	effortLevels: Record<string, string>;
 	permissionModes: Record<string, string>;
@@ -297,6 +298,7 @@ export const WorkspaceComposerContainer = memo(
 		pendingPermission = null,
 		onPermissionResponse = noopPermissionResponse,
 		hasPlanReview = false,
+		unresolvedMdxPlanSlug = null,
 		modelSelections,
 		effortLevels = {},
 		permissionModes = {},
@@ -1381,6 +1383,7 @@ export const WorkspaceComposerContainer = memo(
 								: null
 						}
 						hasPlanReview={hasPlanReview}
+						unresolvedMdxPlanSlug={unresolvedMdxPlanSlug}
 						providerCapabilities={providerCapabilitiesQuery.data}
 						pendingInsertRequests={pendingInsertRequests}
 						onPendingInsertRequestsConsumed={onPendingInsertRequestsConsumed}

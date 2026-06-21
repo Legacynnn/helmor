@@ -905,6 +905,7 @@ export const WorkspaceConversationContainer = memo(
 						pendingPermission={headPendingPermission}
 						onPermissionResponse={handlePermissionResponse}
 						hasPlanReview={hasPlanReview}
+						unresolvedMdxPlanSlug={unresolvedMdxPlanSlug}
 						modelSelections={composerModelSelections}
 						effortLevels={composerEffortLevels}
 						permissionModes={composerPermissionModes}
