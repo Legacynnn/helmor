@@ -9,7 +9,7 @@ export function CanvasNode({ data, selected }: NodeProps) {
 	return (
 		<div
 			className={cn(
-				"w-[220px] max-h-[200px] overflow-hidden rounded-lg border bg-card shadow-sm transition-all",
+				"w-[220px] max-h-[200px] overflow-hidden rounded-lg border bg-card shadow-sm transition-colors",
 				"border-border",
 				selected ? "ring-2 ring-ring border-ring" : "hover:border-ring/60",
 			)}
