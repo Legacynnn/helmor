@@ -115,7 +115,7 @@ type WorkspacePanelHeaderProps = {
 	headerLeading?: React.ReactNode;
 	onSelectSession?: (sessionId: string) => void;
 	onSelectPlan?: (slug: string) => void;
-	onDeletePlan?: (slug: string) => void;
+	onClosePlanTab?: (slug: string) => void;
 	onSelectContextPreview?: () => void;
 	onCloseContextPreview?: () => void;
 	onPrefetchSession?: (sessionId: string) => void;
@@ -154,7 +154,7 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 	headerLeading,
 	onSelectSession,
 	onSelectPlan,
-	onDeletePlan,
+	onClosePlanTab,
 	onSelectContextPreview,
 	onCloseContextPreview,
 	onPrefetchSession,
@@ -776,23 +776,21 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 															{plan.title}
 														</span>
 													</span>
-													{plan.slug === activePlanSlug ? (
-														<span className="pointer-events-none invisible absolute inset-y-0 right-0 flex items-center pr-1 group-hover/tab:pointer-events-auto group-hover/tab:visible">
-															<span
-																role="button"
-																aria-label="Delete plan"
-																onPointerDown={stopTabActionPointerDown}
-																onClick={(event) => {
-																	event.preventDefault();
-																	event.stopPropagation();
-																	onDeletePlan?.(plan.slug);
-																}}
-																className="flex cursor-interactive items-center justify-center rounded-sm p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-															>
-																<X className="size-3" strokeWidth={2} />
-															</span>
+													<span className="pointer-events-none invisible absolute inset-y-0 right-0 flex items-center pr-1 group-hover/tab:pointer-events-auto group-hover/tab:visible">
+														<span
+															role="button"
+															aria-label="Close plan"
+															onPointerDown={stopTabActionPointerDown}
+															onClick={(event) => {
+																event.preventDefault();
+																event.stopPropagation();
+																onClosePlanTab?.(plan.slug);
+															}}
+															className="flex cursor-interactive items-center justify-center rounded-sm p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+														>
+															<X className="size-3" strokeWidth={2} />
 														</span>
-													) : null}
+													</span>
 												</TabsTrigger>
 											</TooltipTrigger>
 											<TooltipContent

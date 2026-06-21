@@ -140,34 +140,63 @@ function nodeSource(node: MdastNode, body: string): string {
 	return body.slice(start, end);
 }
 
+function mdxParse(body: string): MdastNode {
+	return unified()
+		.use(remarkParse)
+		.use(remarkMdx)
+		.parse(body) as unknown as MdastNode;
+}
+
+/** Escape `{`/`}` to HTML entities everywhere OUTSIDE fenced code blocks and
+ *  inline code spans. The entities render back as literal braces, but acorn no
+ *  longer sees an expression to choke on — so a stray brace in prose stops
+ *  crashing the MDX parse while components (which use no braces) still work. */
+function escapeBracesOutsideCode(src: string): string {
+	const codeRe = /```[\s\S]*?```|`[^`\n]*`/g;
+	const escapeBraces = (s: string) =>
+		s.replace(/[{}]/g, (c) => (c === "{" ? "&#123;" : "&#125;"));
+	let out = "";
+	let last = 0;
+	for (const match of src.matchAll(codeRe)) {
+		const start = match.index ?? 0;
+		out += escapeBraces(src.slice(last, start));
+		out += match[0];
+		last = start + match[0].length;
+	}
+	out += escapeBraces(src.slice(last));
+	return out;
+}
+
 /**
- * Parse the document body into an mdast tree. Tries strict MDX first (so plan
- * components are recognised); if acorn rejects an expression it would otherwise
- * throw and crash the whole plan view, so we retry with plain Markdown — the
- * content still renders, just without JSX component handling.
+ * Parse the document body into an mdast tree. Strict MDX (remark-mdx) runs the
+ * content through acorn, which throws on any `{…}` that isn't valid JS — e.g. a
+ * stray `{`, JSON, or a code-ish snippet in agent-authored prose ("Could not
+ * parse expression with acorn"). To keep components rendering, we first retry
+ * with braces escaped outside code; only if THAT still throws do we fall back to
+ * plain Markdown. Returns the body the tree's offsets refer to (the escaped
+ * variant when the retry was used), since the caller slices by byte offset.
  */
-function parseBody(body: string): MdastNode {
+function parseBody(body: string): { tree: MdastNode; body: string } {
 	try {
-		return unified()
-			.use(remarkParse)
-			.use(remarkMdx)
-			.parse(body) as unknown as MdastNode;
+		return { tree: mdxParse(body), body };
 	} catch {
-		return unified().use(remarkParse).parse(body) as unknown as MdastNode;
+		const escaped = escapeBracesOutsideCode(body);
+		try {
+			return { tree: mdxParse(escaped), body: escaped };
+		} catch {
+			return {
+				tree: unified().use(remarkParse).parse(body) as unknown as MdastNode,
+				body,
+			};
+		}
 	}
 }
 
 export function parsePlanMdx(src: string): ParsedPlan {
-	const { yaml, body } = splitFrontmatter(src);
+	const { yaml, body: rawBody } = splitFrontmatter(src);
 	const frontmatter = parseFrontmatter(yaml);
 
-	// Strict MDX parsing (remark-mdx) runs the content through acorn, which throws
-	// on any `{…}` that isn't a valid JS expression — e.g. an agent-authored plan
-	// with a stray `{`, JSON, or a code-ish snippet in prose ("Could not parse
-	// expression with acorn"). A thrown parse must never blank the plan surface,
-	// so fall back to plain Markdown: components/expressions degrade to literal
-	// text, but the document still renders.
-	const tree = parseBody(body);
+	const { tree, body } = parseBody(rawBody);
 
 	// A single counter keeps ids unique and stable in document order, including
 	// nested blocks (the counter is shared across recursion).

@@ -12,7 +12,7 @@ import type {
 	WorkspaceDetail,
 	WorkspaceSessionSummary,
 } from "@/lib/api";
-import { createSession, deletePlan, loadRepoScripts } from "@/lib/api";
+import { createSession, loadRepoScripts } from "@/lib/api";
 import { CLOSE_PLAN_EVENT, OPEN_PLAN_EVENT } from "@/lib/plan-review";
 import {
 	helmorQueryKeys,
@@ -356,30 +356,52 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	const planListQuery = usePlanList(
 		settings.mdxPlanningEnabled ? threadSessionId : null,
 	);
+	// Plan tabs are EPHEMERAL: a tab exists only while the plan is "open" in this
+	// session view. Closing a tab (its X, or Cmd+W) removes it from
+	// `openPlanSlugs` but NEVER deletes the `.mdx` file, so a closed plan can
+	// always be reopened from the file browser, the plan-link strip, the inline
+	// triggers, or by the agent re-surfacing it.
+	const [openPlanSlugs, setOpenPlanSlugs] = useState<string[]>([]);
+	const [activePlanSlug, setActivePlanSlug] = useState<string | null>(null);
+	const planTitleBySlug = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const plan of planListQuery.data ?? []) {
+			map.set(plan.slug, plan.title);
+		}
+		return map;
+	}, [planListQuery.data]);
 	const planTabs = useMemo(
 		() =>
-			(planListQuery.data ?? []).map((plan) => ({
-				slug: plan.slug,
-				title: plan.title,
+			openPlanSlugs.map((slug) => ({
+				slug,
+				title: planTitleBySlug.get(slug) ?? slug,
 			})),
-		[planListQuery.data],
+		[openPlanSlugs, planTitleBySlug],
 	);
-	const [activePlanSlug, setActivePlanSlug] = useState<string | null>(null);
-	// Clear the plan selection whenever the session changes or the selected
-	// plan disappears from the list (deleted / feature toggled off).
+	// Reset the open tabs + selection whenever the displayed session changes.
 	useEffect(() => {
-		if (
-			activePlanSlug &&
-			!planTabs.some((plan) => plan.slug === activePlanSlug)
-		) {
-			setActivePlanSlug(null);
-		}
-	}, [activePlanSlug, planTabs]);
-	useEffect(() => {
+		setOpenPlanSlugs([]);
 		setActivePlanSlug(null);
 	}, [threadSessionId]);
+	// Safety: never keep a selection that isn't an open tab.
+	useEffect(() => {
+		if (activePlanSlug && !openPlanSlugs.includes(activePlanSlug)) {
+			setActivePlanSlug(null);
+		}
+	}, [activePlanSlug, openPlanSlugs]);
+	// Open a plan: add its ephemeral tab (if not already open) and select it.
+	const handleOpenPlan = useCallback((slug: string) => {
+		setOpenPlanSlugs((prev) => (prev.includes(slug) ? prev : [...prev, slug]));
+		setActivePlanSlug(slug);
+	}, []);
+	// Select an already-open plan tab.
 	const handleSelectPlan = useCallback((slug: string) => {
 		setActivePlanSlug(slug);
+	}, []);
+	// Close a plan tab — non-destructive: the `.mdx` file stays on disk.
+	const handleClosePlanTab = useCallback((slug: string) => {
+		setOpenPlanSlugs((prev) => prev.filter((s) => s !== slug));
+		setActivePlanSlug((current) => (current === slug ? null : current));
 	}, []);
 
 	// Cross-component "open this plan tab" signal. Fired by the compact
@@ -393,25 +415,6 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	threadSessionIdRef.current = threadSessionId;
 	const activePlanSlugRef = useRef(activePlanSlug);
 	activePlanSlugRef.current = activePlanSlug;
-
-	const handleDeletePlan = useCallback(
-		(slug: string) => {
-			const sessionId = threadSessionIdRef.current;
-			if (!sessionId) return;
-			// Leave the plan surface immediately if we're deleting the open one.
-			setActivePlanSlug((current) => (current === slug ? null : current));
-			void deletePlan(sessionId, slug)
-				.then(() =>
-					queryClient.invalidateQueries({
-						queryKey: helmorQueryKeys.planList(sessionId),
-					}),
-				)
-				.catch((error) => {
-					console.error("[panel] deletePlan failed", error);
-				});
-		},
-		[queryClient],
-	);
 
 	useEffect(() => {
 		if (!settings.mdxPlanningEnabled) return;
@@ -427,25 +430,24 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			void queryClient.invalidateQueries({
 				queryKey: helmorQueryKeys.planList(sessionId),
 			});
-			setActivePlanSlug(detail.slug);
+			handleOpenPlan(detail.slug);
 		};
 		window.addEventListener(OPEN_PLAN_EVENT, handler);
 		return () => window.removeEventListener(OPEN_PLAN_EVENT, handler);
-	}, [queryClient, settings.mdxPlanningEnabled]);
+	}, [queryClient, settings.mdxPlanningEnabled, handleOpenPlan]);
 
-	// Cmd+W on a plan removes the plan (matching the tab's X) — not the session.
-	// The global shortcut handler dispatches CLOSE_PLAN_EVENT; we own the active
-	// slug, so we delete it (which also clears the selection and refreshes the
-	// tab list). Deleting the plan — never the underlying session — is what
-	// avoids the earlier crash.
+	// Cmd+W on a plan closes its tab (matching the tab's X) — non-destructive:
+	// the plan file is kept and the underlying session is never touched. The
+	// global shortcut handler dispatches CLOSE_PLAN_EVENT; we own the active
+	// slug so we close that tab.
 	useEffect(() => {
 		const handler = () => {
 			const slug = activePlanSlugRef.current;
-			if (slug) handleDeletePlan(slug);
+			if (slug) handleClosePlanTab(slug);
 		};
 		window.addEventListener(CLOSE_PLAN_EVENT, handler);
 		return () => window.removeEventListener(CLOSE_PLAN_EVENT, handler);
-	}, [handleDeletePlan]);
+	}, [handleClosePlanTab]);
 
 	// Non-destructive exit from the plan surface (used by the plan error
 	// boundary's "Back to conversation" — leaves the plan file intact).
@@ -801,7 +803,7 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			onSelectSession={handleSelectSession}
 			onSelectWorkspace={handleSelectWorkspace}
 			onSelectPlan={handleSelectPlan}
-			onDeletePlan={handleDeletePlan}
+			onClosePlanTab={handleClosePlanTab}
 			onClosePlanView={handleClosePlanView}
 			onSelectContextPreview={onSelectContextPreview}
 			onCloseContextPreview={onCloseContextPreview}

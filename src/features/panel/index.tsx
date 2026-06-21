@@ -50,7 +50,7 @@ type WorkspacePanelProps = {
 	onSelectSession?: (sessionId: string) => void;
 	onSelectWorkspace?: (workspaceId: string) => void;
 	onSelectPlan?: (slug: string) => void;
-	onDeletePlan?: (slug: string) => void;
+	onClosePlanTab?: (slug: string) => void;
 	/** Non-destructive return to the conversation (plan error-boundary exit). */
 	onClosePlanView?: () => void;
 	onSelectContextPreview?: () => void;
@@ -90,7 +90,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	onSelectSession,
 	onSelectWorkspace,
 	onSelectPlan,
-	onDeletePlan,
+	onClosePlanTab,
 	onClosePlanView,
 	onSelectContextPreview,
 	onCloseContextPreview,
@@ -194,7 +194,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 					onSelectSession={onSelectSession}
 					onSelectWorkspace={onSelectWorkspace}
 					onSelectPlan={onSelectPlan}
-					onDeletePlan={onDeletePlan}
+					onClosePlanTab={onClosePlanTab}
 					onSelectContextPreview={onSelectContextPreview}
 					onCloseContextPreview={onCloseContextPreview}
 					onPrefetchSession={onPrefetchSession}

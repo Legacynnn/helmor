@@ -20,12 +20,36 @@ describe("parsePlanMdx", () => {
 		expect(() => parsePlanMdx(src)).not.toThrow();
 		const { frontmatter, blocks } = parsePlanMdx(src);
 		expect(frontmatter.title).toBe("Broken");
-		// The body content survived (rendered as prose blocks).
+		// The body content survived (rendered as prose blocks). The stray brace
+		// is escaped to an entity in the source but the surrounding text is intact.
 		const text = blocks
 			.map((b) => (b.kind === "prose" ? b.markdown : ""))
 			.join("\n");
 		expect(text).toContain("Heading");
-		expect(text).toContain("invalid {1 2 3}");
+		expect(text).toContain("1 2 3");
+	});
+
+	it("still recognises components when prose has an unparseable brace", () => {
+		// The stray `{` would crash strict MDX; the brace-escape retry must keep
+		// the RiskCard component intact (not degrade the whole doc to plain text).
+		const src = [
+			"---",
+			'title: "Recovered"',
+			"status: draft",
+			"---",
+			"",
+			"Intro with a stray { brace.",
+			"",
+			'<RiskCard severity="high">',
+			"A real risk.",
+			"</RiskCard>",
+		].join("\n");
+
+		const { blocks } = parsePlanMdx(src);
+		const risk = blocks.find(
+			(b) => b.kind === "component" && b.name === "RiskCard",
+		);
+		expect(risk).toBeDefined();
 	});
 
 	it("parses frontmatter title and status", () => {
