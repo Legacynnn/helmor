@@ -143,9 +143,11 @@ pub enum UiMutationEvent {
         workspace_id: String,
         session_id: Option<String>,
     },
-    /// A plan file under `.helmor/plans/` was created or changed.
+    /// A plan file under `.helmor/plans/` was created or changed. Carries the
+    /// owning workspace + slug (the on-disk identity); the frontend invalidates
+    /// every plan query for that slug regardless of which session opened it.
     PlanFileChanged {
-        session_id: String,
+        workspace_id: String,
         slug: String,
     },
 }
@@ -258,7 +260,7 @@ mod tests {
                 reason: "extra usage not enabled".into(),
             },
             UiMutationEvent::PlanFileChanged {
-                session_id: "s".into(),
+                workspace_id: "w".into(),
                 slug: "my-plan".into(),
             },
         ];
