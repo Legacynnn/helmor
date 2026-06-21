@@ -162,7 +162,7 @@ describe("shortcut registry", () => {
 		const cycleRepo = SHORTCUT_DEFINITIONS.find(
 			(definition) => definition.id === "startSurface.cycleRepository",
 		);
-		expect(planMode?.defaultHotkey).toBe("Mod+Shift+P");
+		expect(planMode?.defaultHotkey).toBe("Shift+Tab");
 		expect(cycleRepo?.defaultHotkey).toBe("Shift+Tab");
 		expect(planMode?.scopes).toEqual(["workspace-composer"]);
 		expect(cycleRepo?.scopes).toEqual(["start-composer"]);

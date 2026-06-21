@@ -382,7 +382,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		id: "composer.togglePlanMode",
 		title: "Toggle plan mode",
 		group: "Composer",
-		defaultHotkey: "Mod+Shift+P",
+		defaultHotkey: "Shift+Tab",
 		// workspace-composer only: plan mode is a per-session concept with
 		// no UI on the start surface.
 		scopes: ["workspace-composer"],

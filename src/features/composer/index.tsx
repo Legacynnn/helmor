@@ -825,7 +825,10 @@ export const WorkspaceComposer = memo(function WorkspaceComposer({
 					// Named container: the footer toolbar sheds label text and
 					// re-aligns in narrow surfaces (quick panel, mini mode) via
 					// pure CSS container queries — no JS width checks.
-					"@container/composer relative flex flex-col rounded-xl border border-border/70 bg-sidebar dark:border-border/40",
+					"@container/composer relative flex flex-col rounded-xl bg-sidebar",
+					permissionMode === "plan"
+						? "border border-dashed border-amber-500/70 dark:border-amber-400/50"
+						: "border border-border/70 dark:border-border/40",
 					// Pending-interaction panels fill the shell edge-to-edge and own
 					// their own internal padding; the default composer gets the
 					// legacy px-4 pt-3 pb-3 breathing room.

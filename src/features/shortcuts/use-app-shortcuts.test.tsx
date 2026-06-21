@@ -156,14 +156,9 @@ describe("useAppShortcuts", () => {
 		fireModT();
 		expect(sessionNew).toHaveBeenCalledTimes(1);
 
-		// Cmd+Shift+P (workspace composer) fires.
+		// Shift+Tab (workspace composer) fires.
 		window.dispatchEvent(
-			new KeyboardEvent("keydown", {
-				key: "p",
-				code: "KeyP",
-				metaKey: true,
-				shiftKey: true,
-			}),
+			new KeyboardEvent("keydown", { key: "Tab", code: "Tab", shiftKey: true }),
 		);
 		expect(togglePlanMode).toHaveBeenCalledTimes(1);
 	});
@@ -206,15 +201,11 @@ describe("useAppShortcuts", () => {
 
 		(getByTestId("workspace-input") as HTMLInputElement).focus();
 		window.dispatchEvent(
-			new KeyboardEvent("keydown", {
-				key: "p",
-				code: "KeyP",
-				metaKey: true,
-				shiftKey: true,
-			}),
+			new KeyboardEvent("keydown", { key: "Tab", code: "Tab", shiftKey: true }),
 		);
 		expect(togglePlanMode).toHaveBeenCalledTimes(1);
-		// Cycling stays put — the workspace surface doesn't claim Shift+Tab.
+		// Each leaf scope resolves Shift+Tab to its own handler — the
+		// workspace-composer toggle didn't re-fire the start-composer cycle.
 		expect(cycleRepository).toHaveBeenCalledTimes(1);
 	});
 
