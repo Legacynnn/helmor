@@ -3,6 +3,7 @@
 
 pub mod auth;
 pub mod client;
+pub mod map;
 
 pub use auth::default_login;
 
