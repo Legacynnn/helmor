@@ -341,7 +341,7 @@ pub async fn update_task(
         ensure_supported(&task.provider)?;
         let key = require_api_key(&task.provider)?;
 
-        let issue_patch = linear::IssuePatch {
+        let issue_patch = crate::integrations::provider::IssuePatch {
             title: patch.title,
             description: patch.description,
             status_id: patch.status_id,
