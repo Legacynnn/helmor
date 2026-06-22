@@ -26,4 +26,9 @@ describe("Diff", () => {
 		expect(screen.getByText(/const x = 2;/)).toBeInTheDocument();
 		expect(screen.getByText(/unchanged\(\);/)).toBeInTheDocument();
 	});
+
+	it("renders nothing when the diff body is empty", () => {
+		const { container } = renderMdx(["<Diff>", "</Diff>"].join("\n"));
+		expect(container.querySelector("section")).toBeNull();
+	});
 });

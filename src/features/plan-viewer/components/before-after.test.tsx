@@ -29,4 +29,19 @@ describe("BeforeAfter", () => {
 		expect(screen.getByText("Old: one big canvas.")).toBeInTheDocument();
 		expect(screen.getByText("New: split canvas.")).toBeInTheDocument();
 	});
+
+	it("renders only the side that has content", () => {
+		renderMdx(
+			[
+				"<BeforeAfter>",
+				"<After>",
+				"Only after.",
+				"</After>",
+				"</BeforeAfter>",
+			].join("\n"),
+		);
+		expect(screen.getByText("After")).toBeInTheDocument();
+		expect(screen.getByText("Only after.")).toBeInTheDocument();
+		expect(screen.queryByText("Before")).toBeNull();
+	});
 });

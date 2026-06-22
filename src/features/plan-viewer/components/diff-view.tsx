@@ -1,13 +1,17 @@
 import { GitCompareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { accentClasses } from "./shell/accent";
 import { PlanBlockShell } from "./shell/plan-block-shell";
 
 type DiffKind = "add" | "remove" | "context";
 type DiffLine = { kind: DiffKind; text: string };
 
+// Diff rows use a distinct GitHub-style fill (a subtle bg tint, no border)
+// rather than the callout-card `container` accent — but the add/remove hue is
+// still sourced from the shared accent system (`.header`) so it can't drift.
 const LINE_STYLES: Record<DiffKind, string> = {
-	add: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-	remove: "bg-red-500/10 text-red-700 dark:text-red-300",
+	add: cn("bg-emerald-500/10", accentClasses("success").header),
+	remove: cn("bg-red-500/10", accentClasses("danger").header),
 	context: "text-muted-foreground",
 };
 
@@ -18,8 +22,15 @@ const GUTTER: Record<DiffKind, string> = {
 };
 
 function parseDiff(text: string): DiffLine[] {
+	// Trim outer whitespace first so a trailing newline (common from editors)
+	// doesn't render a phantom blank final row, and empty input yields no lines
+	// (→ the component renders nothing). Interior blank context lines survive.
+	const trimmed = text.trim();
+	if (trimmed.length === 0) {
+		return [];
+	}
 	const lines: DiffLine[] = [];
-	for (const raw of text.split(/\r?\n/)) {
+	for (const raw of trimmed.split(/\r?\n/)) {
 		if (raw.startsWith("+")) {
 			lines.push({ kind: "add", text: raw.slice(1) });
 		} else if (raw.startsWith("-")) {
