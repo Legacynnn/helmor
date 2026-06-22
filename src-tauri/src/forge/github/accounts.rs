@@ -374,6 +374,17 @@ fn list_github_accounts_full() -> Result<Vec<ForgeAccount>> {
     Ok(accounts)
 }
 
+/// The active GitHub login (the account `gh auth switch` points at), or the
+/// first authenticated account if none is explicitly active.
+pub(crate) fn default_login() -> anyhow::Result<Option<String>> {
+    let accounts = list_github_accounts_full()?;
+    let active = accounts
+        .iter()
+        .find(|a| a.active)
+        .or_else(|| accounts.first());
+    Ok(active.map(|a| a.login.clone()))
+}
+
 /// `(host, login, active)` tuple lifted out of a `gh auth status
 /// --json hosts` payload. Internal staging type for the parallel
 /// profile-fetch fan-out in `list_github_accounts_full`.
