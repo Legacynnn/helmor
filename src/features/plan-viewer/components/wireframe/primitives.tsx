@@ -96,5 +96,12 @@ function WireframePiece({ node }: { node: WireframeNode }) {
 			);
 		case "divider":
 			return <hr className="border-border" />;
+		default: {
+			// Exhaustiveness guard: adding a type to `WireframeNode["type"]`
+			// without a case here becomes a compile error instead of a silent
+			// blank render.
+			const _exhaustive: never = node.type;
+			return _exhaustive;
+		}
 	}
 }

@@ -549,6 +549,12 @@ mod tests {
         assert!(prompt.contains("Variant"));
         assert!(prompt.contains("DataModel"));
         assert!(prompt.contains("Entity"));
+        // Wireframe primitives with distinct (non-common-word) names; the others
+        // (input/button/row/col/box/text/image/divider) are common words that
+        // appear elsewhere in the prompt, so only these three pin uniquely.
+        assert!(prompt.contains("heading"));
+        assert!(prompt.contains("field"));
+        assert!(prompt.contains("pill"));
         assert!(prompt.contains("ExitPlanMode"));
         // The block-element rule is the one the MDX parser actually
         // depends on — inline JSX renders as plain text.
