@@ -2,6 +2,7 @@
 //! their API shapes into these so the frontend renders one icon/status set
 //! regardless of source.
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
@@ -238,4 +239,19 @@ pub struct NewIssue<'a> {
     pub assignee_id: Option<&'a str>,
     pub project_id: Option<&'a str>,
     pub label_ids: Option<&'a [String]>,
+}
+
+/// Provider-agnostic operations the IPC commands call. Each concrete provider
+/// (Linear, GitHub) constructs short-lived clients internally.
+pub trait TaskProvider: Send {
+    /// Probe credentials and load the org name + selectable teams (GitHub: repos).
+    fn org_and_teams(&self) -> Result<OrgTeams>;
+    /// Workflow states for a team (GitHub: the fixed Open/Done/Not planned set).
+    fn list_states(&self, team: &str) -> Result<Vec<TaskStatus>>;
+    fn list_projects(&self, team: &str) -> Result<Vec<TaskProject>>;
+    fn list_labels(&self, team: &str) -> Result<Vec<TaskLabel>>;
+    fn list_members(&self, team: &str) -> Result<Vec<TaskAssignee>>;
+    fn list_issues(&self, team: &str) -> Result<Vec<ProviderTask>>;
+    fn update_issue(&self, external_id: &str, patch: &IssuePatch) -> Result<ProviderTask>;
+    fn create_issue(&self, team: &str, title: &str, fields: &NewIssue<'_>) -> Result<ProviderTask>;
 }

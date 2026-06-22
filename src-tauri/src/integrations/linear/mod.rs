@@ -11,7 +11,7 @@ use serde_json::{json, Map, Value};
 
 pub use crate::integrations::provider::{IssuePatch, NewIssue, OrgTeams};
 use crate::integrations::provider::{
-    ProviderTask, TaskAssignee, TaskLabel, TaskProject, TaskStatus,
+    ProviderTask, TaskAssignee, TaskLabel, TaskProject, TaskProvider, TaskStatus,
 };
 use client::LinearClient;
 
@@ -202,4 +202,44 @@ pub fn create_issue(
         .issue
         .context("Linear create returned no issue")?;
     Ok(map::map_issue(&issue))
+}
+
+/// `TaskProvider` impl backed by a Linear personal API key.
+pub struct LinearProvider {
+    api_key: String,
+}
+
+impl LinearProvider {
+    pub fn new(api_key: impl Into<String>) -> Self {
+        Self {
+            api_key: api_key.into(),
+        }
+    }
+}
+
+impl TaskProvider for LinearProvider {
+    fn org_and_teams(&self) -> Result<OrgTeams> {
+        fetch_org_and_teams(&self.api_key)
+    }
+    fn list_states(&self, team: &str) -> Result<Vec<TaskStatus>> {
+        list_team_states(&self.api_key, team)
+    }
+    fn list_projects(&self, team: &str) -> Result<Vec<TaskProject>> {
+        list_team_projects(&self.api_key, team)
+    }
+    fn list_labels(&self, team: &str) -> Result<Vec<TaskLabel>> {
+        list_team_labels(&self.api_key, team)
+    }
+    fn list_members(&self, team: &str) -> Result<Vec<TaskAssignee>> {
+        list_team_members(&self.api_key, team)
+    }
+    fn list_issues(&self, team: &str) -> Result<Vec<ProviderTask>> {
+        list_team_issues(&self.api_key, team)
+    }
+    fn update_issue(&self, external_id: &str, patch: &IssuePatch) -> Result<ProviderTask> {
+        update_issue(&self.api_key, external_id, patch)
+    }
+    fn create_issue(&self, team: &str, title: &str, fields: &NewIssue<'_>) -> Result<ProviderTask> {
+        create_issue(&self.api_key, team, title, fields)
+    }
 }
