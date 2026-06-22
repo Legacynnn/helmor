@@ -351,7 +351,7 @@ export function TasksContainer(_props: TasksScreenProps) {
 						</div>
 					</div>
 				) : !connected ? (
-					<TasksEmptyState />
+					<TasksEmptyState provider={provider} />
 				) : tasksQuery.isLoading ? (
 					<TableSkeleton />
 				) : tasks.length === 0 ? (
