@@ -43,8 +43,13 @@ fn build_status(
     teams: Option<Vec<IntegrationTeam>>,
 ) -> anyhow::Result<IntegrationStatus> {
     let record = conns::load_connection(provider)?;
-    // Try to resolve the provider; if creds are missing this is Err and we treat
-    // the integration as disconnected (no teams).
+    // Resolve the provider to learn whether usable credentials exist. NOTE: a
+    // resolve `Err` here is deliberately downgraded to "disconnected" (no teams),
+    // and that covers more than just "creds missing" — a genuine keychain failure
+    // or an unreadable/corrupt stored credential lands here too. We intentionally
+    // swallow those so this frequently-polled status read degrades to a clear
+    // "not connected" state rather than erroring; the connect/sync paths surface
+    // the real error when the user acts.
     let resolved = resolve_provider(provider);
     let teams = match (resolved.as_ref(), teams) {
         (_, Some(t)) => t,
