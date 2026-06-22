@@ -535,6 +535,12 @@ mod tests {
         assert!(prompt.contains("BeforeAfter"));
         assert!(prompt.contains("Diff"));
         assert!(prompt.contains("Timeline"));
+        // Sub-components the agent must nest. "Before"/"After" are substrings
+        // of "BeforeAfter" so they need no separate assertion; "Option" and
+        // "Phase" are distinct names that would silently drop if the prose
+        // edits lose them (the parent would then render with no children).
+        assert!(prompt.contains("Option"));
+        assert!(prompt.contains("Phase"));
         assert!(prompt.contains("ExitPlanMode"));
         // The block-element rule is the one the MDX parser actually
         // depends on — inline JSX renders as plain text.

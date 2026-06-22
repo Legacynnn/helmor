@@ -29,4 +29,9 @@ describe("Decision", () => {
 		expect(screen.getByText("Use SQLite")).toBeInTheDocument();
 		expect(screen.getByText("Recommended")).toBeInTheDocument();
 	});
+
+	it("renders nothing when there are no Option children", () => {
+		const { container } = renderMdx(["<Decision>", "</Decision>"].join("\n"));
+		expect(container.querySelector("section")).toBeNull();
+	});
 });

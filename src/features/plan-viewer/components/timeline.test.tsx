@@ -28,4 +28,9 @@ describe("Timeline", () => {
 		expect(screen.getByText("Phase 1: Foundation")).toBeInTheDocument();
 		expect(screen.getByText("Phase 2: Build")).toBeInTheDocument();
 	});
+
+	it("renders nothing when there are no Phase children", () => {
+		const { container } = renderMdx(["<Timeline>", "</Timeline>"].join("\n"));
+		expect(container.querySelector("section")).toBeNull();
+	});
 });
