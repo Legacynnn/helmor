@@ -85,6 +85,7 @@ export function GitHubDetailPage({
 	isLoading,
 	error,
 	kindLabel,
+	headerLabel,
 	refresh,
 }: {
 	card: ContextCard;
@@ -93,6 +94,7 @@ export function GitHubDetailPage({
 	isLoading?: boolean;
 	error?: Error | null;
 	kindLabel: string;
+	headerLabel?: string;
 	refresh?: DetailRefreshControl;
 }) {
 	const reference = parseExternalReference(card.externalId);
@@ -105,7 +107,7 @@ export function GitHubDetailPage({
 					<div className="flex min-w-0 flex-wrap items-center gap-2 text-ui text-muted-foreground">
 						{card.state ? <StatePill state={card.state} /> : null}
 						<span className="font-medium text-foreground/80">
-							{reference.repo}
+							{headerLabel ?? reference.repo}
 						</span>
 						<span className="inline-flex items-center gap-1 font-normal text-muted-foreground/70">
 							<SourceIcon source={card.source} size={13} className="shrink-0" />

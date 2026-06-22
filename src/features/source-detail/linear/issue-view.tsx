@@ -30,6 +30,7 @@ export function LinearIssueView({
 			appendContextTarget={appendContextTarget}
 			description={detail?.description ?? undefined}
 			error={detailQuery.error}
+			headerLabel={card.subtitle ?? undefined}
 			isLoading={detailQuery.isLoading}
 			kindLabel="issue"
 			refresh={toRefreshControl(detailQuery)}
