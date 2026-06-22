@@ -9,11 +9,14 @@ use anyhow::{bail, Context};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
+use crate::forge::inbox::{InboxItemDetail, InboxPage};
 use crate::integrations::provider::{
     IntegrationStatus, IntegrationTeam, IssuePatch, NewIssue, TaskAssignee, TaskLabel, TaskProject,
     TaskStatus,
 };
-use crate::integrations::{self, credentials, resolve_provider, GITHUB_PROVIDER, LINEAR_PROVIDER};
+use crate::integrations::{
+    self, credentials, linear, resolve_provider, GITHUB_PROVIDER, LINEAR_PROVIDER,
+};
 use crate::models::db;
 use crate::models::integration_connections::{self as conns, IntegrationConnectionRecord};
 use crate::models::tasks::{self, TaskView};
@@ -359,6 +362,54 @@ pub async fn create_task(app: AppHandle, input: CreateTaskInput) -> CmdResult<Ta
             },
         );
         tasks::load_task(&id)?.context("Task vanished after create")
+    })
+    .await
+}
+
+// ── Linear inbox ────────────────────────────────────────────────────────────
+
+/// Linear "assigned to me" issues as sidebar inbox items. Linear's fetch
+/// paginates internally, so this returns a single page; `cursor` is accepted for
+/// shape parity with the forge inbox and ignored.
+#[tauri::command]
+pub async fn list_linear_inbox_items(_cursor: Option<String>) -> CmdResult<InboxPage> {
+    run_blocking(move || {
+        let key = match credentials::load_api_key(LINEAR_PROVIDER)? {
+            Some(k) => k,
+            None => {
+                return Ok(InboxPage {
+                    items: Vec::new(),
+                    next_cursor: None,
+                })
+            }
+        };
+        let tasks = linear::list_assigned_issues(&key)?;
+        let mut items: Vec<_> = tasks.iter().map(linear::inbox::task_to_item).collect();
+        items.sort_by_key(|i| std::cmp::Reverse(i.last_activity_at));
+        Ok(InboxPage {
+            items,
+            next_cursor: None,
+        })
+    })
+    .await
+}
+
+/// Detail for a single Linear inbox item (by Linear issue id / external_id).
+#[tauri::command]
+pub async fn get_linear_inbox_item_detail(
+    external_id: String,
+) -> CmdResult<Option<InboxItemDetail>> {
+    run_blocking(move || {
+        let key = match credentials::load_api_key(LINEAR_PROVIDER)? {
+            Some(k) => k,
+            None => return Ok(None),
+        };
+        match linear::get_issue(&key, &external_id)? {
+            Some(task) => Ok(Some(InboxItemDetail::Linear(Box::new(
+                linear::inbox::task_to_detail(&task),
+            )))),
+            None => Ok(None),
+        }
     })
     .await
 }

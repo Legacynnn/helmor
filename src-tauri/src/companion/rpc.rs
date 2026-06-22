@@ -558,6 +558,8 @@ async fn dispatch(
         |         "create_task"
         |         "review_task_with_agent"
         |         "create_workspace_from_task"
+        |         "list_linear_inbox_items"
+        |         "get_linear_inbox_item_detail"
         // Repo copy-file settings are desktop-only configuration.
         |         "detect_repo_copy_candidates"
         |         "load_repo_copy_settings"

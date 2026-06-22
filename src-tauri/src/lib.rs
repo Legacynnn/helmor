@@ -866,6 +866,8 @@ pub fn run() {
             commands::integrations_commands::create_task,
             commands::integrations_commands::review_task_with_agent,
             commands::integrations_commands::create_workspace_from_task,
+            commands::integrations_commands::list_linear_inbox_items,
+            commands::integrations_commands::get_linear_inbox_item_detail,
             commands::companion_commands::companion_status,
             commands::companion_commands::companion_enable,
             commands::companion_commands::companion_disable,
