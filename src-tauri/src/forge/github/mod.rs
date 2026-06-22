@@ -28,6 +28,8 @@ mod pr_match;
 mod pull_request;
 mod types;
 
+pub(crate) use api::{run_graphql, run_graphql_raw, GraphqlOutcome};
+
 use self::actions::{
     build_check_insert_text, query_check_run_detail, query_workspace_pr_action_status,
 };

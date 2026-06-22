@@ -19,7 +19,7 @@ pub(super) const GITHUB_HOST: &str = "github.com";
 /// the user's token was rejected. Splitting the latter out lets callers
 /// degrade to the inspector "Connect" CTA without surfacing a generic
 /// error.
-pub(super) enum GraphqlOutcome<T> {
+pub(crate) enum GraphqlOutcome<T> {
     Ok(T),
     Auth,
 }
@@ -28,7 +28,7 @@ pub(super) enum GraphqlOutcome<T> {
 ///
 /// Cached + deduped: identical concurrent reads for the same login share one
 /// `gh` spawn, and rapid re-polls within `READ_CACHE_TTL` reuse the response.
-pub(super) fn run_graphql<T: for<'de> Deserialize<'de>>(
+pub(crate) fn run_graphql<T: for<'de> Deserialize<'de>>(
     login: &str,
     query: &str,
     variables: &[(&str, &str)],
@@ -93,7 +93,7 @@ const AUTH_SENTINEL: &str = "\u{0}helmor:gh-auth-rejected\u{0}";
 
 /// Same as [`run_graphql`] but leaves the response as `serde_json::Value`
 /// for callers (mutation paths) that pluck individual fields out.
-pub(super) fn run_graphql_raw(
+pub(crate) fn run_graphql_raw(
     login: &str,
     query: &str,
     variables: &[(&str, &str)],
