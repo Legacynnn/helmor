@@ -85,6 +85,32 @@ query TeamIssues($teamId: ID!, $after: String) {
 }
 "#;
 
+/// Issues currently assigned to the authenticated viewer, newest-updated first.
+/// Uses Linear's `viewer.assignedIssues` connection so it spans every team.
+pub const VIEWER_ASSIGNED_ISSUES: &str = r#"
+query ViewerAssignedIssues($after: String) {
+  viewer {
+    assignedIssues(first: 100, after: $after, orderBy: updatedAt) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        id
+        identifier
+        title
+        description
+        priority
+        url
+        updatedAt
+        team { id }
+        project { id name icon color }
+        state { id name type color }
+        assignee { id name avatarUrl }
+        labels { nodes { id name color } }
+      }
+    }
+  }
+}
+"#;
+
 /// Single issue, for a fresh detail load.
 pub const ISSUE_DETAIL: &str = r#"
 query IssueDetail($id: String!) {

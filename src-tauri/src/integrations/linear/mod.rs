@@ -133,6 +133,30 @@ pub fn list_team_issues(api_key: &str, team_id: &str) -> Result<Vec<ProviderTask
     Ok(all)
 }
 
+/// Issues assigned to the authenticated viewer across all teams, newest first.
+pub fn list_assigned_issues(api_key: &str) -> Result<Vec<ProviderTask>> {
+    let client = LinearClient::new(api_key)?;
+    let mut all = Vec::new();
+    let mut after: Option<String> = None;
+    loop {
+        let data: types::ViewerAssignedIssuesData =
+            client.query(queries::VIEWER_ASSIGNED_ISSUES, json!({ "after": after }))?;
+        let conn = data.viewer.assigned_issues;
+        for node in &conn.nodes {
+            all.push(map::map_issue(node));
+        }
+        if conn.page_info.has_next_page {
+            after = conn.page_info.end_cursor.clone();
+            if after.is_none() {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    Ok(all)
+}
+
 /// Fresh single-issue load.
 pub fn get_issue(api_key: &str, external_id: &str) -> Result<Option<ProviderTask>> {
     let client = LinearClient::new(api_key)?;

@@ -172,6 +172,18 @@ pub struct TeamIssuesData {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewerAssignedIssuesData {
+    pub viewer: ViewerAssignedIssues,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewerAssignedIssues {
+    pub assigned_issues: IssueConnection,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct IssueDetailData {
     pub issue: Option<IssueNode>,
 }
