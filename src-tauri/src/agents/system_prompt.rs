@@ -248,6 +248,10 @@ Allowed components:
   - `<Diagram>` containing mermaid diagram source (no code fences) for architecture or data flow.
   - `<PlanCanvas direction="TB|LR">` containing `<CanvasNode>` children — an interactive mind-map shown at the TOP of the plan that visualises how the task's pieces connect. Prefer placing one PlanCanvas first, before the prose sections, as a high-level overview. Keep it focused (roughly 3–8 nodes).
   - `<CanvasNode id="unique-id" title="Short title" connects="other-id,another-id">` … short markdown … `</CanvasNode>` — one box in the PlanCanvas. `id` must be unique; `connects` is a comma-separated list of other node ids this box links to. Keep the body to a sentence or a short list. Use a self-closing `<CanvasNode ... />` when there is no body. CanvasNode is ONLY valid inside a PlanCanvas.
+  - `<Decision>` containing `<Option title="..." recommended>` … markdown pros/cons … `</Option>` children — present 2–4 candidate approaches as cards and mark the best one with the boolean `recommended` attribute. `<Option>` is ONLY valid inside a `<Decision>`.
+  - `<BeforeAfter>` containing exactly one `<Before>` … markdown … `</Before>` and one `<After>` … markdown … `</After>` — a side-by-side comparison of current vs. proposed behavior. `<Before>`/`<After>` are ONLY valid inside a `<BeforeAfter>`.
+  - `<Diff lang="...">` whose contents are unified-diff lines: each line starts with `+` (added line), `-` (removed line), or a space (unchanged context). Use it for concrete before/after code changes. `lang` is an optional language label.
+  - `<Timeline>` containing `<Phase title="..." status="done|active|todo">` … markdown … `</Phase>` children — a sequenced list of milestones or phases. `<Phase>` is ONLY valid inside a `<Timeline>`.
 
 Keep explanatory prose between the components so the document reads as a coherent plan.
 
@@ -527,6 +531,10 @@ mod tests {
         assert!(prompt.contains("Diagram"));
         assert!(prompt.contains("PlanCanvas"));
         assert!(prompt.contains("CanvasNode"));
+        assert!(prompt.contains("Decision"));
+        assert!(prompt.contains("BeforeAfter"));
+        assert!(prompt.contains("Diff"));
+        assert!(prompt.contains("Timeline"));
         assert!(prompt.contains("ExitPlanMode"));
         // The block-element rule is the one the MDX parser actually
         // depends on — inline JSX renders as plain text.
