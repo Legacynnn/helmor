@@ -134,6 +134,9 @@ export const helmorQueryKeys = {
 		source: string,
 		externalId: string,
 	) => ["inboxItemDetail", provider, login, source, externalId] as const,
+	linearInboxItems: () => ["linear-inbox-items"] as const,
+	linearInboxItemDetail: (externalId: string) =>
+		["linear-inbox-item-detail", externalId] as const,
 	forgeLabels: (
 		provider: string,
 		host: string,

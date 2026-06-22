@@ -825,6 +825,19 @@ function inboxItemToContextCard(item: InboxItemWithDetailRef): ContextCard {
 					draft: item.state?.tone === "draft",
 				},
 			};
+		default:
+			// Forge inbox never yields Linear items — they render through
+			// the dedicated Linear sidebar, not this ContextCard mapper.
+			return {
+				...baseFields,
+				meta: {
+					type: "linear",
+					identifier: externalId,
+					priorityLabel: "",
+					team: { name: "", key: "" },
+					labels: [],
+				},
+			};
 	}
 }
 

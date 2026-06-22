@@ -1576,7 +1576,8 @@ export type InboxItemSource =
 	| "github_pr"
 	| "github_discussion"
 	| "gitlab_issue"
-	| "gitlab_mr";
+	| "gitlab_mr"
+	| "linear";
 
 export type InboxItemStateTone =
 	| "open"
@@ -1606,7 +1607,9 @@ export type InboxItemDetailRef = {
 	 *  login may have accounts on multiple instances — without this the
 	 *  detail call could route to the wrong host and 404. */
 	host?: string | null;
-	source: InboxItemSource;
+	/** Forge sources only — Linear items route through the dedicated
+	 *  `get_linear_inbox_item_detail` call, not this forge detail ref. */
+	source: Exclude<InboxItemSource, "linear">;
 	externalId: string;
 };
 
@@ -1678,12 +1681,25 @@ export type GitLabMergeRequestDetail = {
 	updatedAt?: string | null;
 };
 
+export type LinearIssueDetailData = {
+	externalId: string;
+	identifier: string;
+	title: string;
+	description: string | null;
+	url: string;
+	state: string;
+	priorityLabel: string;
+	assigneeName: string | null;
+	updatedAt: string | null;
+};
+
 export type InboxItemDetail =
 	| { type: "github_issue"; data: GitHubIssueDetail }
 	| { type: "github_pr"; data: GitHubPullRequestDetail }
 	| { type: "github_discussion"; data: GitHubDiscussionDetail }
 	| { type: "gitlab_issue"; data: GitLabIssueDetail }
-	| { type: "gitlab_mr"; data: GitLabMergeRequestDetail };
+	| { type: "gitlab_mr"; data: GitLabMergeRequestDetail }
+	| { type: "linear"; data: LinearIssueDetailData };
 
 export type InboxPage = {
 	items: InboxItem[];
@@ -1851,6 +1867,28 @@ export async function getInboxItemDetail(
 			describeInvokeError(error, "Unable to load inbox item details."),
 		);
 	}
+}
+
+export async function listLinearInboxItems(
+	cursor?: string | null,
+): Promise<InboxPage> {
+	try {
+		return await invoke<InboxPage>("list_linear_inbox_items", {
+			cursor: cursor ?? null,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to load Linear issues."),
+		);
+	}
+}
+
+export async function getLinearInboxItemDetail(
+	externalId: string,
+): Promise<InboxItemDetail | null> {
+	return await invoke<InboxItemDetail | null>("get_linear_inbox_item_detail", {
+		externalId,
+	});
 }
 
 export type SlashCommandEntry = {

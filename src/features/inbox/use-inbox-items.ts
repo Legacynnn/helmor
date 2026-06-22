@@ -5,6 +5,7 @@ import {
 	type InboxFilters,
 	type InboxItem,
 	type InboxItemDetailRef,
+	type InboxItemSource,
 	type InboxKind,
 	type InboxPage,
 	listInboxItems,
@@ -261,7 +262,9 @@ export function useInboxItems(
 						provider,
 						login: primary?.login ?? "",
 						host,
-						source: item.source,
+						// Forge inbox hook — `item.source` is always a forge source
+						// at runtime; Linear items never flow through here.
+						source: item.source as Exclude<InboxItemSource, "linear">,
 						externalId: item.externalId,
 					},
 				})),
