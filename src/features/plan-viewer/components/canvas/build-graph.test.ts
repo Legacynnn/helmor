@@ -81,6 +81,19 @@ describe("buildCanvasGraph", () => {
 		expect(edges).toHaveLength(0);
 	});
 
+	it("drops a back-edge that would close a cycle (last → first clutter)", () => {
+		const { edges } = buildCanvasGraph([
+			node("b0", { id: "a", title: "A", connects: "b" }),
+			node("b1", { id: "b", title: "B", connects: "c" }),
+			node("b2", { id: "c", title: "C", connects: "a" }),
+		]);
+		// a→b and b→c survive; c→a is dropped because a already reaches c.
+		expect(edges.map((e) => `${e.source}->${e.target}`)).toEqual([
+			"a->b",
+			"b->c",
+		]);
+	});
+
 	it("carries the node kind from props, defaulting to note", () => {
 		const { nodes } = buildCanvasGraph([
 			node("b0", { id: "a", title: "A", kind: "resume" }),

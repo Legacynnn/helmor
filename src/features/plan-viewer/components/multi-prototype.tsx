@@ -1,5 +1,6 @@
 import { LayersIcon } from "lucide-react";
-import { useState } from "react";
+import { motion } from "motion/react";
+import { useId, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { PlanBlock } from "../mdx/parse";
 import { renderBlocks } from "../render-blocks";
@@ -42,39 +43,66 @@ export function MultiPrototype({
 }) {
 	const variants = extractVariants(childBlocks);
 	const [active, setActive] = useState(0);
+	// Scope the animated tab indicator's layoutId to this instance so multiple
+	// MultiPrototype blocks on one plan don't share (and fight over) it.
+	const indicatorId = useId();
 	if (variants.length === 0) {
 		return null;
 	}
 	const current = variants[Math.min(active, variants.length - 1)];
-	return (
-		<PlanBlockShell accent="neutral" icon={LayersIcon} title="Prototypes">
-			<div
-				className="mb-3 inline-flex max-w-full flex-wrap gap-0.5 rounded-md border border-border bg-background p-0.5"
-				role="tablist"
-				aria-label="Prototype variants"
-			>
-				{variants.map((variant, i) => (
-					<button
-						key={variant.id}
-						type="button"
-						role="tab"
-						aria-selected={i === active}
-						onClick={() => setActive(i)}
-						className={cn(
-							"cursor-pointer rounded px-2.5 py-1 text-micro transition-colors",
-							i === active
-								? "bg-primary font-medium text-primary-foreground"
-								: "text-muted-foreground hover:bg-muted",
-						)}
-					>
+	// Tabs live in the shell's trailing slot so the block has a single header row
+	// (icon + "Prototypes" + variant tabs) instead of stacking a separate tab bar
+	// and an inner bordered surface.
+	const tabs = (
+		<div
+			className="inline-flex max-w-full flex-wrap gap-0.5 rounded-md border border-border bg-background p-0.5"
+			role="tablist"
+			aria-label="Prototype variants"
+		>
+			{variants.map((variant, i) => (
+				<button
+					key={variant.id}
+					type="button"
+					role="tab"
+					aria-selected={i === active}
+					onClick={() => setActive(i)}
+					className={cn(
+						"relative cursor-pointer rounded px-2.5 py-1 text-micro transition-colors",
+						i === active
+							? "text-primary-foreground"
+							: "text-muted-foreground hover:bg-muted",
+					)}
+				>
+					{i === active ? (
+						<motion.span
+							layoutId={`prototype-tab-${indicatorId}`}
+							className="absolute inset-0 rounded bg-primary"
+							transition={{ type: "spring", stiffness: 520, damping: 36 }}
+						/>
+					) : null}
+					<span className={cn("relative z-10", i === active && "font-medium")}>
 						{variant.label}
 						{variant.recommended ? <span aria-hidden="true"> ★</span> : null}
-					</button>
-				))}
-			</div>
-			<div className="rounded-md border border-border bg-background p-3">
+					</span>
+				</button>
+			))}
+		</div>
+	);
+	return (
+		<PlanBlockShell
+			accent="neutral"
+			icon={LayersIcon}
+			title="Prototypes"
+			badge={tabs}
+		>
+			<motion.div
+				key={current.id}
+				initial={{ opacity: 0, y: 4 }}
+				animate={{ opacity: 1, y: 0 }}
+				transition={{ duration: 0.2, ease: "easeOut" }}
+			>
 				{renderBlocks(current.body)}
-			</div>
+			</motion.div>
 		</PlanBlockShell>
 	);
 }

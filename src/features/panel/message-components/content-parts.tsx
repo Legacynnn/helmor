@@ -32,6 +32,7 @@ import {
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useFileLinkContext } from "./file-link-context";
+import { PlanReadyCard } from "./plan-ready-card";
 
 export function TodoList({ part }: { part: TodoListPart }) {
 	if (part.items.length === 0) {
@@ -183,26 +184,11 @@ export function PlanReviewCard({ part }: { part: PlanReviewPart }) {
 	// agent wrote the document with its own file tools, so the real content is
 	// already on disk and surfaced through the Plan tab.
 	if (settings.mdxPlanningEnabled && isMdxPlanPath(part.planFilePath)) {
-		const slug = planSlugFromPath(part.planFilePath);
 		return (
-			<div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-border/70 bg-background/60 px-3.5 py-3">
-				<ClipboardList
-					className="size-4 shrink-0 text-muted-foreground"
-					strokeWidth={1.8}
-				/>
-				<span className="min-w-0 flex-1 text-ui leading-5 text-foreground">
-					Plan ready — open the Plan tab to review.
-				</span>
-				{slug ? (
-					<button
-						type="button"
-						onClick={() => dispatchOpenPlan({ slug, sessionId })}
-						className="shrink-0 cursor-pointer rounded-md border border-border/70 bg-background px-2.5 py-1 text-small font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
-					>
-						Open plan
-					</button>
-				) : null}
-			</div>
+			<PlanReadyCard
+				sessionId={sessionId}
+				slug={planSlugFromPath(part.planFilePath)}
+			/>
 		);
 	}
 

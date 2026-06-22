@@ -42,7 +42,11 @@ export function PlanView({
 	onRequestChanges: (comments: BlockComment[]) => void;
 	onHandoff: () => void;
 }) {
-	const { blocks } = useMemo(() => parsePlanMdx(content), [content]);
+	const { blocks, frontmatter } = useMemo(
+		() => parsePlanMdx(content),
+		[content],
+	);
+	const title = frontmatter.title?.trim();
 	// Hoist the plan canvas (if any) so it always renders first and full-bleed,
 	// above the padded plan content.
 	const canvasBlock = useMemo(
@@ -109,9 +113,14 @@ export function PlanView({
 	return (
 		<div className="flex h-full flex-col pt-2">
 			<div className="flex shrink-0 items-center justify-between gap-3 border-border border-b px-4 py-2">
-				<span className="font-medium text-muted-foreground text-small">
-					Plan · {status}
-				</span>
+				<div className="flex min-w-0 items-center gap-2">
+					<span className="truncate font-medium text-foreground text-small">
+						{title || "Plan"}
+					</span>
+					<span className="shrink-0 text-muted-foreground text-mini uppercase tracking-wide">
+						{status}
+					</span>
+				</div>
 				<div className="flex items-center gap-2">
 					<Button
 						variant="outline"

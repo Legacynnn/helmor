@@ -4,6 +4,8 @@ export type WireframeNode = {
 	type:
 		| "row"
 		| "col"
+		| "grid"
+		| "section"
 		| "box"
 		| "heading"
 		| "text"
@@ -12,6 +14,7 @@ export type WireframeNode = {
 		| "pill"
 		| "button"
 		| "image"
+		| "spacer"
 		| "divider";
 	label: string;
 	children: WireframeNode[];
@@ -20,6 +23,8 @@ export type WireframeNode = {
 const TYPES = new Set([
 	"row",
 	"col",
+	"grid",
+	"section",
 	"box",
 	"heading",
 	"text",
@@ -28,6 +33,7 @@ const TYPES = new Set([
 	"pill",
 	"button",
 	"image",
+	"spacer",
 	"divider",
 ]);
 

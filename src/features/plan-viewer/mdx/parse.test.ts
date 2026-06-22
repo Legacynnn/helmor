@@ -52,6 +52,42 @@ describe("parsePlanMdx", () => {
 		expect(risk).toBeDefined();
 	});
 
+	it("isolates a single malformed component instead of blanking the plan", () => {
+		// The AnnotatedCode attribute uses invalid `\"` escapes (JSX has no
+		// backslash escaping), which makes strict MDX throw for the whole doc.
+		// The parser must isolate ONLY that block and keep the others rendering.
+		const src = [
+			"---",
+			'title: "Iso"',
+			"status: draft",
+			"---",
+			"",
+			"## Section",
+			"",
+			"<Steps>",
+			"1. First",
+			"2. Second",
+			"</Steps>",
+			"",
+			'<AnnotatedCode code="<Foo bar=\\"x\\">" lang="mdx" note="n" />',
+			"",
+			'<RiskCard severity="low">',
+			"Watch out.",
+			"</RiskCard>",
+		].join("\n");
+
+		expect(() => parsePlanMdx(src)).not.toThrow();
+		const { blocks } = parsePlanMdx(src);
+		const names = blocks
+			.filter((b) => b.kind === "component")
+			.map((b) => (b.kind === "component" ? b.name : ""));
+		// Good components on BOTH sides of the malformed one still render…
+		expect(names).toContain("Steps");
+		expect(names).toContain("RiskCard");
+		// …and the broken one is contained as the sentinel error block.
+		expect(names).toContain("HelmorMalformedBlock");
+	});
+
 	it("parses frontmatter title and status", () => {
 		const src = `---
 title: My Plan

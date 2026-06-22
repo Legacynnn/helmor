@@ -48,16 +48,16 @@ describe("OpenQuestions", () => {
 });
 
 describe("Steps", () => {
-	it("renders a Steps header and forwards children", () => {
-		render(
-			<Steps>
-				<ol>
-					<li>First do this</li>
-				</ol>
-			</Steps>,
-		);
+	it("renders a Steps header and the parsed steps", () => {
+		render(<Steps>{"1. First do this\n2. Then that"}</Steps>);
 		expect(screen.getByText("Steps")).toBeInTheDocument();
-		expect(screen.getByText("First do this")).toBeInTheDocument();
+		expect(screen.getByText(/First do this/)).toBeInTheDocument();
+		expect(screen.getByText(/Then that/)).toBeInTheDocument();
+	});
+
+	it("renders nothing when the body is empty", () => {
+		const { container } = render(<Steps>{"   "}</Steps>);
+		expect(container.querySelector("section")).toBeNull();
 	});
 });
 

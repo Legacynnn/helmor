@@ -46,6 +46,15 @@ describe("parseWireframe", () => {
 		expect(roots.map((r) => r.type)).toEqual(["heading", "field", "pill"]);
 	});
 
+	it("recognizes the grid, section, and spacer types", () => {
+		const roots = parseWireframe(
+			["grid 3", "section Group", "spacer"].join("\n"),
+		);
+		expect(roots.map((r) => r.type)).toEqual(["grid", "section", "spacer"]);
+		// The grid's column-count label is preserved for the renderer.
+		expect(roots[0].label).toBe("3");
+	});
+
 	it("treats a leading tab as the same depth as a two-space indent", () => {
 		const src = ["col", "\ttext Tabbed", "  input Spaced"].join("\n");
 		const roots = parseWireframe(src);

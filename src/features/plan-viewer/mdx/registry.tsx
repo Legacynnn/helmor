@@ -9,6 +9,8 @@ import { Diff } from "../components/diff-view";
 import { FileMap } from "../components/file-map";
 import { MultiPrototype } from "../components/multi-prototype";
 import { OpenQuestions } from "../components/open-questions";
+import { MalformedBlock } from "../components/placeholder";
+import { Preview } from "../components/preview";
 import { RiskCard } from "../components/risk-card";
 import { Steps } from "../components/steps";
 import { Timeline } from "../components/timeline";
@@ -53,7 +55,7 @@ export type PlanComponentDef = {
  */
 export const PLAN_COMPONENTS: Record<string, PlanComponentDef> = {
 	RiskCard: { render: RiskCard, childMode: "blocks" },
-	Steps: { render: Steps, childMode: "blocks" },
+	Steps: { render: Steps, childMode: "raw" },
 	FileMap: { render: FileMap, childMode: "raw" },
 	OpenQuestions: { render: OpenQuestions, childMode: "blocks" },
 	AnnotatedCode: { render: AnnotatedCode, childMode: "raw" },
@@ -71,8 +73,12 @@ export const PLAN_COMPONENTS: Record<string, PlanComponentDef> = {
 	Wireframe: { render: Wireframe, childMode: "raw" },
 	MultiPrototype: { render: MultiPrototype, childMode: "structured" },
 	Variant: { render: SubComponentFallback, childMode: "blocks" },
+	Preview: { render: Preview, childMode: "raw" },
 	DataModel: { render: DataModel, childMode: "structured" },
 	Entity: { render: SubComponentFallback, childMode: "raw" },
+	// Sentinel the parser swaps in for a component it couldn't read, so one
+	// malformed block degrades alone instead of blanking the whole plan.
+	HelmorMalformedBlock: { render: MalformedBlock, childMode: "raw" },
 };
 
 /** Resolve a component's child mode, or `null` when the name is unknown. */

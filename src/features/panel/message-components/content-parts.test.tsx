@@ -1,7 +1,19 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PlanReviewPart, WorkflowPart } from "@/lib/api";
 import { PlanReviewCard, WorkflowCard } from "./content-parts";
+
+/** The upgraded plan-ready card reads the plan list via React Query. */
+function renderWithQuery(ui: ReactElement) {
+	const client = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	return render(
+		<QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+	);
+}
 
 const mdxPlanningEnabled = { current: true };
 vi.mock("@/lib/settings", () => ({
@@ -109,17 +121,16 @@ function planReview(overrides: Partial<PlanReviewPart> = {}): PlanReviewPart {
 }
 
 describe("PlanReviewCard", () => {
-	it("renders the compact card for an MDX plan with the setting on", () => {
+	it("renders the rich plan-ready card for an MDX plan with the setting on", () => {
 		const dispatchSpy = vi.spyOn(window, "dispatchEvent");
-		render(<PlanReviewCard part={planReview()} />);
+		renderWithQuery(<PlanReviewCard part={planReview()} />);
 
-		expect(
-			screen.getByText(/open the Plan tab to review/i),
-		).toBeInTheDocument();
-		// Full markdown is NOT dumped inline.
+		// The card surfaces a title (fallback before the list loads) and an Open
+		// CTA — not the full plan markdown.
+		expect(screen.getByText(/Plan ready/i)).toBeInTheDocument();
 		expect(screen.queryByText(/Do the thing/)).toBeNull();
 
-		fireEvent.click(screen.getByRole("button", { name: /open plan/i }));
+		fireEvent.click(screen.getByRole("button"));
 		const event = dispatchSpy.mock.calls.at(-1)?.[0] as CustomEvent;
 		expect(event.type).toBe("helmor:open-plan");
 		expect(event.detail).toEqual({ slug: "big-plan" });

@@ -30,7 +30,9 @@ test("renders known blocks and a placeholder for unknown ones", () => {
 	expect(screen.getByText("High risk")).toBeInTheDocument();
 	expect(screen.getByText(/Unsupported plan block/i)).toBeInTheDocument();
 	expect(screen.getByRole("button", { name: /handoff/i })).toBeInTheDocument();
-	expect(screen.getByText(/Plan ·/i)).toBeInTheDocument();
+	// The header shows the plan's frontmatter title alongside its status.
+	expect(screen.getByText("Demo")).toBeInTheDocument();
+	expect(screen.getByText("draft")).toBeInTheDocument();
 });
 
 test("renders a nested blocks-mode component recursively", () => {

@@ -30,7 +30,7 @@ export function Wireframe({
 			title={label || "Wireframe"}
 		>
 			<WireframeFrame surface={normalizeSurface(surface)}>
-				{renderChildren(nodes)}
+				{renderChildren(nodes, false, true)}
 			</WireframeFrame>
 		</PlanBlockShell>
 	);

@@ -29,7 +29,6 @@ import {
 	consumeAnchoredToggle,
 	EmptyState,
 	MemoConversationMessage,
-	PlanLinkStrip,
 	resetAnchoredToggle,
 	UserMessageExpansionProvider,
 } from "./message-components";
@@ -180,7 +179,6 @@ export function ActiveThreadViewport({
 			ref={stackRef}
 			className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
 		>
-			<PlanLinkStrip sessionId={pane.sessionId} messages={pane.messages} />
 			<div className="relative z-10 flex min-h-0 min-w-0 flex-1">
 				<ChatThread
 					hasSession={hasSession}

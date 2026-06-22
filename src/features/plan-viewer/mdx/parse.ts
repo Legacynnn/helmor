@@ -1,6 +1,8 @@
 import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
+import { isolateMalformedComponents } from "./isolate";
+import { maskRawComponentBodies } from "./mask-raw";
 import { planChildMode } from "./registry";
 
 export type PlanBlock =
@@ -167,14 +169,36 @@ function escapeBracesOutsideCode(src: string): string {
 	return out;
 }
 
+/** Whether a snippet parses as MDX, retrying with braces escaped (mirrors the
+ * document-level tiers). Used to test individual component spans in isolation. */
+function snippetParses(snippet: string): boolean {
+	try {
+		mdxParse(snippet);
+		return true;
+	} catch {
+		try {
+			mdxParse(escapeBracesOutsideCode(snippet));
+			return true;
+		} catch {
+			return false;
+		}
+	}
+}
+
 /**
  * Parse the document body into an mdast tree. Strict MDX (remark-mdx) runs the
  * content through acorn, which throws on any `{…}` that isn't valid JS — e.g. a
  * stray `{`, JSON, or a code-ish snippet in agent-authored prose ("Could not
- * parse expression with acorn"). To keep components rendering, we first retry
- * with braces escaped outside code; only if THAT still throws do we fall back to
- * plain Markdown. Returns the body the tree's offsets refer to (the escaped
- * variant when the retry was used), since the caller slices by byte offset.
+ * parse expression with acorn"), OR a malformed component (e.g. invalid `\"`
+ * attribute escapes). Recovery tiers, in order:
+ *   1. strict MDX;
+ *   2. retry with braces escaped outside code (fixes stray-brace prose);
+ *   3. ISOLATE — replace only the top-level component span(s) that fail to parse
+ *      with a sentinel error block, so one malformed component no longer blanks
+ *      the whole plan, and re-parse;
+ *   4. last resort — plain Markdown (every component degrades to text).
+ * Returns the body the tree's offsets refer to (an escaped/patched variant when
+ * a later tier was used), since the caller slices by byte offset.
  */
 function parseBody(body: string): { tree: MdastNode; body: string } {
 	try {
@@ -184,6 +208,16 @@ function parseBody(body: string): { tree: MdastNode; body: string } {
 		try {
 			return { tree: mdxParse(escaped), body: escaped };
 		} catch {
+			// Tier 3: isolate the malformed component(s) and re-parse the rest.
+			const isolated = isolateMalformedComponents(body, snippetParses);
+			if (isolated != null) {
+				const isolatedEscaped = escapeBracesOutsideCode(isolated);
+				try {
+					return { tree: mdxParse(isolatedEscaped), body: isolatedEscaped };
+				} catch {
+					// fall through to plain Markdown
+				}
+			}
 			return {
 				tree: unified().use(remarkParse).parse(body) as unknown as MdastNode,
 				body,
@@ -196,7 +230,11 @@ export function parsePlanMdx(src: string): ParsedPlan {
 	const { yaml, body: rawBody } = splitFrontmatter(src);
 	const frontmatter = parseFrontmatter(yaml);
 
-	const { tree, body } = parseBody(rawBody);
+	// Lift raw-content component bodies (Preview JS, diffs, generics, …) out of
+	// the source BEFORE MDX parsing — they are not valid MDX and would otherwise
+	// crash the parse. They are reattached verbatim from `stash` during the walk.
+	const { body: maskedBody, stash } = maskRawComponentBodies(rawBody);
+	const { tree, body } = parseBody(maskedBody);
 
 	// A single counter keeps ids unique and stable in document order, including
 	// nested blocks (the counter is shared across recursion).
@@ -250,7 +288,14 @@ export function parsePlanMdx(src: string): ParsedPlan {
 				const name = node.name ?? "Unknown";
 				const id = nextId();
 				const props = attributesToProps(node);
-				const rawText = childrenText(node, body);
+				// A masked raw component carries `__rawid`; reattach its verbatim
+				// body from the stash instead of slicing the (now self-closed) source.
+				let rawText = childrenText(node, body);
+				const rawId = props.__rawid;
+				if (rawId != null) {
+					delete props.__rawid;
+					rawText = stash.get(rawId) ?? rawText;
+				}
 				const mode = planChildMode(name);
 				const childBlocks =
 					mode === "blocks" || mode === "structured"
