@@ -96,6 +96,35 @@ impl<T> Default for NodeList<T> {
     }
 }
 
+/// A paginated `{ nodes, pageInfo }` connection.
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeListPaged<T> {
+    #[serde(default = "Vec::new")]
+    pub nodes: Vec<T>,
+    #[serde(default)]
+    pub page_info: PageInfo,
+}
+
+// Manual `Default` so it does not require `T: Default`, mirroring `NodeList<T>`.
+impl<T> Default for NodeListPaged<T> {
+    fn default() -> Self {
+        Self {
+            nodes: Vec::new(),
+            page_info: PageInfo::default(),
+        }
+    }
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageInfo {
+    #[serde(default)]
+    pub has_next_page: bool,
+    #[serde(default)]
+    pub end_cursor: Option<String>,
+}
+
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssigneeNode {
