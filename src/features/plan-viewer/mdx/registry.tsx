@@ -4,6 +4,7 @@ import { BeforeAfter } from "../components/before-after";
 import { PlanCanvas } from "../components/canvas";
 import { Decision } from "../components/decision";
 import { Diagram } from "../components/diagram";
+import { Diff } from "../components/diff-view";
 import { FileMap } from "../components/file-map";
 import { OpenQuestions } from "../components/open-questions";
 import { RiskCard } from "../components/risk-card";
@@ -60,6 +61,7 @@ export const PLAN_COMPONENTS: Record<string, PlanComponentDef> = {
 	BeforeAfter: { render: BeforeAfter, childMode: "structured" },
 	Before: { render: SubComponentFallback, childMode: "blocks" },
 	After: { render: SubComponentFallback, childMode: "blocks" },
+	Diff: { render: Diff, childMode: "raw" },
 };
 
 /** Resolve a component's child mode, or `null` when the name is unknown. */
