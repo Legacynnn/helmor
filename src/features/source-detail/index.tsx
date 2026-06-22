@@ -6,8 +6,8 @@ import { GitHubIssueView } from "./github/issue-view";
 import { GitHubPullRequestView } from "./github/pull-request-view";
 import { GitLabIssueView } from "./gitlab/issue-view";
 import { GitLabMergeRequestView } from "./gitlab/merge-request-view";
+import { LinearIssueView } from "./linear/issue-view";
 import { SlackThreadView } from "./slack/thread-view";
-import { UnsupportedSourceView } from "./unsupported-view";
 
 // `memo` keeps the markdown render in `GitHubDetailPage` from re-running
 // when the surrounding start page changes state. Once a card is open and the
@@ -64,6 +64,11 @@ export const SourceDetailView = memo(function SourceDetailView({
 				/>
 			);
 		case "linear":
-			return <UnsupportedSourceView card={card} />;
+			return (
+				<LinearIssueView
+					card={card}
+					appendContextTarget={appendContextTarget}
+				/>
+			);
 	}
 });
