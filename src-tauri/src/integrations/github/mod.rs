@@ -4,14 +4,18 @@
 pub mod auth;
 pub mod client;
 pub mod map;
+pub mod queries;
 
 pub use auth::default_login;
 
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
+use serde::Deserialize;
+use serde_json::Value;
 
+use self::client::GithubClient;
 use crate::integrations::provider::{
-    IssuePatch, NewIssue, OrgTeams, ProviderTask, TaskAssignee, TaskLabel, TaskProject,
-    TaskProvider, TaskStatus,
+    IntegrationTeam, IssuePatch, NewIssue, OrgTeams, ProviderTask, TaskAssignee, TaskLabel,
+    TaskProject, TaskProvider, TaskStatus,
 };
 
 pub struct GithubProvider {
@@ -26,35 +30,300 @@ impl GithubProvider {
     }
 }
 
+/// `gh api graphql` returns the full `{ "data": {...} }` envelope; the typed
+/// `run_graphql`/`client.query` path does NOT unwrap `data` (unlike the Linear
+/// client), so response structs and `Value` indexing both go through `data`.
+fn split_repo(team: &str) -> Result<(&str, &str)> {
+    team.split_once('/')
+        .context("Repository must be in owner/name form")
+}
+
+#[derive(Deserialize)]
+struct ViewerReposEnvelope {
+    data: ViewerReposData,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ViewerReposData {
+    viewer: ViewerRepos,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ViewerRepos {
+    login: String,
+    repositories: map::NodeListPaged<RepoNode>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RepoNode {
+    name: String,
+    name_with_owner: String,
+}
+
 impl TaskProvider for GithubProvider {
     fn org_and_teams(&self) -> Result<OrgTeams> {
-        let _ = &self.login;
-        anyhow::bail!("GitHub Issues integration is not available yet")
+        let client = GithubClient::new(&self.login);
+        let mut teams = Vec::new();
+        let mut after: Option<String> = None;
+        let mut login: Option<String> = None;
+        loop {
+            let after_str = after.clone().unwrap_or_default();
+            let mut vars: Vec<(&str, &str)> = Vec::new();
+            if !after_str.is_empty() {
+                vars.push(("after", after_str.as_str()));
+            }
+            let envelope: ViewerReposEnvelope =
+                client.query(queries::VIEWER_REPOSITORIES, &vars)?;
+            let data = envelope.data;
+            if login.is_none() {
+                login = Some(data.viewer.login.clone());
+            }
+            for node in &data.viewer.repositories.nodes {
+                teams.push(IntegrationTeam {
+                    id: node.name_with_owner.clone(),
+                    key: node.name.clone(),
+                    name: node.name_with_owner.clone(),
+                });
+            }
+            if data.viewer.repositories.page_info.has_next_page {
+                after = data.viewer.repositories.page_info.end_cursor.clone();
+                if after.is_none() {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        teams.sort_by_key(|t| t.name.to_lowercase());
+        Ok(OrgTeams {
+            org_name: login.unwrap_or_else(|| self.login.clone()),
+            teams,
+        })
     }
+
     fn list_states(&self, _team: &str) -> Result<Vec<TaskStatus>> {
-        anyhow::bail!("GitHub Issues integration is not available yet")
+        Ok(map::fixed_statuses())
     }
+
     fn list_projects(&self, _team: &str) -> Result<Vec<TaskProject>> {
         Ok(Vec::new())
     }
-    fn list_labels(&self, _team: &str) -> Result<Vec<TaskLabel>> {
-        anyhow::bail!("GitHub Issues integration is not available yet")
+
+    fn list_labels(&self, team: &str) -> Result<Vec<TaskLabel>> {
+        let (owner, name) = split_repo(team)?;
+        let client = GithubClient::new(&self.login);
+        let data: Value = client.query(queries::REPO_META, &[("owner", owner), ("name", name)])?;
+        let labels = data["data"]["repository"]["labels"]["nodes"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let mut out: Vec<TaskLabel> = labels
+            .iter()
+            .filter_map(|l| {
+                Some(TaskLabel {
+                    id: l["id"].as_str()?.to_string(),
+                    name: l["name"].as_str()?.to_string(),
+                    color: l["color"].as_str().map(|c| format!("#{c}")),
+                })
+            })
+            .collect();
+        out.sort_by_key(|l| l.name.to_lowercase());
+        Ok(out)
     }
-    fn list_members(&self, _team: &str) -> Result<Vec<TaskAssignee>> {
-        anyhow::bail!("GitHub Issues integration is not available yet")
+
+    fn list_members(&self, team: &str) -> Result<Vec<TaskAssignee>> {
+        let (owner, name) = split_repo(team)?;
+        let client = GithubClient::new(&self.login);
+        let data: Value = client.query(queries::REPO_META, &[("owner", owner), ("name", name)])?;
+        let users = data["data"]["repository"]["assignableUsers"]["nodes"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let mut out: Vec<TaskAssignee> = users
+            .iter()
+            .filter_map(|u| {
+                let login = u["login"].as_str()?.to_string();
+                Some(TaskAssignee {
+                    id: u["id"].as_str()?.to_string(),
+                    name: u["name"].as_str().map(|s| s.to_string()).unwrap_or(login),
+                    avatar_url: u["avatarUrl"].as_str().map(|s| s.to_string()),
+                })
+            })
+            .collect();
+        out.sort_by_key(|m| m.name.to_lowercase());
+        Ok(out)
     }
-    fn list_issues(&self, _team: &str) -> Result<Vec<ProviderTask>> {
-        anyhow::bail!("GitHub Issues integration is not available yet")
+
+    fn list_issues(&self, team: &str) -> Result<Vec<ProviderTask>> {
+        let (owner, name) = split_repo(team)?;
+        let client = GithubClient::new(&self.login);
+        let query = queries::repo_issues(queries::ISSUE_FIELDS);
+        let mut all = Vec::new();
+        let mut after: Option<String> = None;
+        loop {
+            let after_str = after.clone().unwrap_or_default();
+            let mut vars: Vec<(&str, &str)> = vec![("owner", owner), ("name", name)];
+            if !after_str.is_empty() {
+                vars.push(("after", after_str.as_str()));
+            }
+            let data: Value = client.query(&query, &vars)?;
+            let issues = &data["data"]["repository"]["issues"];
+            if let Some(nodes) = issues["nodes"].as_array() {
+                for raw in nodes {
+                    let node: map::IssueNode = serde_json::from_value(raw.clone())
+                        .context("Failed to decode GitHub issue node")?;
+                    all.push(map::map_issue(&node));
+                }
+            }
+            if issues["pageInfo"]["hasNextPage"].as_bool().unwrap_or(false) {
+                after = issues["pageInfo"]["endCursor"]
+                    .as_str()
+                    .map(|s| s.to_string());
+                if after.is_none() {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        Ok(all)
     }
-    fn update_issue(&self, _external_id: &str, _patch: &IssuePatch) -> Result<ProviderTask> {
-        anyhow::bail!("GitHub Issues integration is not available yet")
+
+    fn update_issue(&self, external_id: &str, patch: &IssuePatch) -> Result<ProviderTask> {
+        if patch.is_empty() {
+            bail!("No fields to update");
+        }
+        let client = GithubClient::new(&self.login);
+
+        // Title / body.
+        if patch.title.is_some() || patch.description.is_some() {
+            let title = patch.title.clone().unwrap_or_default();
+            let body = patch.description.clone().unwrap_or_default();
+            let mut vars: Vec<(&str, &str)> = vec![("id", external_id)];
+            if patch.title.is_some() {
+                vars.push(("title", title.as_str()));
+            }
+            if patch.description.is_some() {
+                vars.push(("body", body.as_str()));
+            }
+            client.mutate(queries::UPDATE_ISSUE, &vars)?;
+        }
+
+        // Status -> open/close/reopen.
+        if let Some(status_id) = &patch.status_id {
+            match status_id.as_str() {
+                map::STATUS_DONE => {
+                    client.mutate(
+                        queries::CLOSE_ISSUE,
+                        &[("id", external_id), ("reason", "COMPLETED")],
+                    )?;
+                }
+                map::STATUS_NOT_PLANNED => {
+                    client.mutate(
+                        queries::CLOSE_ISSUE,
+                        &[("id", external_id), ("reason", "NOT_PLANNED")],
+                    )?;
+                }
+                map::STATUS_OPEN => {
+                    client.mutate(queries::REOPEN_ISSUE, &[("id", external_id)])?;
+                }
+                other => bail!("Unknown GitHub status id: {other}"),
+            }
+        }
+
+        // Assignee (single; empty string = unassign). `assigneeIds` is a list
+        // arg, so it must be inlined into the document (gh `-f` can't encode
+        // lists). `assignee_id` is a GitHub node id, safe to inline.
+        if let Some(assignee_id) = &patch.assignee_id {
+            let ids = if assignee_id.is_empty() {
+                "[]".to_string()
+            } else {
+                format!("[\"{assignee_id}\"]")
+            };
+            let mutation = format!(
+                "mutation($id: ID!) {{ updateIssue(input: {{ id: $id, assigneeIds: {ids} }}) {{ issue {{ id }} }} }}"
+            );
+            client.mutate(&mutation, &[("id", external_id)])?;
+        }
+
+        // Labels (absolute set). GitHub has no single "replace"; remove existing
+        // then add. Both list args are inlined for the same `-f` reason.
+        if let Some(label_ids) = &patch.label_ids {
+            let current = self.get_issue(external_id)?;
+            if let Some(task) = &current {
+                if !task.labels.is_empty() {
+                    let existing: Vec<String> = task.labels.iter().map(|l| l.id.clone()).collect();
+                    let existing_json = serde_json::to_string(&existing)?;
+                    let remove = format!(
+                        "mutation($id: ID!) {{ removeLabelsFromLabelable(input: {{ labelableId: $id, labelIds: {existing_json} }}) {{ clientMutationId }} }}"
+                    );
+                    client.mutate(&remove, &[("id", external_id)])?;
+                }
+            }
+            if !label_ids.is_empty() {
+                let json_ids = serde_json::to_string(label_ids)?;
+                let add = format!(
+                    "mutation($id: ID!) {{ addLabelsToLabelable(input: {{ labelableId: $id, labelIds: {json_ids} }}) {{ clientMutationId }} }}"
+                );
+                client.mutate(&add, &[("id", external_id)])?;
+            }
+        }
+
+        self.get_issue(external_id)?
+            .context("Issue vanished after update")
     }
-    fn create_issue(
-        &self,
-        _team: &str,
-        _title: &str,
-        _fields: &NewIssue<'_>,
-    ) -> Result<ProviderTask> {
-        anyhow::bail!("GitHub Issues integration is not available yet")
+
+    fn create_issue(&self, team: &str, title: &str, fields: &NewIssue<'_>) -> Result<ProviderTask> {
+        let (owner, name) = split_repo(team)?;
+        let client = GithubClient::new(&self.login);
+        // Resolve the repository node id.
+        let meta: Value = client.query(queries::REPO_META, &[("owner", owner), ("name", name)])?;
+        let repo_id = meta["data"]["repository"]["id"]
+            .as_str()
+            .context("Repository id missing")?
+            .to_string();
+
+        // Build a templated mutation so list args (assigneeIds/labelIds) inline
+        // cleanly — `gh -f` can't encode list-typed variables.
+        let assignees = match fields.assignee_id {
+            Some(id) if !id.is_empty() => format!(", assigneeIds: [\"{id}\"]"),
+            _ => String::new(),
+        };
+        let labels = match fields.label_ids {
+            Some(ids) if !ids.is_empty() => format!(", labelIds: {}", serde_json::to_string(ids)?),
+            _ => String::new(),
+        };
+        let body = fields.description.unwrap_or_default();
+        let mutation = format!(
+            "mutation($repositoryId: ID!, $title: String!, $body: String) {{ createIssue(input: {{ repositoryId: $repositoryId, title: $title, body: $body{assignees}{labels} }}) {{ issue {{ id }} }} }}"
+        );
+        let created = client.mutate(
+            &mutation,
+            &[
+                ("repositoryId", repo_id.as_str()),
+                ("title", title),
+                ("body", body),
+            ],
+        )?;
+        let id = created["data"]["createIssue"]["issue"]["id"]
+            .as_str()
+            .context("Created issue id missing")?
+            .to_string();
+        self.get_issue(&id)?.context("Issue vanished after create")
+    }
+}
+
+impl GithubProvider {
+    fn get_issue(&self, external_id: &str) -> Result<Option<ProviderTask>> {
+        let client = GithubClient::new(&self.login);
+        let query = queries::single_issue(queries::ISSUE_FIELDS);
+        let data: Value = client.query(&query, &[("id", external_id)])?;
+        let node_json = data["data"]["node"].clone();
+        if node_json.is_null() {
+            return Ok(None);
+        }
+        let node: map::IssueNode =
+            serde_json::from_value(node_json).context("Failed to decode issue")?;
+        Ok(Some(map::map_issue(&node)))
     }
 }
