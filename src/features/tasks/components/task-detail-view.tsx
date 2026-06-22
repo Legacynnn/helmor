@@ -80,7 +80,9 @@ export function TaskDetailView({
 							type="button"
 							variant="ghost"
 							size="icon-sm"
-							aria-label="Open in Linear"
+							aria-label={
+								task.provider === "github" ? "Open in GitHub" : "Open in Linear"
+							}
 							onClick={() => task.url && void openUrl(task.url)}
 						>
 							<SquareArrowOutUpRight className="size-3.5" />
