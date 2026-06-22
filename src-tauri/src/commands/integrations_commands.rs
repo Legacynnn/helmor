@@ -9,8 +9,11 @@ use anyhow::{bail, Context};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
-use crate::integrations::provider::{IntegrationStatus, IntegrationTeam};
-use crate::integrations::{self, credentials, linear};
+use crate::integrations::provider::{
+    IntegrationStatus, IntegrationTeam, IssuePatch, NewIssue, TaskAssignee, TaskLabel, TaskProject,
+    TaskStatus,
+};
+use crate::integrations::{self, credentials, resolve_provider, GITHUB_PROVIDER, LINEAR_PROVIDER};
 use crate::models::db;
 use crate::models::integration_connections::{self as conns, IntegrationConnectionRecord};
 use crate::models::tasks::{self, TaskView};
@@ -20,37 +23,36 @@ use crate::workspace_status::WorkspaceStatus;
 
 use super::common::{run_blocking, CmdResult};
 
-const LINEAR: &str = integrations::LINEAR_PROVIDER;
-
-fn ensure_supported(provider: &str) -> anyhow::Result<()> {
-    if provider != LINEAR {
-        bail!("Unsupported integration provider: {provider}");
-    }
-    Ok(())
-}
-
-fn require_api_key(provider: &str) -> anyhow::Result<String> {
-    credentials::load_api_key(provider)?.with_context(|| {
-        format!("{provider} is not connected — add an API key in Settings → Integrations")
-    })
+/// Resolve the team to operate on: an explicit `team_id`, falling back to the
+/// connection's selected team.
+fn selected_team(provider: &str, team_id: Option<String>) -> anyhow::Result<String> {
+    team_id
+        .or_else(|| {
+            conns::load_connection(provider)
+                .ok()
+                .flatten()
+                .and_then(|r| r.selected_team_id)
+        })
+        .with_context(|| format!("No team selected for {provider}"))
 }
 
 /// Build the status snapshot. Pass `teams` when already fetched (connect path)
-/// to avoid a second round-trip; otherwise fetch live when a key is present.
+/// to avoid a second round-trip; otherwise fetch live when creds are present.
 fn build_status(
     provider: &str,
     teams: Option<Vec<IntegrationTeam>>,
 ) -> anyhow::Result<IntegrationStatus> {
     let record = conns::load_connection(provider)?;
-    let key = credentials::load_api_key(provider)?;
-    let teams = match (key.as_ref(), teams) {
+    // Try to resolve the provider; if creds are missing this is Err and we treat
+    // the integration as disconnected (no teams).
+    let resolved = resolve_provider(provider);
+    let teams = match (resolved.as_ref(), teams) {
         (_, Some(t)) => t,
-        (Some(k), None) => linear::fetch_org_and_teams(k)
-            .map(|ot| ot.teams)
-            .unwrap_or_default(),
-        (None, None) => Vec::new(),
+        (Ok(p), None) => p.org_and_teams().map(|ot| ot.teams).unwrap_or_default(),
+        (Err(_), None) => Vec::new(),
     };
-    let connected = key.is_some() && record.as_ref().map(|r| r.connected).unwrap_or(false);
+    let has_creds = resolved.is_ok();
+    let connected = has_creds && record.as_ref().map(|r| r.connected).unwrap_or(false);
     Ok(IntegrationStatus {
         provider: provider.to_string(),
         connected,
@@ -71,14 +73,23 @@ pub async fn connect_integration(
     api_key: String,
 ) -> CmdResult<IntegrationStatus> {
     run_blocking(move || {
-        ensure_supported(&provider)?;
-        let key = api_key.trim().to_string();
-        if key.is_empty() {
-            bail!("API key is empty");
+        match provider.as_str() {
+            LINEAR_PROVIDER => {
+                let key = api_key.trim().to_string();
+                if key.is_empty() {
+                    bail!("API key is empty");
+                }
+                credentials::store_api_key(&provider, &key)?;
+            }
+            GITHUB_PROVIDER => {
+                // No API key — connection is the bundled gh auth. Validate it.
+                integrations::github::default_login()?;
+            }
+            other => bail!("Unsupported integration provider: {other}"),
         }
-        // Validates the key as a side effect.
-        let org_teams = linear::fetch_org_and_teams(&key)?;
-        credentials::store_api_key(&provider, &key)?;
+
+        // Probe org + teams via the resolved provider (also validates creds).
+        let org_teams = resolve_provider(&provider)?.org_and_teams()?;
 
         // Keep a previously-selected team if it still exists, else default to
         // the first team so the user can sync immediately.
@@ -117,7 +128,6 @@ pub async fn connect_integration(
 #[tauri::command]
 pub async fn disconnect_integration(app: AppHandle, provider: String) -> CmdResult<()> {
     run_blocking(move || {
-        ensure_supported(&provider)?;
         // Clear the key first — even if the DB delete fails, the secret is gone.
         let _ = credentials::clear_api_key(&provider);
         conns::clear_connection(&provider)?;
@@ -134,11 +144,7 @@ pub async fn disconnect_integration(app: AppHandle, provider: String) -> CmdResu
 
 #[tauri::command]
 pub async fn get_integration_status(provider: String) -> CmdResult<IntegrationStatus> {
-    run_blocking(move || {
-        ensure_supported(&provider)?;
-        build_status(&provider, None)
-    })
-    .await
+    run_blocking(move || build_status(&provider, None)).await
 }
 
 #[tauri::command]
@@ -149,7 +155,6 @@ pub async fn set_integration_team(
     team_name: String,
 ) -> CmdResult<()> {
     run_blocking(move || {
-        ensure_supported(&provider)?;
         conns::set_selected_team(&provider, &team_id, &team_name)?;
         ui_sync::publish(
             &app,
@@ -166,11 +171,7 @@ pub async fn set_integration_team(
 
 #[tauri::command]
 pub async fn list_tasks(provider: String, team_id: Option<String>) -> CmdResult<Vec<TaskView>> {
-    run_blocking(move || {
-        ensure_supported(&provider)?;
-        tasks::list_tasks(&provider, team_id.as_deref())
-    })
-    .await
+    run_blocking(move || tasks::list_tasks(&provider, team_id.as_deref())).await
 }
 
 #[tauri::command]
@@ -184,19 +185,10 @@ pub async fn get_task(task_id: String) -> CmdResult<Option<TaskView>> {
 pub async fn list_task_statuses(
     provider: String,
     team_id: Option<String>,
-) -> CmdResult<Vec<crate::integrations::provider::TaskStatus>> {
+) -> CmdResult<Vec<TaskStatus>> {
     run_blocking(move || {
-        ensure_supported(&provider)?;
-        let key = require_api_key(&provider)?;
-        let team = team_id
-            .or_else(|| {
-                conns::load_connection(&provider)
-                    .ok()
-                    .flatten()
-                    .and_then(|r| r.selected_team_id)
-            })
-            .with_context(|| format!("No team selected for {provider}"))?;
-        linear::list_team_states(&key, &team)
+        let team = selected_team(&provider, team_id)?;
+        resolve_provider(&provider)?.list_states(&team)
     })
     .await
 }
@@ -207,19 +199,10 @@ pub async fn list_task_statuses(
 pub async fn list_task_projects(
     provider: String,
     team_id: Option<String>,
-) -> CmdResult<Vec<crate::integrations::provider::TaskProject>> {
+) -> CmdResult<Vec<TaskProject>> {
     run_blocking(move || {
-        ensure_supported(&provider)?;
-        let key = require_api_key(&provider)?;
-        let team = team_id
-            .or_else(|| {
-                conns::load_connection(&provider)
-                    .ok()
-                    .flatten()
-                    .and_then(|r| r.selected_team_id)
-            })
-            .with_context(|| format!("No team selected for {provider}"))?;
-        linear::list_team_projects(&key, &team)
+        let team = selected_team(&provider, team_id)?;
+        resolve_provider(&provider)?.list_projects(&team)
     })
     .await
 }
@@ -229,19 +212,10 @@ pub async fn list_task_projects(
 pub async fn list_task_labels(
     provider: String,
     team_id: Option<String>,
-) -> CmdResult<Vec<crate::integrations::provider::TaskLabel>> {
+) -> CmdResult<Vec<TaskLabel>> {
     run_blocking(move || {
-        ensure_supported(&provider)?;
-        let key = require_api_key(&provider)?;
-        let team = team_id
-            .or_else(|| {
-                conns::load_connection(&provider)
-                    .ok()
-                    .flatten()
-                    .and_then(|r| r.selected_team_id)
-            })
-            .with_context(|| format!("No team selected for {provider}"))?;
-        linear::list_team_labels(&key, &team)
+        let team = selected_team(&provider, team_id)?;
+        resolve_provider(&provider)?.list_labels(&team)
     })
     .await
 }
@@ -251,19 +225,10 @@ pub async fn list_task_labels(
 pub async fn list_task_assignees(
     provider: String,
     team_id: Option<String>,
-) -> CmdResult<Vec<crate::integrations::provider::TaskAssignee>> {
+) -> CmdResult<Vec<TaskAssignee>> {
     run_blocking(move || {
-        ensure_supported(&provider)?;
-        let key = require_api_key(&provider)?;
-        let team = team_id
-            .or_else(|| {
-                conns::load_connection(&provider)
-                    .ok()
-                    .flatten()
-                    .and_then(|r| r.selected_team_id)
-            })
-            .with_context(|| format!("No team selected for {provider}"))?;
-        linear::list_team_members(&key, &team)
+        let team = selected_team(&provider, team_id)?;
+        resolve_provider(&provider)?.list_members(&team)
     })
     .await
 }
@@ -277,18 +242,8 @@ pub async fn sync_tasks(
     team_id: Option<String>,
 ) -> CmdResult<usize> {
     run_blocking(move || {
-        ensure_supported(&provider)?;
-        let key = require_api_key(&provider)?;
-        let team = team_id
-            .or_else(|| {
-                conns::load_connection(&provider)
-                    .ok()
-                    .flatten()
-                    .and_then(|r| r.selected_team_id)
-            })
-            .with_context(|| format!("No team selected for {provider}"))?;
-
-        let mut issues = linear::list_team_issues(&key, &team)?;
+        let team = selected_team(&provider, team_id)?;
+        let mut issues = resolve_provider(&provider)?.list_issues(&team)?;
         let synced_at = db::current_timestamp()?;
         let count = issues.len();
         for issue in &mut issues {
@@ -338,10 +293,7 @@ pub async fn update_task(
     run_blocking(move || {
         let task =
             tasks::load_task(&task_id)?.with_context(|| format!("Task {task_id} not found"))?;
-        ensure_supported(&task.provider)?;
-        let key = require_api_key(&task.provider)?;
-
-        let issue_patch = crate::integrations::provider::IssuePatch {
+        let issue_patch = IssuePatch {
             title: patch.title,
             description: patch.description,
             status_id: patch.status_id,
@@ -349,7 +301,8 @@ pub async fn update_task(
             assignee_id: patch.assignee_id,
             label_ids: patch.label_ids,
         };
-        let updated = linear::update_issue(&key, &task.external_id, &issue_patch)?;
+        let updated =
+            resolve_provider(&task.provider)?.update_issue(&task.external_id, &issue_patch)?;
         let synced_at = db::current_timestamp()?;
         let id = tasks::upsert_task(&updated, &synced_at)?;
         ui_sync::publish(
@@ -380,13 +333,10 @@ pub struct CreateTaskInput {
 #[tauri::command]
 pub async fn create_task(app: AppHandle, input: CreateTaskInput) -> CmdResult<TaskView> {
     run_blocking(move || {
-        ensure_supported(&input.provider)?;
-        let key = require_api_key(&input.provider)?;
-        let created = linear::create_issue(
-            &key,
+        let created = resolve_provider(&input.provider)?.create_issue(
             &input.team_id,
             &input.title,
-            &linear::NewIssue {
+            &NewIssue {
                 description: input.description.as_deref(),
                 priority: input.priority,
                 status_id: input.status_id.as_deref(),
