@@ -73,6 +73,7 @@ import { ComponentsPanel } from "./panels/components";
 import { ConductorImportPanel } from "./panels/conductor-import";
 import { DevToolsPanel } from "./panels/dev-tools";
 import { InboxSettingsPanel } from "./panels/inbox";
+import { IntegrationsPanel } from "./panels/integrations";
 import { LocalLlmPanel } from "./panels/local-llm";
 import { MobileCompanionPanel } from "./panels/mobile-companion";
 import { ProvidersPanel } from "./panels/providers";
@@ -106,6 +107,7 @@ const SECTION_LABEL_OVERRIDES: Partial<Record<SettingsSection, string>> = {
 const SECTION_TITLE_CAPTIONS: Partial<Record<SettingsSection, string>> = {
 	account: "Synced with your local gh / glab CLI.",
 	inbox: "Pick which items each connected account contributes to Contexts.",
+	integrations: "Connect task trackers to sync issues into the Tasks page.",
 };
 
 function sidebarSectionLabel(
@@ -193,6 +195,7 @@ export const SettingsDialog = memo(function SettingsDialog({
 		...(conductorEnabled ? (["import"] as const) : []),
 		"account",
 		"inbox",
+		"integrations",
 		"experimental",
 		"storage",
 		// Developer is intentionally last in the fixed group — it sits
@@ -654,6 +657,8 @@ export const SettingsDialog = memo(function SettingsDialog({
 									initialProvider={initialInboxProvider}
 								/>
 							)}
+
+							{activeSection === "integrations" && <IntegrationsPanel />}
 
 							{activeRepo && (
 								<RepositorySettingsPanel

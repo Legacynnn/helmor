@@ -947,6 +947,17 @@ fn run_migrations(connection: &Connection) -> Result<()> {
         .execute_batch(SESSION_PLAN_STATE_DDL)
         .context("Failed to create session_plan_state table")?;
 
+    // `tasks.project_*` added after the table shipped — backfill for dev DBs
+    // that created `tasks` before the project facet existed. No-op on fresh
+    // installs (SCHEMA_SQL already includes the columns).
+    if has_table(connection, "tasks") {
+        add_column_if_missing(connection, "tasks", "project_id", "TEXT")?;
+        add_column_if_missing(connection, "tasks", "project_name", "TEXT")?;
+        // `project_icon` / `project_color` added alongside project-icon rendering.
+        add_column_if_missing(connection, "tasks", "project_icon", "TEXT")?;
+        add_column_if_missing(connection, "tasks", "project_color", "TEXT")?;
+    }
+
     Ok(())
 }
 
@@ -1301,6 +1312,56 @@ CREATE TABLE IF NOT EXISTS paired_devices (
     revoked_at TEXT
 );
 
+-- Third-party task-tracker connections (Linear today; GitHub Issues / ClickUp
+-- later). The API key itself lives in the macOS keychain
+-- (`io.helmor.integrations`); this row only holds non-secret connection
+-- metadata so the UI can render status without touching the keychain.
+CREATE TABLE IF NOT EXISTS integration_connections (
+    provider TEXT PRIMARY KEY,
+    connected INTEGER NOT NULL DEFAULT 0,
+    org_name TEXT,
+    selected_team_id TEXT,
+    selected_team_name TEXT,
+    last_synced_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Local mirror of tasks pulled from a connected integration. Two-way sync:
+-- `dirty = 1` marks a row with a local edit pending push. Local-only columns
+-- (`agent_feedback`, `linked_workspace_id`) survive re-sync via upsert.
+CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    identifier TEXT,
+    title TEXT NOT NULL,
+    description TEXT,
+    status_id TEXT,
+    status_name TEXT,
+    status_kind TEXT,
+    status_color TEXT,
+    priority INTEGER NOT NULL DEFAULT 0,
+    assignee_id TEXT,
+    assignee_name TEXT,
+    assignee_avatar TEXT,
+    labels_json TEXT,
+    project_id TEXT,
+    project_name TEXT,
+    project_icon TEXT,
+    project_color TEXT,
+    url TEXT,
+    team_id TEXT,
+    remote_updated_at TEXT,
+    agent_feedback TEXT,
+    linked_workspace_id TEXT,
+    synced_at TEXT,
+    dirty INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (provider, external_id)
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_session_messages_sent_at ON session_messages(session_id, sent_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_workspace_id ON sessions(workspace_id);
@@ -1308,6 +1369,7 @@ CREATE INDEX IF NOT EXISTS idx_workspaces_repository_id ON workspaces(repository
 CREATE INDEX IF NOT EXISTS idx_runtime_processes_ended_at ON runtime_processes(ended_at);
 CREATE INDEX IF NOT EXISTS idx_triage_candidate_open ON triage_candidate(source_time DESC) WHERE decision IS NULL;
 CREATE INDEX IF NOT EXISTS idx_triage_candidate_source ON triage_candidate(source, source_time DESC);
+CREATE INDEX IF NOT EXISTS idx_tasks_provider_team ON tasks(provider, team_id);
 -- idx_workspaces_kind + idx_workspaces_triage_source are created in
 -- `run_migrations` (after the ALTERs on upgraded DBs).
 
@@ -1338,6 +1400,13 @@ CREATE TRIGGER IF NOT EXISTS update_repo_run_actions_updated_at
     BEGIN
         UPDATE repo_run_actions SET updated_at = datetime('now')
         WHERE id = NEW.id;
+    END;
+
+CREATE TRIGGER IF NOT EXISTS update_integration_connections_updated_at
+    AFTER UPDATE ON integration_connections
+    BEGIN
+        UPDATE integration_connections SET updated_at = datetime('now')
+        WHERE provider = NEW.provider;
     END;
 
 "#;
@@ -1373,6 +1442,8 @@ mod tests {
         assert!(tables.contains(&"session_messages".to_string()));
         assert!(tables.contains(&"settings".to_string()));
         assert!(tables.contains(&"slack_workspaces".to_string()));
+        assert!(tables.contains(&"integration_connections".to_string()));
+        assert!(tables.contains(&"tasks".to_string()));
     }
 
     #[test]

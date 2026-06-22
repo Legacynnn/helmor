@@ -12,6 +12,7 @@ pub mod git;
 pub mod global_hotkey;
 pub mod image_store;
 mod import;
+pub mod integrations;
 pub mod lark;
 pub mod local_llm;
 pub mod logging;
@@ -850,6 +851,21 @@ pub fn run() {
             commands::slack_commands::slack_get_thread_detail,
             commands::slack_commands::slack_list_emoji,
             commands::slack_commands::slack_prepare_thread_context,
+            commands::integrations_commands::connect_integration,
+            commands::integrations_commands::disconnect_integration,
+            commands::integrations_commands::get_integration_status,
+            commands::integrations_commands::set_integration_team,
+            commands::integrations_commands::list_tasks,
+            commands::integrations_commands::get_task,
+            commands::integrations_commands::list_task_statuses,
+            commands::integrations_commands::list_task_projects,
+            commands::integrations_commands::list_task_labels,
+            commands::integrations_commands::list_task_assignees,
+            commands::integrations_commands::sync_tasks,
+            commands::integrations_commands::update_task,
+            commands::integrations_commands::create_task,
+            commands::integrations_commands::review_task_with_agent,
+            commands::integrations_commands::create_workspace_from_task,
             commands::companion_commands::companion_status,
             commands::companion_commands::companion_enable,
             commands::companion_commands::companion_disable,

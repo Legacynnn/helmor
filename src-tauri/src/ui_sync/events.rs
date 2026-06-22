@@ -116,6 +116,22 @@ pub enum UiMutationEvent {
     SlackTokenInvalidated {
         team_id: String,
     },
+    /// A task integration connection changed (connected, disconnected, or the
+    /// selected team changed). Frontends invalidate the integration-status and
+    /// task-list queries for that provider.
+    IntegrationConnectionChanged {
+        provider: String,
+    },
+    /// The local task mirror for a provider changed in bulk (a sync pulled new
+    /// rows, or a task was created). Frontends invalidate the task-list query.
+    TasksChanged {
+        provider: String,
+    },
+    /// A single task changed (inline edit pushed, agent feedback stored, or a
+    /// workspace was linked). Frontends invalidate that task + the list.
+    TaskChanged {
+        task_id: String,
+    },
     /// AI-triage config changed.
     TriageConfigChanged,
     /// Active tick status changed (begin / progress / end).

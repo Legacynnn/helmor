@@ -312,6 +312,32 @@ function handleUiMutation(
 				queryKey: helmorQueryKeys.slackWorkspaces,
 			});
 			return;
+		case "integrationConnectionChanged":
+			void queryClient.invalidateQueries({
+				queryKey: helmorQueryKeys.integrationStatus(event.provider),
+			});
+			return;
+		case "tasksChanged":
+			// A bulk change (sync or create) — invalidate every task-list query
+			// for this provider regardless of which team is selected, plus the
+			// workflow-state and project lists (a sync may surface newly-added
+			// states / projects).
+			void queryClient.invalidateQueries({
+				predicate: (query) =>
+					(query.queryKey[0] === "tasks" ||
+						query.queryKey[0] === "taskStatuses" ||
+						query.queryKey[0] === "taskProjects") &&
+					query.queryKey[1] === event.provider,
+			});
+			return;
+		case "taskChanged":
+			void queryClient.invalidateQueries({
+				queryKey: helmorQueryKeys.task(event.taskId),
+			});
+			void queryClient.invalidateQueries({
+				predicate: (query) => query.queryKey[0] === "tasks",
+			});
+			return;
 		case "triageConfigChanged":
 			void queryClient.invalidateQueries({
 				queryKey: helmorQueryKeys.triageConfig,

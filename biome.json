@@ -19,7 +19,8 @@
 			"!**/.local-data",
 			"!**/.bundle-cache",
 			"!src-tauri/gen",
-			"!src-tauri/target"
+			"!src-tauri/target",
+			"!src/features/tasks/components/emoji-shortcodes.json"
 		]
 	},
 	"formatter": {
