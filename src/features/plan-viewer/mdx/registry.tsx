@@ -10,6 +10,7 @@ import { OpenQuestions } from "../components/open-questions";
 import { RiskCard } from "../components/risk-card";
 import { Steps } from "../components/steps";
 import { Timeline } from "../components/timeline";
+import { Wireframe } from "../components/wireframe";
 
 /** Standalone fallback: a CanvasNode authored outside a PlanCanvas just renders
  * its body blocks inline so content is never lost. */
@@ -65,6 +66,7 @@ export const PLAN_COMPONENTS: Record<string, PlanComponentDef> = {
 	Diff: { render: Diff, childMode: "raw" },
 	Timeline: { render: Timeline, childMode: "structured" },
 	Phase: { render: SubComponentFallback, childMode: "blocks" },
+	Wireframe: { render: Wireframe, childMode: "raw" },
 };
 
 /** Resolve a component's child mode, or `null` when the name is unknown. */
