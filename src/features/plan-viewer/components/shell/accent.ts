@@ -39,6 +39,8 @@ const ACCENTS: Record<PlanAccent, AccentClasses> = {
 		badge: "border-amber-500/40 text-amber-600 dark:text-amber-400",
 	},
 	danger: {
+		// Container border is /45 (not /40 like the others) — preserved from the
+		// original RiskCard high-risk styling so the visual stays unchanged.
 		container: "border-red-500/45 bg-red-500/5",
 		header: "text-red-600 dark:text-red-400",
 		badge: "border-red-500/40 text-red-600 dark:text-red-400",

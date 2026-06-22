@@ -40,6 +40,9 @@ export function PlanBlockShell({
 
 	return (
 		<section
+			// A bare <section> has no accessible name; surface the (string) title
+			// so screen readers announce a meaningful landmark.
+			aria-label={typeof title === "string" ? title : undefined}
 			className={cn(
 				"my-4 overflow-hidden rounded-lg border",
 				styles.container,

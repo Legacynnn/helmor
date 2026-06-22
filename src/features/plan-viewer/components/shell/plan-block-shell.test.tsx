@@ -1,7 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { HelpCircleIcon } from "lucide-react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { PlanBlockShell } from "./plan-block-shell";
+
+// This project's vitest config does not enable globals, so @testing-library's
+// auto-cleanup is not registered — unmount between tests so accumulated renders
+// don't cause getByText to find duplicate labels.
+afterEach(cleanup);
 
 describe("PlanBlockShell", () => {
 	it("renders a header row with title and body when title is given", () => {
