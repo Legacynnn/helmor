@@ -6,6 +6,7 @@ import { Decision } from "../components/decision";
 import { Diagram } from "../components/diagram";
 import { Diff } from "../components/diff-view";
 import { FileMap } from "../components/file-map";
+import { MultiPrototype } from "../components/multi-prototype";
 import { OpenQuestions } from "../components/open-questions";
 import { RiskCard } from "../components/risk-card";
 import { Steps } from "../components/steps";
@@ -67,6 +68,8 @@ export const PLAN_COMPONENTS: Record<string, PlanComponentDef> = {
 	Timeline: { render: Timeline, childMode: "structured" },
 	Phase: { render: SubComponentFallback, childMode: "blocks" },
 	Wireframe: { render: Wireframe, childMode: "raw" },
+	MultiPrototype: { render: MultiPrototype, childMode: "structured" },
+	Variant: { render: SubComponentFallback, childMode: "blocks" },
 };
 
 /** Resolve a component's child mode, or `null` when the name is unknown. */
