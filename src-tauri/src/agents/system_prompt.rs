@@ -247,11 +247,14 @@ Allowed components:
   - `<AnnotatedCode code="…" lang="…" note="…" />` for an annotated snippet (the code may instead be passed as the component's children).
   - `<Diagram>` containing mermaid diagram source (no code fences) for architecture or data flow.
   - `<PlanCanvas direction="TB|LR">` containing `<CanvasNode>` children — an interactive mind-map shown at the TOP of the plan that visualises how the task's pieces connect. Prefer placing one PlanCanvas first, before the prose sections, as a high-level overview. Keep it focused (roughly 3–8 nodes).
-  - `<CanvasNode id="unique-id" title="Short title" connects="other-id,another-id">` … short markdown … `</CanvasNode>` — one box in the PlanCanvas. `id` must be unique; `connects` is a comma-separated list of other node ids this box links to. Keep the body to a sentence or a short list. Use a self-closing `<CanvasNode ... />` when there is no body. CanvasNode is ONLY valid inside a PlanCanvas.
+  - `<CanvasNode id="unique-id" title="Short title" connects="other-id,another-id">` … short markdown … `</CanvasNode>` — one box in the PlanCanvas. `id` must be unique; `connects` is a comma-separated list of other node ids this box links to. Keep the body to a sentence or a short list. Use a self-closing `<CanvasNode ... />` when there is no body. CanvasNode is ONLY valid inside a PlanCanvas. Optionally set `kind="note|resume|option|phase|wireframe"` to style a node by its role (e.g. a `resume` summary box or an `option` box).
   - `<Decision>` containing `<Option title="..." recommended>` … markdown pros/cons … `</Option>` children — present 2–4 candidate approaches as cards and mark the best one with the boolean `recommended` attribute. `<Option>` is ONLY valid inside a `<Decision>`.
   - `<BeforeAfter>` containing exactly one `<Before>` … markdown … `</Before>` and one `<After>` … markdown … `</After>` — a side-by-side comparison of current vs. proposed behavior. `<Before>`/`<After>` are ONLY valid inside a `<BeforeAfter>`.
   - `<Diff lang="...">` whose contents are unified-diff lines: each line starts with `+` (added line), `-` (removed line), or a space (unchanged context). Use it for concrete before/after code changes. `lang` is an optional language label.
   - `<Timeline>` containing `<Phase title="..." status="done|active|todo">` … markdown … `</Phase>` children — a sequenced list of milestones or phases. `<Phase>` is ONLY valid inside a `<Timeline>`.
+  - `<Wireframe label="...">` whose contents are low-fidelity mockup lines — one element per line, leading-space indentation = nesting, from this fixed set: `row`/`col`/`box` (containers) and `text`/`input`/`button`/`image`/`divider` (elements), each optionally followed by a label (e.g. `button Sign in`). Use it to sketch a proposed UI.
+  - `<MultiPrototype>` containing 2–4 `<Variant label="..." recommended>` … usually a single `<Wireframe>` … `</Variant>` children — compares prototype options as tabs; mark the preferred one `recommended`. `<Variant>` is ONLY valid inside a `<MultiPrototype>`.
+  - `<DataModel>` containing `<Entity name="...">` … `fieldName: type` lines … `</Entity>` children — typed entity/schema tables. `<Entity>` is ONLY valid inside a `<DataModel>`.
 
 Keep explanatory prose between the components so the document reads as a coherent plan.
 
@@ -541,6 +544,11 @@ mod tests {
         // edits lose them (the parent would then render with no children).
         assert!(prompt.contains("Option"));
         assert!(prompt.contains("Phase"));
+        assert!(prompt.contains("Wireframe"));
+        assert!(prompt.contains("MultiPrototype"));
+        assert!(prompt.contains("Variant"));
+        assert!(prompt.contains("DataModel"));
+        assert!(prompt.contains("Entity"));
         assert!(prompt.contains("ExitPlanMode"));
         // The block-element rule is the one the MDX parser actually
         // depends on — inline JSX renders as plain text.
