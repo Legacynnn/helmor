@@ -2,6 +2,7 @@
 //! shared `ProviderTask` model. Built on the bundled `gh` auth via `forge`.
 
 pub mod auth;
+pub mod client;
 
 pub use auth::default_login;
 
