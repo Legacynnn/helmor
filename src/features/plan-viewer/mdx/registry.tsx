@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import { AnnotatedCode } from "../components/annotated-code";
+import { BeforeAfter } from "../components/before-after";
 import { PlanCanvas } from "../components/canvas";
 import { Decision } from "../components/decision";
 import { Diagram } from "../components/diagram";
@@ -56,6 +57,9 @@ export const PLAN_COMPONENTS: Record<string, PlanComponentDef> = {
 	CanvasNode: { render: CanvasNodeFallback, childMode: "blocks" },
 	Decision: { render: Decision, childMode: "structured" },
 	Option: { render: SubComponentFallback, childMode: "blocks" },
+	BeforeAfter: { render: BeforeAfter, childMode: "structured" },
+	Before: { render: SubComponentFallback, childMode: "blocks" },
+	After: { render: SubComponentFallback, childMode: "blocks" },
 };
 
 /** Resolve a component's child mode, or `null` when the name is unknown. */
