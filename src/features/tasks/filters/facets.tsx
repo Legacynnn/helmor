@@ -171,6 +171,8 @@ const labelFacet: TaskFacet = {
  * tags; other providers can return a different set without touching the bar. */
 export function facetsForProvider(provider: IntegrationProvider): TaskFacet[] {
 	switch (provider) {
+		case "github":
+			return [assigneeFacet, labelFacet];
 		default:
 			return [projectFacet, assigneeFacet, priorityFacet, labelFacet];
 	}
