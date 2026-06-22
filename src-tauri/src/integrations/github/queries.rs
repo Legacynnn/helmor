@@ -38,18 +38,32 @@ query RepoIssues($owner: String!, $name: String!, $after: String) {{
     )
 }
 
-/// Repository id + assignable users + labels for a repo (powers pickers + create).
-pub const REPO_META: &str = r#"
-query RepoMeta($owner: String!, $name: String!, $afterUsers: String, $afterLabels: String) {
+/// Repository node id (powers `create_issue`'s repository lookup).
+pub const REPO_ID: &str = r#"
+query RepoId($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) { id }
+}
+"#;
+
+/// One page of a repo's labels (paginated via `$after`).
+pub const REPO_LABELS: &str = r#"
+query RepoLabels($owner: String!, $name: String!, $after: String) {
   repository(owner: $owner, name: $name) {
-    id
-    assignableUsers(first: 100, after: $afterUsers) {
-      pageInfo { hasNextPage endCursor }
-      nodes { id name login avatarUrl }
-    }
-    labels(first: 100, after: $afterLabels) {
+    labels(first: 100, after: $after) {
       pageInfo { hasNextPage endCursor }
       nodes { id name color }
+    }
+  }
+}
+"#;
+
+/// One page of a repo's assignable users (paginated via `$after`).
+pub const REPO_ASSIGNEES: &str = r#"
+query RepoAssignees($owner: String!, $name: String!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    assignableUsers(first: 100, after: $after) {
+      pageInfo { hasNextPage endCursor }
+      nodes { id name login avatarUrl }
     }
   }
 }
