@@ -36,6 +36,7 @@ import { useAutoSync, useSyncTasks, useTasks } from "./hooks/use-tasks";
 import { useUpdateTask } from "./hooks/use-update-task";
 
 const VIEW_STORAGE_KEY = "helmor-tasks-view";
+const PROVIDER_STORAGE_KEY = "helmor-tasks-provider";
 
 function loadView(): TasksView {
 	try {
@@ -47,11 +48,21 @@ function loadView(): TasksView {
 	}
 }
 
+function loadProvider(): IntegrationProvider {
+	try {
+		return localStorage.getItem(PROVIDER_STORAGE_KEY) === "github"
+			? "github"
+			: "linear";
+	} catch {
+		return "linear";
+	}
+}
+
 // Navigation to seeded workspaces is handled by the app's pending-CLI-send
 // pipeline (the backend queues a prompt + fires `pendingCliSendQueued`), so the
 // screen-host actions are unused here for now.
 export function TasksContainer(_props: TasksScreenProps) {
-	const provider: IntegrationProvider = "linear";
+	const [provider, setProvider] = useState<IntegrationProvider>(loadProvider);
 	const queryClient = useQueryClient();
 	const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 	// When set, the task is shown as a focused full page instead of the drawer.
@@ -258,8 +269,17 @@ export function TasksContainer(_props: TasksScreenProps) {
 				<ProviderTabBar
 					active={provider}
 					connected={connected}
-					onSelect={() => {
-						/* single provider for now */
+					onSelect={(next) => {
+						setProvider(next);
+						try {
+							localStorage.setItem(PROVIDER_STORAGE_KEY, next);
+						} catch {
+							/* private mode — keep in-memory */
+						}
+						// Reset transient view state when switching providers.
+						setSelectedTaskId(null);
+						setFullTaskId(null);
+						setHiddenColumns(new Set());
 					}}
 				/>
 				{connected && status?.selectedTeamName ? (
