@@ -80,4 +80,13 @@ describe("buildCanvasGraph", () => {
 		]);
 		expect(edges).toHaveLength(0);
 	});
+
+	it("carries the node kind from props, defaulting to note", () => {
+		const { nodes } = buildCanvasGraph([
+			node("b0", { id: "a", title: "A", kind: "resume" }),
+			node("b1", { id: "b", title: "B" }),
+		]);
+		expect(nodes[0].data.kind).toBe("resume");
+		expect(nodes[1].data.kind).toBe("note");
+	});
 });

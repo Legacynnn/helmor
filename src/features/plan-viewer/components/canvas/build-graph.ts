@@ -1,9 +1,11 @@
 import type { PlanBlock } from "../../mdx/parse";
+import { type CanvasNodeKind, normalizeKind } from "./node-kinds";
 
 /** Data carried on each React Flow node (rendered by canvas-node.tsx). */
 export type CanvasNodeData = {
 	title: string;
 	bodyBlocks: PlanBlock[];
+	kind?: CanvasNodeKind;
 };
 
 export type CanvasGraphNode = {
@@ -54,6 +56,7 @@ export function buildCanvasGraph(childBlocks: PlanBlock[]): CanvasGraph {
 			data: {
 				title: block.props.title?.trim() || id,
 				bodyBlocks: block.childBlocks,
+				kind: normalizeKind(block.props.kind),
 			},
 			position: { x: 0, y: 0 },
 		});
