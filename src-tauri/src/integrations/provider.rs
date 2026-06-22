@@ -3,6 +3,7 @@
 //! regardless of source.
 
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Map, Value};
 
 /// A selectable team/project within a connected workspace (Linear "team").
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -169,4 +170,72 @@ pub struct ProviderTask {
     pub team_id: Option<String>,
     /// Provider's `updatedAt`, RFC3339. Used for last-write-wins conflict notes.
     pub remote_updated_at: Option<String>,
+}
+
+/// Result of the bootstrap probe — also doubles as credential validation.
+pub struct OrgTeams {
+    pub org_name: String,
+    pub teams: Vec<IntegrationTeam>,
+}
+
+/// Mutable fields for an issue update. `None` leaves a field untouched.
+#[derive(Debug, Default, Clone)]
+pub struct IssuePatch {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub status_id: Option<String>,
+    pub priority: Option<i64>,
+    pub assignee_id: Option<String>,
+    /// Full replacement set of label ids.
+    pub label_ids: Option<Vec<String>>,
+}
+
+impl IssuePatch {
+    pub fn is_empty(&self) -> bool {
+        self.title.is_none()
+            && self.description.is_none()
+            && self.status_id.is_none()
+            && self.priority.is_none()
+            && self.assignee_id.is_none()
+            && self.label_ids.is_none()
+    }
+
+    /// Linear-style GraphQL input map. GitHub builds its own input separately.
+    pub fn to_linear_input(&self) -> Value {
+        let mut input = Map::new();
+        if let Some(title) = &self.title {
+            input.insert("title".into(), json!(title));
+        }
+        if let Some(description) = &self.description {
+            input.insert("description".into(), json!(description));
+        }
+        if let Some(status_id) = &self.status_id {
+            input.insert("stateId".into(), json!(status_id));
+        }
+        if let Some(priority) = self.priority {
+            input.insert("priority".into(), json!(priority));
+        }
+        if let Some(assignee_id) = &self.assignee_id {
+            if assignee_id.is_empty() {
+                input.insert("assigneeId".into(), Value::Null);
+            } else {
+                input.insert("assigneeId".into(), json!(assignee_id));
+            }
+        }
+        if let Some(label_ids) = &self.label_ids {
+            input.insert("labelIds".into(), json!(label_ids));
+        }
+        Value::Object(input)
+    }
+}
+
+/// Optional fields for a new issue beyond the required title.
+#[derive(Debug, Default)]
+pub struct NewIssue<'a> {
+    pub description: Option<&'a str>,
+    pub priority: Option<i64>,
+    pub status_id: Option<&'a str>,
+    pub assignee_id: Option<&'a str>,
+    pub project_id: Option<&'a str>,
+    pub label_ids: Option<&'a [String]>,
 }

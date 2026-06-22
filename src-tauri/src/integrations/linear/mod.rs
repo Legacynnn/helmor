@@ -9,67 +9,11 @@ pub mod types;
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Map, Value};
 
+pub use crate::integrations::provider::{IssuePatch, NewIssue, OrgTeams};
 use crate::integrations::provider::{
-    IntegrationTeam, ProviderTask, TaskAssignee, TaskLabel, TaskProject, TaskStatus,
+    ProviderTask, TaskAssignee, TaskLabel, TaskProject, TaskStatus,
 };
 use client::LinearClient;
-
-/// Result of the bootstrap probe — also doubles as API-key validation.
-pub struct OrgTeams {
-    pub org_name: String,
-    pub teams: Vec<IntegrationTeam>,
-}
-
-/// Mutable fields for an issue update. `None` leaves a field untouched.
-#[derive(Debug, Default, Clone)]
-pub struct IssuePatch {
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub status_id: Option<String>,
-    pub priority: Option<i64>,
-    pub assignee_id: Option<String>,
-    /// Full replacement set of label ids (Linear's `labelIds` is absolute).
-    pub label_ids: Option<Vec<String>>,
-}
-
-impl IssuePatch {
-    fn is_empty(&self) -> bool {
-        self.title.is_none()
-            && self.description.is_none()
-            && self.status_id.is_none()
-            && self.priority.is_none()
-            && self.assignee_id.is_none()
-            && self.label_ids.is_none()
-    }
-
-    fn to_input(&self) -> Value {
-        let mut input = Map::new();
-        if let Some(title) = &self.title {
-            input.insert("title".into(), json!(title));
-        }
-        if let Some(description) = &self.description {
-            input.insert("description".into(), json!(description));
-        }
-        if let Some(status_id) = &self.status_id {
-            input.insert("stateId".into(), json!(status_id));
-        }
-        if let Some(priority) = self.priority {
-            input.insert("priority".into(), json!(priority));
-        }
-        if let Some(assignee_id) = &self.assignee_id {
-            // Empty string is the "unassign" signal -> send explicit null.
-            if assignee_id.is_empty() {
-                input.insert("assigneeId".into(), Value::Null);
-            } else {
-                input.insert("assigneeId".into(), json!(assignee_id));
-            }
-        }
-        if let Some(label_ids) = &self.label_ids {
-            input.insert("labelIds".into(), json!(label_ids));
-        }
-        Value::Object(input)
-    }
-}
 
 /// Validate the key and load org name + teams for the selector.
 pub fn fetch_org_and_teams(api_key: &str) -> Result<OrgTeams> {
@@ -205,7 +149,7 @@ pub fn update_issue(api_key: &str, external_id: &str, patch: &IssuePatch) -> Res
     let client = LinearClient::new(api_key)?;
     let data: types::IssueUpdateData = client.query(
         queries::ISSUE_UPDATE,
-        json!({ "id": external_id, "input": patch.to_input() }),
+        json!({ "id": external_id, "input": patch.to_linear_input() }),
     )?;
     if !data.issue_update.success {
         bail!("Linear rejected the issue update");
@@ -218,17 +162,6 @@ pub fn update_issue(api_key: &str, external_id: &str, patch: &IssuePatch) -> Res
 }
 
 /// Create a new issue in a team.
-/// Optional fields for a new issue beyond the required title.
-#[derive(Debug, Default)]
-pub struct NewIssue<'a> {
-    pub description: Option<&'a str>,
-    pub priority: Option<i64>,
-    pub status_id: Option<&'a str>,
-    pub assignee_id: Option<&'a str>,
-    pub project_id: Option<&'a str>,
-    pub label_ids: Option<&'a [String]>,
-}
-
 pub fn create_issue(
     api_key: &str,
     team_id: &str,
