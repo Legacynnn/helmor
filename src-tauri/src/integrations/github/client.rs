@@ -30,7 +30,22 @@ impl GithubClient {
 
     /// Run a mutation, returning raw JSON and surfacing GraphQL `errors`.
     pub fn mutate(&self, mutation: &str, variables: &[(&str, &str)]) -> Result<Value> {
-        let value = match run_graphql_raw(&self.login, mutation, variables)? {
+        self.run_raw(mutation, variables)
+    }
+
+    /// Run a read query through the UNCACHED raw path, returning the full
+    /// `{ "data": ..., "errors": ... }` envelope as `Value` (same shape as
+    /// [`mutate`]). Use this for reads that must reflect a just-applied
+    /// mutation — the cached [`query`](Self::query) can return a stale
+    /// pre-mutation snapshot for up to the read-cache TTL (~6s).
+    pub fn query_uncached(&self, query: &str, variables: &[(&str, &str)]) -> Result<Value> {
+        self.run_raw(query, variables)
+    }
+
+    /// Shared uncached transport: applies Auth-rejection handling and inspects
+    /// the GraphQL `errors` array, returning the full envelope `Value`.
+    fn run_raw(&self, document: &str, variables: &[(&str, &str)]) -> Result<Value> {
+        let value = match run_graphql_raw(&self.login, document, variables)? {
             GraphqlOutcome::Auth => {
                 bail!("GitHub rejected the request — re-authenticate `gh` and try again")
             }

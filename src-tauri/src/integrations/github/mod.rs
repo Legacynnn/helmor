@@ -109,47 +109,86 @@ impl TaskProvider for GithubProvider {
         Ok(Vec::new())
     }
 
+    /// Fetch all label pages for the repo (paginated; not capped at one page).
     fn list_labels(&self, team: &str) -> Result<Vec<TaskLabel>> {
         let (owner, name) = split_repo(team)?;
         let client = GithubClient::new(&self.login);
-        let data: Value = client.query(queries::REPO_META, &[("owner", owner), ("name", name)])?;
-        let labels = data["data"]["repository"]["labels"]["nodes"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
-        let mut out: Vec<TaskLabel> = labels
-            .iter()
-            .filter_map(|l| {
-                Some(TaskLabel {
-                    id: l["id"].as_str()?.to_string(),
-                    name: l["name"].as_str()?.to_string(),
-                    color: l["color"].as_str().map(|c| format!("#{c}")),
-                })
-            })
-            .collect();
+        let mut out: Vec<TaskLabel> = Vec::new();
+        let mut after: Option<String> = None;
+        loop {
+            let after_str = after.clone().unwrap_or_default();
+            let mut vars: Vec<(&str, &str)> = vec![("owner", owner), ("name", name)];
+            if !after_str.is_empty() {
+                vars.push(("after", after_str.as_str()));
+            }
+            let data: Value = client.query(queries::REPO_LABELS, &vars)?;
+            let labels = &data["data"]["repository"]["labels"];
+            if let Some(nodes) = labels["nodes"].as_array() {
+                for l in nodes {
+                    if let (Some(id), Some(name)) = (l["id"].as_str(), l["name"].as_str()) {
+                        out.push(TaskLabel {
+                            id: id.to_string(),
+                            name: name.to_string(),
+                            color: l["color"].as_str().map(|c| format!("#{c}")),
+                        });
+                    }
+                }
+            }
+            if labels["pageInfo"]["hasNextPage"].as_bool().unwrap_or(false) {
+                after = labels["pageInfo"]["endCursor"]
+                    .as_str()
+                    .map(|s| s.to_string());
+                if after.is_none() {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
         out.sort_by_key(|l| l.name.to_lowercase());
         Ok(out)
     }
 
+    /// Fetch all assignable-user pages for the repo (paginated; not capped at one page).
     fn list_members(&self, team: &str) -> Result<Vec<TaskAssignee>> {
         let (owner, name) = split_repo(team)?;
         let client = GithubClient::new(&self.login);
-        let data: Value = client.query(queries::REPO_META, &[("owner", owner), ("name", name)])?;
-        let users = data["data"]["repository"]["assignableUsers"]["nodes"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
-        let mut out: Vec<TaskAssignee> = users
-            .iter()
-            .filter_map(|u| {
-                let login = u["login"].as_str()?.to_string();
-                Some(TaskAssignee {
-                    id: u["id"].as_str()?.to_string(),
-                    name: u["name"].as_str().map(|s| s.to_string()).unwrap_or(login),
-                    avatar_url: u["avatarUrl"].as_str().map(|s| s.to_string()),
-                })
-            })
-            .collect();
+        let mut out: Vec<TaskAssignee> = Vec::new();
+        let mut after: Option<String> = None;
+        loop {
+            let after_str = after.clone().unwrap_or_default();
+            let mut vars: Vec<(&str, &str)> = vec![("owner", owner), ("name", name)];
+            if !after_str.is_empty() {
+                vars.push(("after", after_str.as_str()));
+            }
+            let data: Value = client.query(queries::REPO_ASSIGNEES, &vars)?;
+            let users = &data["data"]["repository"]["assignableUsers"];
+            if let Some(nodes) = users["nodes"].as_array() {
+                for u in nodes {
+                    let Some(login) = u["login"].as_str().map(|s| s.to_string()) else {
+                        continue;
+                    };
+                    let Some(id) = u["id"].as_str().map(|s| s.to_string()) else {
+                        continue;
+                    };
+                    out.push(TaskAssignee {
+                        id,
+                        name: u["name"].as_str().map(|s| s.to_string()).unwrap_or(login),
+                        avatar_url: u["avatarUrl"].as_str().map(|s| s.to_string()),
+                    });
+                }
+            }
+            if users["pageInfo"]["hasNextPage"].as_bool().unwrap_or(false) {
+                after = users["pageInfo"]["endCursor"]
+                    .as_str()
+                    .map(|s| s.to_string());
+                if after.is_none() {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
         out.sort_by_key(|m| m.name.to_lowercase());
         Ok(out)
     }
@@ -277,7 +316,7 @@ impl TaskProvider for GithubProvider {
         let (owner, name) = split_repo(team)?;
         let client = GithubClient::new(&self.login);
         // Resolve the repository node id.
-        let meta: Value = client.query(queries::REPO_META, &[("owner", owner), ("name", name)])?;
+        let meta: Value = client.query(queries::REPO_ID, &[("owner", owner), ("name", name)])?;
         let repo_id = meta["data"]["repository"]["id"]
             .as_str()
             .context("Repository id missing")?
@@ -309,6 +348,28 @@ impl TaskProvider for GithubProvider {
             .as_str()
             .context("Created issue id missing")?
             .to_string();
+
+        // New issues are created OPEN. If the caller dropped the issue into a
+        // closed column, close it with the matching reason. An unknown
+        // status_id is intentionally ignored here (no bail) — a create
+        // shouldn't fail over a column hint; `update_issue` is the strict path.
+        match fields.status_id {
+            Some(map::STATUS_DONE) => {
+                client.mutate(
+                    queries::CLOSE_ISSUE,
+                    &[("id", id.as_str()), ("reason", "COMPLETED")],
+                )?;
+            }
+            Some(map::STATUS_NOT_PLANNED) => {
+                client.mutate(
+                    queries::CLOSE_ISSUE,
+                    &[("id", id.as_str()), ("reason", "NOT_PLANNED")],
+                )?;
+            }
+            // STATUS_OPEN, None, or any unknown id: leave open.
+            _ => {}
+        }
+
         self.get_issue(&id)?.context("Issue vanished after create")
     }
 }
@@ -317,7 +378,10 @@ impl GithubProvider {
     fn get_issue(&self, external_id: &str) -> Result<Option<ProviderTask>> {
         let client = GithubClient::new(&self.login);
         let query = queries::single_issue(queries::ISSUE_FIELDS);
-        let data: Value = client.query(&query, &[("id", external_id)])?;
+        // UNCACHED: `get_issue` is the post-mutation freshness path. The cached
+        // `query` can return a pre-mutation snapshot for ~6s, making edits look
+        // like they silently reverted.
+        let data: Value = client.query_uncached(&query, &[("id", external_id)])?;
         let node_json = data["data"]["node"].clone();
         if node_json.is_null() {
             return Ok(None);
