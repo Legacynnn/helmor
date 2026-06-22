@@ -3,7 +3,7 @@
 //! builds the query string + cursor and calls this, so GitHub issue listing has
 //! one execution path (the integrations client). Issue DETAIL stays in forge.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 
 use super::client::GithubClient;
@@ -27,6 +27,12 @@ pub struct IssueSearchPage {
 #[derive(Deserialize)]
 struct Envelope {
     data: Option<Data>,
+    errors: Option<Vec<GraphqlError>>,
+}
+
+#[derive(Deserialize)]
+struct GraphqlError {
+    message: String,
 }
 
 #[derive(Deserialize)]
@@ -96,6 +102,18 @@ pub fn search_issues(
     }
     let document = with_search_first(ISSUE_PR_SEARCH_QUERY, limit);
     let env: Envelope = client.query(&document, &vars)?;
+    if let Some(errors) = env.errors {
+        if !errors.is_empty() {
+            bail!(
+                "GitHub search errors: {}",
+                errors
+                    .iter()
+                    .map(|e| e.message.as_str())
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            );
+        }
+    }
     let payload = env
         .data
         .context("GitHub issue search returned no data")?
