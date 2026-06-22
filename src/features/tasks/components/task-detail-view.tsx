@@ -136,18 +136,20 @@ export function TaskDetailView({
 						disabled={isUpdating}
 						onChange={(statusId) => onUpdate({ statusId })}
 					/>
-					<PrioritySelect
-						priority={task.priority}
-						disabled={isUpdating}
-						onChange={(priority) => onUpdate({ priority })}
-					/>
+					{task.provider !== "github" ? (
+						<PrioritySelect
+							priority={task.priority}
+							disabled={isUpdating}
+							onChange={(priority) => onUpdate({ priority })}
+						/>
+					) : null}
 					<AssigneeSelect
 						assignee={task.assignee}
 						options={assigneeOptions}
 						disabled={isUpdating}
 						onChange={(assigneeId) => onUpdate({ assigneeId })}
 					/>
-					{task.project ? (
+					{task.provider !== "github" && task.project ? (
 						<Badge variant="outline" className="gap-1.5 font-normal">
 							<ProjectIcon project={task.project} size={12} />
 							{task.project.name}

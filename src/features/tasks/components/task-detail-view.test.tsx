@@ -54,6 +54,23 @@ describe("TaskDetailView", () => {
 		expect(onUpdate).toHaveBeenCalledWith({ title: "Renamed task" });
 	});
 
+	it("hides the priority editor for GitHub tasks", () => {
+		render(
+			<TaskDetailView
+				task={makeTask({ provider: "github" })}
+				statusOptions={[]}
+				labelOptions={[]}
+				assigneeOptions={[]}
+				expanded={false}
+				onToggleExpand={() => {}}
+				isUpdating={false}
+				onClose={() => {}}
+				onUpdate={() => {}}
+			/>,
+		);
+		expect(screen.queryByText("High")).toBeNull();
+	});
+
 	it("renders an agent feedback panel when present", () => {
 		render(
 			<TaskDetailView
