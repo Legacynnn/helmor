@@ -551,6 +551,8 @@ async fn dispatch(
         |         "get_task"
         |         "list_task_statuses"
         |         "list_task_projects"
+        |         "list_task_labels"
+        |         "list_task_assignees"
         |         "sync_tasks"
         |         "update_task"
         |         "create_task"
