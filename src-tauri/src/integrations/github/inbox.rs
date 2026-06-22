@@ -10,12 +10,22 @@ use super::client::GithubClient;
 use crate::forge::github::inbox::{
     issue_state, pick_sort_timestamp, with_search_first, ISSUE_PR_SEARCH_QUERY,
 };
+use crate::forge::github::GraphqlOutcome;
 use crate::forge::inbox::{InboxItem, InboxSortFilter, InboxSource};
 
 pub struct IssueSearchPage {
     pub items: Vec<InboxItem>,
     pub has_next_page: bool,
     pub end_cursor: Option<String>,
+}
+
+/// Result of a single issue search page: either a mapped page, or a typed
+/// signal that `gh` auth was rejected. The caller (forge inbox) treats
+/// `AuthRequired` as "log + empty page, don't fail the whole multi-source
+/// fetch" — replacing the old string-match on the client's error phrase.
+pub enum IssueSearchOutcome {
+    Page(IssueSearchPage),
+    AuthRequired,
 }
 
 // We reuse forge's `ISSUE_PR_SEARCH_QUERY` (selecting both Issue and
@@ -93,7 +103,7 @@ pub fn search_issues(
     cursor: Option<&str>,
     sort: Option<InboxSortFilter>,
     limit: usize,
-) -> Result<IssueSearchPage> {
+) -> Result<IssueSearchOutcome> {
     let client = GithubClient::new(login);
     let cursor_owned = cursor.unwrap_or_default().to_string();
     let mut vars: Vec<(&str, &str)> = vec![("q", query)];
@@ -101,7 +111,10 @@ pub fn search_issues(
         vars.push(("cursor", cursor_owned.as_str()));
     }
     let document = with_search_first(ISSUE_PR_SEARCH_QUERY, limit);
-    let env: Envelope = client.query(&document, &vars)?;
+    let env: Envelope = match client.query_outcome::<Envelope>(&document, &vars)? {
+        GraphqlOutcome::Auth => return Ok(IssueSearchOutcome::AuthRequired),
+        GraphqlOutcome::Ok(env) => env,
+    };
     if let Some(errors) = env.errors {
         if !errors.is_empty() {
             bail!(
@@ -123,11 +136,11 @@ pub fn search_issues(
         .into_iter()
         .filter_map(|node| node_to_item(node, sort))
         .collect();
-    Ok(IssueSearchPage {
+    Ok(IssueSearchOutcome::Page(IssueSearchPage {
         items,
         has_next_page: payload.page_info.has_next_page,
         end_cursor: payload.page_info.end_cursor,
-    })
+    }))
 }
 
 fn node_to_item(node: Node, sort: Option<InboxSortFilter>) -> Option<InboxItem> {

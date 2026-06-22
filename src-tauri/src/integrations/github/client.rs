@@ -20,12 +20,24 @@ impl GithubClient {
 
     /// Run a typed query. Variables are string pairs (gh `-f key=value`).
     pub fn query<T: DeserializeOwned>(&self, query: &str, variables: &[(&str, &str)]) -> Result<T> {
-        match run_graphql::<T>(&self.login, query, variables)? {
+        match self.query_outcome::<T>(query, variables)? {
             GraphqlOutcome::Auth => {
                 bail!("GitHub rejected the request — re-authenticate `gh` and try again")
             }
             GraphqlOutcome::Ok(value) => Ok(value),
         }
+    }
+
+    /// Like [`query`](Self::query), but surfaces an auth rejection as a typed
+    /// outcome instead of an error, so callers can distinguish "re-auth needed"
+    /// from a hard failure (the inbox treats auth as an empty page, not a fatal
+    /// error). Transport errors still propagate via `?`.
+    pub(crate) fn query_outcome<T: DeserializeOwned>(
+        &self,
+        query: &str,
+        variables: &[(&str, &str)],
+    ) -> Result<GraphqlOutcome<T>> {
+        run_graphql::<T>(&self.login, query, variables)
     }
 
     /// Run a mutation, returning raw JSON and surfacing GraphQL `errors`.

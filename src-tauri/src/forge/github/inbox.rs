@@ -408,27 +408,27 @@ pub fn list_inbox_items(
             // `search_issues` builds no query, so we pass the already-sorted
             // string and hand `sort_filter` separately for timestamp picking.
             let sorted_query = format!("{q} {sort_qual}");
+            // `search_issues` returns a typed `IssueSearchOutcome`: a mapped
+            // page, or `AuthRequired` when `gh` auth was rejected. Forge's
+            // issue branch treats Auth as "log + return an empty page, don't
+            // fail the whole multi-source call" — so other sources still load.
+            // A non-auth/transport error still propagates via `?`; the
+            // GraphQL-errors case inside `search_issues` bails (hard error).
             let page = match crate::integrations::github::inbox::search_issues(
                 login,
                 &sorted_query,
                 cursor_entry.cursor.as_deref(),
                 sort_filter,
                 limit,
-            ) {
-                Ok(page) => page,
-                // `search_issues` bails on auth rejection (the integrations
-                // `GithubClient` maps `GraphqlOutcome::Auth` to a fixed error
-                // phrase) instead of returning a `FetchOutcome::Auth`. Forge's
-                // prior issue branch treated Auth as "log + return an empty
-                // page, don't fail the whole call". Preserve that exactly.
-                Err(error) if is_integrations_auth_rejection(&error) => {
+            )? {
+                crate::integrations::github::inbox::IssueSearchOutcome::AuthRequired => {
                     tracing::warn!(target: "helmor::inbox", login, "issues search: auth required");
                     return Ok(InboxPage {
                         items: Vec::new(),
                         next_cursor: None,
                     });
                 }
-                Err(error) => return Err(error),
+                crate::integrations::github::inbox::IssueSearchOutcome::Page(page) => page,
             };
             tracing::debug!(
                 target: "helmor::inbox",
@@ -800,15 +800,6 @@ fn run_github_api_with_options(
         return Ok(None);
     }
     Err(anyhow!("`gh api` failed for {label}: {detail}"))
-}
-
-/// Detect the auth-rejection error surfaced by the integrations
-/// `GithubClient::query` (it maps `GraphqlOutcome::Auth` to a fixed phrase
-/// rather than a typed variant). Forge's inbox issue branch must treat this
-/// the same way it treated `FetchOutcome::Auth` — return an empty page instead
-/// of failing the whole multi-source fetch — so other sources still load.
-fn is_integrations_auth_rejection(error: &anyhow::Error) -> bool {
-    format!("{error:#}").contains("GitHub rejected the request")
 }
 
 fn looks_like_not_found(output: &CommandOutput, detail: &str) -> bool {
