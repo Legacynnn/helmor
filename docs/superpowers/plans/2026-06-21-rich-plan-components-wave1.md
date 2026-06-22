@@ -667,22 +667,31 @@ Add `import { AnnotatedCode } from "./annotated-code";` to the top import group,
 
 ```tsx
 describe("AnnotatedCode", () => {
-	it("renders the lang as the header title and the note", () => {
+	it("renders the note above the code under a constant 'Code' header", () => {
 		render(
 			<AnnotatedCode lang="ts" note="This wires the handler.">
 				const x = 1;
 			</AnnotatedCode>,
 		);
-		expect(screen.getByText("ts")).toBeInTheDocument();
+		expect(screen.getByText("Code")).toBeInTheDocument();
 		expect(screen.getByText("This wires the handler.")).toBeInTheDocument();
 	});
 
-	it("falls back to a 'Code' header when no lang is given", () => {
+	it("renders a 'Code' header even without a note or lang", () => {
 		render(<AnnotatedCode>const y = 2;</AnnotatedCode>);
 		expect(screen.getByText("Code")).toBeInTheDocument();
 	});
 });
 ```
+
+> **Correction (found during execution):** the shell header is a constant
+> `"Code"`, NOT `lang` — `CodeBlock` already renders its own language chip from
+> `lang`, so a `title={lang}` header would duplicate it (two "ts" nodes) and the
+> `getByText` query throws on multiple matches. Also add `afterEach(cleanup)` to
+> `components.test.tsx` (import `cleanup` from `@testing-library/react`,
+> `afterEach` from `vitest`) — this project's vitest config does not enable
+> globals, so without explicit cleanup repeated renders accumulate in
+> `document.body` and shared header labels (two "Code" headers) collide.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -723,7 +732,7 @@ export function AnnotatedCode({
 		<PlanBlockShell
 			accent="neutral"
 			icon={CodeIcon}
-			title={lang ?? "Code"}
+			title="Code"
 			bodyClassName="p-3"
 		>
 			{annotation ? (
