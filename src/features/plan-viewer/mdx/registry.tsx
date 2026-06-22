@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { AnnotatedCode } from "../components/annotated-code";
 import { PlanCanvas } from "../components/canvas";
+import { Decision } from "../components/decision";
 import { Diagram } from "../components/diagram";
 import { FileMap } from "../components/file-map";
 import { OpenQuestions } from "../components/open-questions";
@@ -10,6 +11,13 @@ import { Steps } from "../components/steps";
 /** Standalone fallback: a CanvasNode authored outside a PlanCanvas just renders
  * its body blocks inline so content is never lost. */
 function CanvasNodeFallback({ children }: { children?: ReactNode }) {
+	return <>{children}</>;
+}
+
+/** Sub-components (Option, Before, After, Phase) are consumed by their parent
+ * (Decision / BeforeAfter / Timeline). Authored standalone, they just render
+ * their body blocks so content is never lost. */
+function SubComponentFallback({ children }: { children?: ReactNode }) {
 	return <>{children}</>;
 }
 
@@ -46,6 +54,8 @@ export const PLAN_COMPONENTS: Record<string, PlanComponentDef> = {
 	Diagram: { render: Diagram, childMode: "raw" },
 	PlanCanvas: { render: PlanCanvas, childMode: "structured" },
 	CanvasNode: { render: CanvasNodeFallback, childMode: "blocks" },
+	Decision: { render: Decision, childMode: "structured" },
+	Option: { render: SubComponentFallback, childMode: "blocks" },
 };
 
 /** Resolve a component's child mode, or `null` when the name is unknown. */
