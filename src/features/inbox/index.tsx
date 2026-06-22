@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type {
 	ForgeProvider,
+	InboxItem,
 	InboxKindLabels,
 	RepositoryCreateOption,
 } from "@/lib/api";
@@ -50,6 +51,7 @@ import {
 	type InboxKind,
 	useInboxItems,
 } from "./use-inbox-items";
+import { useLinearInboxItems } from "./use-linear-inbox-items";
 
 /** Forge providers that have an inbox backend implementation. Used to
  *  narrow `repository.forgeProvider` (which can also be "unknown"). */
@@ -280,10 +282,12 @@ export const InboxSidebar = memo(function InboxSidebar({
 
 	const isForgeSource =
 		selectedSource === "github" || selectedSource === "gitlab";
+	const isLinearSource = selectedSource === "linear";
 	const activeForgeProvider: ForgeFilterId = isForgeSource
 		? (selectedSource as ForgeFilterId)
 		: projectForgeId;
-	const isComingSoonSource = !isForgeSource;
+	// Linear is an active source — only Slack / Mobile stay "Coming Soon".
+	const isComingSoonSource = !isForgeSource && !isLinearSource;
 	const activeForgeLabels = forgeLabelsFor(activeForgeProvider);
 
 	// Backend-authoritative kind labels. Provider-specific copy (PR vs
@@ -404,6 +408,15 @@ export const InboxSidebar = memo(function InboxSidebar({
 		() => inbox.items.map(inboxItemToContextCard),
 		[inbox.items],
 	);
+
+	// Linear "assigned to me" issues. Gated on the integration being
+	// connected; the query only fires when `connected` is true (see hook).
+	const linear = useLinearInboxItems();
+	const linearCards = useMemo<ContextCard[]>(
+		() => linear.items.map(inboxItemToContextCard),
+		[linear.items],
+	);
+
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
 	// IntersectionObserver-driven infinite scroll. Sentinel at the
@@ -646,6 +659,22 @@ export const InboxSidebar = memo(function InboxSidebar({
 								</ul>
 							</div>
 						</div>
+					) : isLinearSource ? (
+						<LinearInboxBranch
+							connected={linear.connected}
+							statusLoading={linear.statusLoading}
+							isLoading={linear.isLoading}
+							isError={linear.isError}
+							error={linear.error}
+							cards={linearCards}
+							selectedCardId={selectedCardId}
+							onOpenCard={onOpenCard}
+							appendContextTarget={appendContextTarget}
+							onRetry={() => {
+								void linear.refetch();
+							}}
+							onConfigure={openInboxSettings}
+						/>
 					) : !hasForgeAccount ? (
 						// State 1: no account at all → big Connect CTA.
 						<ConnectForgeState
@@ -753,14 +782,113 @@ function InboxErrorState({
 	);
 }
 
+/** Linear source content. Mirrors the forge list states (connect →
+ *  loading → error → empty → list) but with a single "issues" view and
+ *  no sub-tabs / pagination (the backend returns the viewer's assigned
+ *  issues in one page). Disconnected falls back to a connect prompt so
+ *  we never regress the prior "Coming Soon" placeholder. */
+function LinearInboxBranch({
+	connected,
+	statusLoading,
+	isLoading,
+	isError,
+	error,
+	cards,
+	selectedCardId,
+	onOpenCard,
+	appendContextTarget,
+	onRetry,
+	onConfigure,
+}: {
+	connected: boolean;
+	statusLoading: boolean;
+	isLoading: boolean;
+	isError: boolean;
+	error: unknown;
+	cards: ContextCard[];
+	selectedCardId?: string | null;
+	onOpenCard?: (card: ContextCard) => void;
+	appendContextTarget?: ComposerInsertTarget;
+	onRetry: () => void;
+	onConfigure: () => void;
+}) {
+	if (!connected) {
+		// Don't flash the connect prompt while the status check is still
+		// in flight — show the spinner instead.
+		if (statusLoading) return <InboxLoadingState />;
+		return <ConnectLinearState onConfigure={onConfigure} />;
+	}
+	if (isError) {
+		return <InboxErrorState error={error} onRetry={onRetry} />;
+	}
+	if (isLoading) {
+		return <InboxLoadingState />;
+	}
+	if (cards.length === 0) {
+		return (
+			<div className="mt-8 flex flex-col items-center gap-1 px-6 text-center">
+				<div className="text-small leading-5 text-muted-foreground/80">
+					No issues assigned to you
+				</div>
+			</div>
+		);
+	}
+	return (
+		<div className="flex w-full flex-col gap-2">
+			{cards.map((card, index) => (
+				<div key={card.id} data-index={index}>
+					<SourceCard
+						card={card}
+						selected={card.id === selectedCardId}
+						onOpen={onOpenCard}
+						appendContextTarget={appendContextTarget}
+					/>
+				</div>
+			))}
+		</div>
+	);
+}
+
+/** Disconnected Linear state — points the user at Settings →
+ *  Integrations to connect Linear. Replaces the old "Coming Soon"
+ *  placeholder now that the source is live. */
+function ConnectLinearState({ onConfigure }: { onConfigure: () => void }) {
+	return (
+		<div className="mt-8 flex flex-col items-center gap-2 px-6 text-center">
+			<div className="flex size-8 items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground">
+				<SourceIcon source="linear" size={16} />
+			</div>
+			<div className="text-ui font-medium text-foreground">Connect Linear</div>
+			<div className="text-small leading-5 text-muted-foreground">
+				List issues assigned to you from Linear.
+			</div>
+			<Button
+				type="button"
+				size="sm"
+				onClick={onConfigure}
+				className="mt-1 cursor-interactive gap-1.5"
+			>
+				<SlidersHorizontal className="size-3.5" strokeWidth={2} />
+				Configure
+			</Button>
+		</div>
+	);
+}
+
 /** Map the Rust-side InboxItem into the existing ContextCard shape that
  * SourceCard renders. `meta` is synthesized as a minimal placeholder —
  * SourceCard reads only `source / externalId / title / state /
  * lastActivityAt`, so the meta variant only needs to satisfy types. */
-function inboxItemToContextCard(item: InboxItemWithDetailRef): ContextCard {
+function inboxItemToContextCard(
+	item: InboxItem | InboxItemWithDetailRef,
+): ContextCard {
 	const externalId = item.externalId;
 	const number = parseExternalNumber(externalId);
 	const repo = parseExternalRepo(externalId);
+	// Forge items carry a `detailRef`; Linear items (mapped straight from a
+	// plain `InboxItem`) don't — `ContextCard.detailRef` is optional, so an
+	// absent ref is fine and routes Linear detail through its own path.
+	const detailRef = "detailRef" in item ? item.detailRef : undefined;
 	const baseFields = {
 		id: item.id,
 		source: item.source as ContextCardSource,
@@ -770,7 +898,7 @@ function inboxItemToContextCard(item: InboxItemWithDetailRef): ContextCard {
 		subtitle: item.subtitle ?? undefined,
 		state: item.state ?? undefined,
 		lastActivityAt: item.lastActivityAt,
-		detailRef: item.detailRef,
+		detailRef,
 	};
 	switch (item.source) {
 		case "github_issue":
