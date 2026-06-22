@@ -189,20 +189,24 @@ export function CreateTaskDialog({
 							}
 						/>
 					) : null}
-					<PrioritySelect
-						priority={priority}
-						onChange={(num) => setPriority(NUM_TO_PRIORITY[num] ?? "none")}
-					/>
+					{provider !== "github" ? (
+						<PrioritySelect
+							priority={priority}
+							onChange={(num) => setPriority(NUM_TO_PRIORITY[num] ?? "none")}
+						/>
+					) : null}
 					<AssigneeSelect
 						assignee={assignee}
 						options={assigneeOptions}
 						onChange={(id) => setAssigneeId(id || null)}
 					/>
-					<ProjectSelect
-						project={project}
-						options={projectOptions}
-						onChange={(id) => setProjectId(id || null)}
-					/>
+					{provider !== "github" ? (
+						<ProjectSelect
+							project={project}
+							options={projectOptions}
+							onChange={(id) => setProjectId(id || null)}
+						/>
+					) : null}
 					<LabelSelect
 						value={selectedLabels}
 						options={labelOptions}
