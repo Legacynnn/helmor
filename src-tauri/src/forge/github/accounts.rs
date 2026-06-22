@@ -374,15 +374,48 @@ fn list_github_accounts_full() -> Result<Vec<ForgeAccount>> {
     Ok(accounts)
 }
 
-/// The active GitHub login (the account `gh auth switch` points at), or the
-/// first authenticated account if none is explicitly active.
+/// The login the GitHub tasks integration should act as: the account
+/// `gh auth switch` points at (the `active` one), or — when none is
+/// flagged active — the lexicographically-first authenticated login so
+/// the choice is stable run-to-run.
+///
+/// Reads the cheap, cached `gh auth status --json hosts` slots directly
+/// (same call `list_github_accounts_full` already caches) rather than
+/// `list_github_accounts_full`, which fans a `gh api /user` profile
+/// fetch out per account. This hot path only needs `login` + `active`,
+/// both of which come from the status parse — no profile network
+/// round-trips.
 pub(crate) fn default_login() -> anyhow::Result<Option<String>> {
-    let accounts = list_github_accounts_full()?;
-    let active = accounts
+    let output = crate::forge::throttle::run_cached(
+        GH_AUTH_STATUS_CACHE_KEY.to_string(),
+        crate::forge::throttle::READ_CACHE_TTL,
+        || run_command("gh", ["auth", "status", "--json", "hosts"]),
+    )
+    .with_context(|| "Failed to spawn `gh auth status --json hosts`".to_string())?;
+    if !output.success {
+        if looks_like_unauthenticated(&command_detail(&output)) {
+            return Ok(None);
+        }
+        return Err(anyhow!(
+            "`gh auth status --json hosts` failed: {}",
+            command_detail(&output)
+        ));
+    }
+    let slots = parse_account_slots(&output.stdout)?;
+    Ok(select_default_login(&slots))
+}
+
+/// Pick the default login from parsed account slots: the `active` one if
+/// any, else the lexicographically-first login. The fallback sort makes
+/// the result deterministic even though `parse_account_slots` yields an
+/// unspecified (HashMap walk) order. Returns `None` when no accounts are
+/// authenticated.
+fn select_default_login(slots: &[AccountSlot]) -> Option<String> {
+    slots
         .iter()
-        .find(|a| a.active)
-        .or_else(|| accounts.first());
-    Ok(active.map(|a| a.login.clone()))
+        .find(|slot| slot.active)
+        .map(|slot| slot.login.clone())
+        .or_else(|| slots.iter().map(|slot| slot.login.clone()).min())
 }
 
 /// `(host, login, active)` tuple lifted out of a `gh auth status
@@ -841,6 +874,43 @@ mod tests {
         assert_eq!(slots[0].login, "alice-ghe");
         assert_eq!(slots[1].host, "github.com");
         assert_eq!(slots[1].login, "alice");
+    }
+
+    // ---------------- select_default_login ----------------
+
+    fn slot(host: &str, login: &str, active: bool) -> AccountSlot {
+        AccountSlot {
+            host: host.to_string(),
+            login: login.to_string(),
+            active,
+        }
+    }
+
+    #[test]
+    fn select_default_login_prefers_active_account() {
+        let slots = vec![
+            slot("github.com", "zelda", false),
+            slot("github.com", "alice", true),
+            slot("github.com", "bob", false),
+        ];
+        assert_eq!(select_default_login(&slots), Some("alice".to_string()));
+    }
+
+    #[test]
+    fn select_default_login_falls_back_to_lexicographically_first() {
+        // No active flag set anywhere — the choice must be stable
+        // regardless of slot order, so it's the min login string.
+        let slots = vec![
+            slot("github.com", "zelda", false),
+            slot("ghe.example.com", "alice-ghe", false),
+            slot("github.com", "bob", false),
+        ];
+        assert_eq!(select_default_login(&slots), Some("alice-ghe".to_string()));
+    }
+
+    #[test]
+    fn select_default_login_none_when_no_accounts() {
+        assert_eq!(select_default_login(&[]), None);
     }
 
     // ---------------- parse_repo_push_permission ----------------
