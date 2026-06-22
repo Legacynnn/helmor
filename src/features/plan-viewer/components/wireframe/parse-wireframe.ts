@@ -28,8 +28,11 @@ const TYPES = new Set([
 /**
  * Parse the constrained wireframe line-DSL: one element per line, leading
  * whitespace = nesting depth, `<type> <label?>`. Unknown element types and
- * blank lines are skipped (their indented descendants reattach to the nearest
- * valid ancestor). Returns the forest of top-level nodes.
+ * blank lines are skipped; their indented descendants reattach to the nearest
+ * valid ancestor, or become top-level roots when no valid ancestor exists.
+ * Leading tabs are normalized to two spaces so tab- and space-indented bodies
+ * (agents often emit tabs) nest consistently. Returns the forest of top-level
+ * nodes.
  */
 export function parseWireframe(src: string): WireframeNode[] {
 	const roots: WireframeNode[] = [];
@@ -38,8 +41,11 @@ export function parseWireframe(src: string): WireframeNode[] {
 		if (raw.trim().length === 0) {
 			continue;
 		}
-		const indent = raw.length - raw.trimStart().length;
-		const trimmed = raw.trim();
+		// Expand leading tabs to two spaces so a tab and a 2-space indent are
+		// treated as the same depth.
+		const line = raw.replace(/^[\t ]+/, (ws) => ws.replace(/\t/g, "  "));
+		const indent = line.length - line.trimStart().length;
+		const trimmed = line.trim();
 		const sp = trimmed.indexOf(" ");
 		const type = (sp === -1 ? trimmed : trimmed.slice(0, sp)).toLowerCase();
 		const label = sp === -1 ? "" : trimmed.slice(sp + 1).trim();

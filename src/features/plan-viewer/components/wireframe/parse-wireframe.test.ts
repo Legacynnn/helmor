@@ -38,4 +38,17 @@ describe("parseWireframe", () => {
 	it("returns an empty array for empty input", () => {
 		expect(parseWireframe("   \n  ")).toEqual([]);
 	});
+
+	it("treats a leading tab as the same depth as a two-space indent", () => {
+		const src = ["col", "\ttext Tabbed", "  input Spaced"].join("\n");
+		const roots = parseWireframe(src);
+		expect(roots).toHaveLength(1);
+		expect(roots[0].children.map((c) => c.type)).toEqual(["text", "input"]);
+	});
+
+	it("promotes orphaned children of a top-level unknown line to roots", () => {
+		const src = ["frobnicate nope", "  text Inside"].join("\n");
+		const roots = parseWireframe(src);
+		expect(roots.map((r) => r.type)).toEqual(["text"]);
+	});
 });
