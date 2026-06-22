@@ -1,10 +1,17 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { AnnotatedCode } from "./annotated-code";
 import { FileMap } from "./file-map";
 import { OpenQuestions } from "./open-questions";
 import { UnsupportedBlock } from "./placeholder";
 import { RiskCard } from "./risk-card";
 import { Steps } from "./steps";
+
+// These tests render multiple components that share header labels (e.g. two
+// AnnotatedCode blocks both render a "Code" header). Without auto-cleanup
+// (globals are not enabled in this project's vitest config) renders accumulate
+// in document.body and getByText finds duplicates — so unmount between tests.
+afterEach(cleanup);
 
 describe("RiskCard", () => {
 	it("shows the high severity label", () => {
@@ -66,5 +73,22 @@ describe("FileMap", () => {
 	it("renders nothing when there are no valid entries", () => {
 		const { container } = render(<FileMap>{"not a real line"}</FileMap>);
 		expect(container.querySelector("section")).toBeNull();
+	});
+});
+
+describe("AnnotatedCode", () => {
+	it("renders the note above the code under a constant 'Code' header", () => {
+		render(
+			<AnnotatedCode lang="ts" note="This wires the handler.">
+				const x = 1;
+			</AnnotatedCode>,
+		);
+		expect(screen.getByText("Code")).toBeInTheDocument();
+		expect(screen.getByText("This wires the handler.")).toBeInTheDocument();
+	});
+
+	it("renders a 'Code' header even without a note or lang", () => {
+		render(<AnnotatedCode>const y = 2;</AnnotatedCode>);
+		expect(screen.getByText("Code")).toBeInTheDocument();
 	});
 });
