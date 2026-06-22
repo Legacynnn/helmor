@@ -48,11 +48,17 @@ export function MultiPrototype({
 	const current = variants[Math.min(active, variants.length - 1)];
 	return (
 		<PlanBlockShell accent="neutral" icon={LayersIcon} title="Prototypes">
-			<div className="mb-3 flex flex-wrap gap-1">
+			<div
+				className="mb-3 flex flex-wrap gap-1"
+				role="tablist"
+				aria-label="Prototype variants"
+			>
 				{variants.map((variant, i) => (
 					<button
 						key={variant.id}
 						type="button"
+						role="tab"
+						aria-selected={i === active}
 						onClick={() => setActive(i)}
 						className={cn(
 							"cursor-pointer rounded border px-2 py-1 text-micro transition-colors",
@@ -62,7 +68,7 @@ export function MultiPrototype({
 						)}
 					>
 						{variant.label}
-						{variant.recommended ? " ★" : ""}
+						{variant.recommended ? <span aria-hidden="true"> ★</span> : null}
 					</button>
 				))}
 			</div>

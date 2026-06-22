@@ -24,17 +24,15 @@ describe("MultiPrototype", () => {
 
 	it("shows variant tabs and the first variant body initially", () => {
 		renderMdx(src);
-		expect(screen.getByRole("button", { name: /Compact/ })).toBeInTheDocument();
-		expect(
-			screen.getByRole("button", { name: /Spacious/ }),
-		).toBeInTheDocument();
+		expect(screen.getByRole("tab", { name: /Compact/ })).toBeInTheDocument();
+		expect(screen.getByRole("tab", { name: /Spacious/ })).toBeInTheDocument();
 		expect(screen.getByText("Compact layout body.")).toBeInTheDocument();
 		expect(screen.queryByText("Spacious layout body.")).toBeNull();
 	});
 
 	it("switches body when another variant tab is clicked", () => {
 		renderMdx(src);
-		fireEvent.click(screen.getByRole("button", { name: /Spacious/ }));
+		fireEvent.click(screen.getByRole("tab", { name: /Spacious/ }));
 		expect(screen.getByText("Spacious layout body.")).toBeInTheDocument();
 		expect(screen.queryByText("Compact layout body.")).toBeNull();
 	});
