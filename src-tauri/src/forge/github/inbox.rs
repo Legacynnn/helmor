@@ -1232,7 +1232,7 @@ fn encode_cursor(state: &MultiCursor) -> Result<String> {
     Ok(URL_SAFE_NO_PAD.encode(&json))
 }
 
-const ISSUE_PR_SEARCH_QUERY: &str = r#"
+pub(crate) const ISSUE_PR_SEARCH_QUERY: &str = r#"
 query InboxIssuePrSearch($q: String!, $cursor: String) {
   search(type: ISSUE, query: $q, first: 50, after: $cursor) {
     pageInfo { hasNextPage endCursor }
@@ -1406,7 +1406,7 @@ struct GraphqlSearchError {
 /// Avoids over-fetching followed by client-side truncate (which would
 /// silently drop the tail of every page — see the 23-issue / 20-limit
 /// case where 3 items got lost).
-fn with_search_first(query: &'static str, limit: usize) -> String {
+pub(crate) fn with_search_first(query: &'static str, limit: usize) -> String {
     let limit = limit.clamp(1, 100);
     query.replace("first: 50", &format!("first: {limit}"))
 }
@@ -1570,7 +1570,7 @@ fn issue_or_pr_to_item(
 /// `sort:` qualifier we sent, and makes the UI's "X ago" display the
 /// metric the user actually picked. Comments-by sort falls back to
 /// `updated_at` (no comment count plumbed through yet).
-fn pick_sort_timestamp(
+pub(crate) fn pick_sort_timestamp(
     sort: Option<InboxSortFilter>,
     created_at: &str,
     updated_at: &str,
@@ -1614,7 +1614,7 @@ fn discussion_to_item(node: DiscussionNode, sort: Option<InboxSortFilter>) -> Op
     })
 }
 
-fn issue_state(state: &str, reason: Option<&str>) -> InboxState {
+pub(crate) fn issue_state(state: &str, reason: Option<&str>) -> InboxState {
     match state {
         "OPEN" => InboxState {
             label: "Open".to_string(),
