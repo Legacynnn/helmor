@@ -1,28 +1,14 @@
 import { AlertTriangleIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import type { PlanAccent } from "./shell/accent";
+import { PlanBlockShell } from "./shell/plan-block-shell";
 
 type Severity = "low" | "medium" | "high";
 
-const SEVERITY_STYLES: Record<
-	Severity,
-	{ container: string; label: string; text: string }
-> = {
-	low: {
-		container: "border-sky-500/40 bg-sky-500/5",
-		label: "text-sky-600 dark:text-sky-400",
-		text: "Low risk",
-	},
-	medium: {
-		container: "border-amber-500/40 bg-amber-500/5",
-		label: "text-amber-600 dark:text-amber-400",
-		text: "Medium risk",
-	},
-	high: {
-		container: "border-red-500/45 bg-red-500/5",
-		label: "text-red-600 dark:text-red-400",
-		text: "High risk",
-	},
+const SEVERITY: Record<Severity, { accent: PlanAccent; label: string }> = {
+	low: { accent: "info", label: "Low risk" },
+	medium: { accent: "warning", label: "Medium risk" },
+	high: { accent: "danger", label: "High risk" },
 };
 
 function normalizeSeverity(value?: string): Severity {
@@ -39,21 +25,10 @@ export function RiskCard({
 	severity?: string;
 	children?: ReactNode;
 }) {
-	const level = normalizeSeverity(severity);
-	const style = SEVERITY_STYLES[level];
-
+	const { accent, label } = SEVERITY[normalizeSeverity(severity)];
 	return (
-		<div className={cn("my-4 rounded-lg border p-4", style.container)}>
-			<div
-				className={cn(
-					"mb-2 flex items-center gap-2 font-medium text-small",
-					style.label,
-				)}
-			>
-				<AlertTriangleIcon className="size-4 shrink-0" />
-				<span>{style.text}</span>
-			</div>
+		<PlanBlockShell accent={accent} icon={AlertTriangleIcon} title={label}>
 			{children}
-		</div>
+		</PlanBlockShell>
 	);
 }
