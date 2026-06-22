@@ -1,6 +1,7 @@
-import { waitFor } from "@testing-library/react";
+import { act, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { dispatchClosePlan, dispatchOpenPlan } from "@/lib/plan-review";
 import { createHelmorQueryClient, helmorQueryKeys } from "@/lib/query-client";
 import { DEFAULT_SETTINGS, SettingsContext } from "@/lib/settings";
 import { renderWithProviders } from "@/test/render-with-providers";
@@ -1101,5 +1102,78 @@ describe("WorkspacePanelContainer loading semantics", () => {
 		).find((entry) => entry.sessionId === "session-1");
 
 		expect(pane?.messages).toHaveLength(1);
+	});
+
+	it("keeps a single plan tab, swapping plans instead of stacking, and closes freely", async () => {
+		const queryClient = createHelmorQueryClient();
+		queryClient.setQueryData(
+			helmorQueryKeys.workspaceDetail("workspace-1"),
+			createWorkspaceDetail("workspace-1"),
+		);
+		queryClient.setQueryData(
+			helmorQueryKeys.workspaceSessions("workspace-1"),
+			createWorkspaceSessions("workspace-1"),
+		);
+		queryClient.setQueryData(
+			[...helmorQueryKeys.sessionMessages("session-1"), "thread"],
+			createMessages("session-1"),
+		);
+
+		renderWithProviders(
+			<SettingsContext.Provider
+				value={{
+					settings: { ...DEFAULT_SETTINGS, mdxPlanningEnabled: true },
+					isLoaded: true,
+					updateSettings: vi.fn(),
+				}}
+			>
+				<WorkspacePanelContainer
+					selectedWorkspaceId="workspace-1"
+					displayedWorkspaceId="workspace-1"
+					selectedSessionId="session-1"
+					displayedSessionId="session-1"
+					sending={false}
+					onSelectSession={vi.fn()}
+					onResolveDisplayedSession={vi.fn()}
+				/>
+			</SettingsContext.Provider>,
+			{ queryClient },
+		);
+
+		// Wait until the panel is bound to the session thread (so the plan-open
+		// handler has a session to attach to).
+		await waitFor(() => {
+			expect(getSessionPaneIds()).toContain("session-1");
+		});
+
+		// Open plan A → exactly one plan tab.
+		act(() => {
+			dispatchOpenPlan({ slug: "plan-a" });
+		});
+		await waitFor(() => {
+			expect(getLatestPanelProps().planTabs).toEqual([
+				{ slug: "plan-a", title: "plan-a" },
+			]);
+		});
+
+		// Open plan B → B REPLACES A; still exactly one tab (no stacking).
+		act(() => {
+			dispatchOpenPlan({ slug: "plan-b" });
+		});
+		await waitFor(() => {
+			expect(getLatestPanelProps().planTabs).toEqual([
+				{ slug: "plan-b", title: "plan-b" },
+			]);
+			expect(getLatestPanelProps().activePlanSlug).toBe("plan-b");
+		});
+
+		// Cmd+W (close-plan signal) clears the single tab.
+		act(() => {
+			dispatchClosePlan();
+		});
+		await waitFor(() => {
+			expect(getLatestPanelProps().planTabs).toEqual([]);
+			expect(getLatestPanelProps().activePlanSlug).toBeNull();
+		});
 	});
 });

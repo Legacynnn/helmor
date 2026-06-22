@@ -356,12 +356,12 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	const planListQuery = usePlanList(
 		settings.mdxPlanningEnabled ? threadSessionId : null,
 	);
-	// Plan tabs are EPHEMERAL: a tab exists only while the plan is "open" in this
-	// session view. Closing a tab (its X, or Cmd+W) removes it from
-	// `openPlanSlugs` but NEVER deletes the `.mdx` file, so a closed plan can
-	// always be reopened from the file browser, the plan-link strip, the inline
-	// triggers, or by the agent re-surfacing it.
-	const [openPlanSlugs, setOpenPlanSlugs] = useState<string[]>([]);
+	// The plan surface shows AT MOST ONE plan at a time. Opening another plan
+	// SWAPS it into the same single tab rather than stacking a new one, so there
+	// is only ever one plan tab. It is EPHEMERAL and freely closable: closing it
+	// (its X, or Cmd+W) just clears `activePlanSlug` and NEVER deletes the `.mdx`
+	// file, so a closed plan can always be reopened from the file browser, the
+	// plan-link strip, the inline triggers, or by the agent re-surfacing it.
 	const [activePlanSlug, setActivePlanSlug] = useState<string | null>(null);
 	const planTitleBySlug = useMemo(() => {
 		const map = new Map<string, string>();
@@ -370,37 +370,33 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 		}
 		return map;
 	}, [planListQuery.data]);
+	// The tab bar shows the single active plan tab (or none).
 	const planTabs = useMemo(
 		() =>
-			openPlanSlugs.map((slug) => ({
-				slug,
-				title: planTitleBySlug.get(slug) ?? slug,
-			})),
-		[openPlanSlugs, planTitleBySlug],
+			activePlanSlug
+				? [
+						{
+							slug: activePlanSlug,
+							title: planTitleBySlug.get(activePlanSlug) ?? activePlanSlug,
+						},
+					]
+				: [],
+		[activePlanSlug, planTitleBySlug],
 	);
-	// Reset the open tabs + selection whenever the displayed session changes.
+	// Reset the plan selection whenever the displayed session changes.
 	useEffect(() => {
-		setOpenPlanSlugs([]);
 		setActivePlanSlug(null);
 	}, [threadSessionId]);
-	// Safety: never keep a selection that isn't an open tab.
-	useEffect(() => {
-		if (activePlanSlug && !openPlanSlugs.includes(activePlanSlug)) {
-			setActivePlanSlug(null);
-		}
-	}, [activePlanSlug, openPlanSlugs]);
-	// Open a plan: add its ephemeral tab (if not already open) and select it.
+	// Open a plan: swap it into the single plan tab and select it.
 	const handleOpenPlan = useCallback((slug: string) => {
-		setOpenPlanSlugs((prev) => (prev.includes(slug) ? prev : [...prev, slug]));
 		setActivePlanSlug(slug);
 	}, []);
-	// Select an already-open plan tab.
+	// Select the (single) open plan tab.
 	const handleSelectPlan = useCallback((slug: string) => {
 		setActivePlanSlug(slug);
 	}, []);
-	// Close a plan tab — non-destructive: the `.mdx` file stays on disk.
+	// Close the plan tab — non-destructive: the `.mdx` file stays on disk.
 	const handleClosePlanTab = useCallback((slug: string) => {
-		setOpenPlanSlugs((prev) => prev.filter((s) => s !== slug));
 		setActivePlanSlug((current) => (current === slug ? null : current));
 	}, []);
 
