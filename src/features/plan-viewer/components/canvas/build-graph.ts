@@ -5,6 +5,9 @@ import { type CanvasNodeKind, normalizeKind } from "./node-kinds";
 export type CanvasNodeData = {
 	title: string;
 	bodyBlocks: PlanBlock[];
+	/** Optional only because nodes may be constructed outside `buildCanvasGraph`
+	 * (e.g. test fixtures); `buildCanvasGraph` always resolves it via
+	 * `normalizeKind`. Consumers should default a missing value to "note". */
 	kind?: CanvasNodeKind;
 };
 
