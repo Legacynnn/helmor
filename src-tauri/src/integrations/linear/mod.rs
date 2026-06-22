@@ -2,6 +2,7 @@
 //! short-lived blocking client (commands already run on `spawn_blocking`).
 
 pub mod client;
+pub mod inbox;
 pub mod map;
 pub mod queries;
 pub mod types;

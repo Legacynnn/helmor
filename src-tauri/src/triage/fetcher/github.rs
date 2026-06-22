@@ -370,8 +370,8 @@ fn source_kind_for(source: InboxSource) -> &'static str {
         InboxSource::GithubIssue => "issue",
         InboxSource::GithubPr => "pr",
         InboxSource::GithubDiscussion => "discussion",
-        // Router would never send GitLab here; treat as opaque.
-        InboxSource::GitlabIssue | InboxSource::GitlabMr => "other",
+        // Router would never send GitLab/Linear here; treat as opaque.
+        InboxSource::GitlabIssue | InboxSource::GitlabMr | InboxSource::Linear => "other",
     }
 }
 

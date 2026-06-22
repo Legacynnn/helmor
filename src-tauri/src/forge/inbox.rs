@@ -12,6 +12,7 @@ use super::github::inbox::detail::{
     GithubDiscussionDetail, GithubIssueDetail, GithubPullRequestDetail,
 };
 use super::gitlab::inbox::detail::{GitlabIssueDetail, GitlabMergeRequestDetail};
+pub use crate::integrations::linear::inbox::LinearIssueDetail;
 
 /// Per-kind toggle the user picks in Settings → Inbox. Each forge maps
 /// the kinds onto its own concrete sources (`GithubIssue` ↔ `Issue`,
@@ -111,6 +112,7 @@ pub enum InboxSource {
     GithubDiscussion,
     GitlabIssue,
     GitlabMr,
+    Linear,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -184,4 +186,5 @@ pub enum InboxItemDetail {
     GithubDiscussion(Box<GithubDiscussionDetail>),
     GitlabIssue(Box<GitlabIssueDetail>),
     GitlabMr(Box<GitlabMergeRequestDetail>),
+    Linear(Box<LinearIssueDetail>),
 }
