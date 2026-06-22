@@ -13,6 +13,7 @@ export type SettingsSection =
 	| "developer"
 	| "account"
 	| "inbox"
+	| "integrations"
 	| "storage"
 	| `repo:${string}`;
 

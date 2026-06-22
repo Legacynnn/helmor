@@ -533,6 +533,28 @@ async fn dispatch(
         |         "toggle_mini_window_mode"
         |         "write_agent_login_terminal_stdin"
         |         "write_forge_cli_auth_terminal_stdin"
+        // Task integrations (Linear, etc.) + the Tasks page are desktop-only
+        // surfaces — a paired phone browser has no Tasks UI. Read paths could
+        // be exposed over HTTP later; for now they no-op like other
+        // desktop-only features (the keychain + workspace spawn paths can't run
+        // browser-side anyway).
+        |         "connect_integration"
+        |         "disconnect_integration"
+        |         "get_integration_status"
+        |         "set_integration_team"
+        |         "list_tasks"
+        |         "get_task"
+        |         "list_task_statuses"
+        |         "list_task_projects"
+        |         "sync_tasks"
+        |         "update_task"
+        |         "create_task"
+        |         "review_task_with_agent"
+        |         "create_workspace_from_task"
+        // Repo copy-file settings are desktop-only configuration.
+        |         "detect_repo_copy_candidates"
+        |         "load_repo_copy_settings"
+        |         "update_repo_copy_settings"
         |         "write_repo_script_stdin" => Ok(Value::Null),
 
         other => Err(anyhow::anyhow!("Unknown companion command: {other}").into()),

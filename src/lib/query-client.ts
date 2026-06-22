@@ -179,6 +179,19 @@ export const helmorQueryKeys = {
 	pairedDevices: ["pairedDevices"] as const,
 	resourceSnapshot: ["resourceSnapshot"] as const,
 	storageBreakdown: ["storageBreakdown"] as const,
+	integrationStatus: (provider: string) =>
+		["integrationStatus", provider] as const,
+	tasks: (provider: string, teamId: string | null) =>
+		["tasks", provider, teamId] as const,
+	taskStatuses: (provider: string, teamId: string | null) =>
+		["taskStatuses", provider, teamId] as const,
+	taskProjects: (provider: string, teamId: string | null) =>
+		["taskProjects", provider, teamId] as const,
+	taskLabels: (provider: string, teamId: string | null) =>
+		["taskLabels", provider, teamId] as const,
+	taskAssignees: (provider: string, teamId: string | null) =>
+		["taskAssignees", provider, teamId] as const,
+	task: (taskId: string) => ["task", taskId] as const,
 };
 
 /** Persistence is opt-in per `queryOptions` via `meta: { persist: true }`.

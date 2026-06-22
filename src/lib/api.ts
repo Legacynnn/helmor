@@ -2560,6 +2560,9 @@ export type UiMutationEvent =
 	| { type: "activeStreamsChanged" }
 	| { type: "slackWorkspacesChanged" }
 	| { type: "slackTokenInvalidated"; teamId: string }
+	| { type: "integrationConnectionChanged"; provider: string }
+	| { type: "tasksChanged"; provider: string }
+	| { type: "taskChanged"; taskId: string }
 	| { type: "triageConfigChanged" }
 	| { type: "triageActiveStatusChanged" }
 	| { type: "triageWorkspaceCreated"; workspaceId: string }
@@ -5444,6 +5447,338 @@ export async function destroyStableUrl(): Promise<CompanionStatus> {
 	} catch (error) {
 		throw new Error(
 			describeInvokeError(error, "Unable to forget the stable URL."),
+		);
+	}
+}
+
+// ── Task integrations (Linear, etc.) ────────────────────────────────────────
+
+/** Stable provider ids for task integrations. */
+export type IntegrationProvider = "linear";
+
+/** Normalized lifecycle bucket for a task's status — drives the status icon. */
+export type TaskStatusKind =
+	| "backlog"
+	| "unstarted"
+	| "started"
+	| "completed"
+	| "canceled";
+
+/** Normalized priority (Linear's 0–4 scale, named). */
+export type TaskPriority = "none" | "urgent" | "high" | "medium" | "low";
+
+export type TaskStatus = {
+	id: string;
+	name: string;
+	kind: TaskStatusKind;
+	color: string | null;
+};
+
+export type TaskAssignee = {
+	id: string;
+	name: string;
+	avatarUrl: string | null;
+};
+
+export type TaskLabel = {
+	id: string;
+	name: string;
+	color: string | null;
+};
+
+export type TaskProject = {
+	id: string;
+	name: string;
+	/** Emoji when the user picked one, else a named glyph id or null. */
+	icon: string | null;
+	/** Hex accent color, e.g. `#5e6ad2`. */
+	color: string | null;
+};
+
+export type Task = {
+	id: string;
+	provider: string;
+	externalId: string;
+	identifier: string | null;
+	title: string;
+	description: string | null;
+	status: TaskStatus;
+	priority: TaskPriority;
+	assignee: TaskAssignee | null;
+	labels: TaskLabel[];
+	project: TaskProject | null;
+	url: string | null;
+	teamId: string | null;
+	remoteUpdatedAt: string | null;
+	agentFeedback: string | null;
+	linkedWorkspaceId: string | null;
+	syncedAt: string | null;
+	dirty: boolean;
+	updatedAt: string | null;
+};
+
+export type IntegrationTeam = {
+	id: string;
+	key: string;
+	name: string;
+};
+
+export type IntegrationStatus = {
+	provider: string;
+	connected: boolean;
+	orgName: string | null;
+	selectedTeamId: string | null;
+	selectedTeamName: string | null;
+	teams: IntegrationTeam[];
+	lastSyncedAt: string | null;
+};
+
+/** Map the numeric Linear priority (0–4) to/from the named enum. */
+export const TASK_PRIORITY_ORDER: TaskPriority[] = [
+	"none",
+	"urgent",
+	"high",
+	"medium",
+	"low",
+];
+
+export function taskPriorityToNumber(priority: TaskPriority): number {
+	const index = TASK_PRIORITY_ORDER.indexOf(priority);
+	return index < 0 ? 0 : index;
+}
+
+/** Validate an API key and connect the provider. Returns the new status. */
+export async function connectIntegration(
+	provider: IntegrationProvider,
+	apiKey: string,
+): Promise<IntegrationStatus> {
+	try {
+		return await invoke<IntegrationStatus>("connect_integration", {
+			provider,
+			apiKey,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to connect the integration."),
+		);
+	}
+}
+
+export async function disconnectIntegration(
+	provider: IntegrationProvider,
+): Promise<void> {
+	try {
+		await invoke("disconnect_integration", { provider });
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to disconnect the integration."),
+		);
+	}
+}
+
+export async function getIntegrationStatus(
+	provider: IntegrationProvider,
+): Promise<IntegrationStatus> {
+	try {
+		return await invoke<IntegrationStatus>("get_integration_status", {
+			provider,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to load integration status."),
+		);
+	}
+}
+
+export async function setIntegrationTeam(
+	provider: IntegrationProvider,
+	teamId: string,
+	teamName: string,
+): Promise<void> {
+	try {
+		await invoke("set_integration_team", { provider, teamId, teamName });
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to select the team."));
+	}
+}
+
+export async function listTasks(
+	provider: IntegrationProvider,
+	teamId?: string | null,
+): Promise<Task[]> {
+	try {
+		return await invoke<Task[]>("list_tasks", {
+			provider,
+			teamId: teamId ?? null,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to load tasks."));
+	}
+}
+
+export async function getTask(taskId: string): Promise<Task | null> {
+	try {
+		return await invoke<Task | null>("get_task", { taskId });
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to load the task."));
+	}
+}
+
+/** All workflow states for the team — board columns, including empty ones. */
+export async function listTaskStatuses(
+	provider: IntegrationProvider,
+	teamId?: string | null,
+): Promise<TaskStatus[]> {
+	try {
+		return await invoke<TaskStatus[]>("list_task_statuses", {
+			provider,
+			teamId: teamId ?? null,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to load statuses."));
+	}
+}
+
+/** All projects for the team — for the project filter, including empty ones. */
+export async function listTaskProjects(
+	provider: IntegrationProvider,
+	teamId?: string | null,
+): Promise<TaskProject[]> {
+	try {
+		return await invoke<TaskProject[]>("list_task_projects", {
+			provider,
+			teamId: teamId ?? null,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to load projects."));
+	}
+}
+
+/** All labels for the team — powers the task detail tag editor. */
+export async function listTaskLabels(
+	provider: IntegrationProvider,
+	teamId?: string | null,
+): Promise<TaskLabel[]> {
+	try {
+		return await invoke<TaskLabel[]>("list_task_labels", {
+			provider,
+			teamId: teamId ?? null,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to load labels."));
+	}
+}
+
+/** Active members of the team — powers the assignee picker. */
+export async function listTaskAssignees(
+	provider: IntegrationProvider,
+	teamId?: string | null,
+): Promise<TaskAssignee[]> {
+	try {
+		return await invoke<TaskAssignee[]>("list_task_assignees", {
+			provider,
+			teamId: teamId ?? null,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to load members."));
+	}
+}
+
+/** Pull issues from the provider into the local mirror. Returns the count. */
+export async function syncTasks(
+	provider: IntegrationProvider,
+	teamId?: string | null,
+): Promise<number> {
+	try {
+		return await invoke<number>("sync_tasks", {
+			provider,
+			teamId: teamId ?? null,
+		});
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to sync tasks."));
+	}
+}
+
+export type TaskPatchInput = {
+	title?: string | null;
+	description?: string | null;
+	statusId?: string | null;
+	priority?: number | null;
+	assigneeId?: string | null;
+	/** Full replacement set of label ids. */
+	labelIds?: string[] | null;
+};
+
+export async function updateTask(
+	taskId: string,
+	patch: TaskPatchInput,
+): Promise<Task> {
+	try {
+		return await invoke<Task>("update_task", { taskId, patch });
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to update the task."));
+	}
+}
+
+export type CreateTaskInput = {
+	provider: IntegrationProvider;
+	teamId: string;
+	title: string;
+	description?: string | null;
+	priority?: number | null;
+	statusId?: string | null;
+	assigneeId?: string | null;
+	projectId?: string | null;
+	labelIds?: string[] | null;
+};
+
+export async function createTask(input: CreateTaskInput): Promise<Task> {
+	try {
+		return await invoke<Task>("create_task", { input });
+	} catch (error) {
+		throw new Error(describeInvokeError(error, "Unable to create the task."));
+	}
+}
+
+/** A freshly-created session the frontend should navigate to. */
+export type SeededSessionResult = {
+	workspaceId: string;
+	sessionId: string;
+};
+
+/** Ask an agent to review a task in a new chat session. */
+export async function reviewTaskWithAgent(
+	taskId: string,
+): Promise<SeededSessionResult> {
+	try {
+		return await invoke<SeededSessionResult>("review_task_with_agent", {
+			taskId,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to start the agent review."),
+		);
+	}
+}
+
+export type CreateWorkspaceFromTaskInput = {
+	taskId: string;
+	repoId: string;
+	sourceBranch?: string | null;
+	mode?: WorkspaceMode;
+};
+
+/** Start a new workspace seeded from a task. */
+export async function createWorkspaceFromTask(
+	input: CreateWorkspaceFromTaskInput,
+): Promise<SeededSessionResult> {
+	try {
+		return await invoke<SeededSessionResult>("create_workspace_from_task", {
+			input,
+		});
+	} catch (error) {
+		throw new Error(
+			describeInvokeError(error, "Unable to start a workspace from the task."),
 		);
 	}
 }

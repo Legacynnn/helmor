@@ -35,7 +35,12 @@ export function ScreenHost({
 					screenActions={screenActions}
 				/>
 			)}
-			{activeScreen === "tasks" && <TasksScreen />}
+			{activeScreen === "tasks" && (
+				<TasksScreen
+					selectionActions={selectionActions}
+					screenActions={screenActions}
+				/>
+			)}
 			{activeScreen === "history" && <HistoryScreen />}
 		</section>
 	);
