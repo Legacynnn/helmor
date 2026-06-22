@@ -23,6 +23,7 @@ import {
 	SettingsSelect,
 	type SettingsSelectOption,
 } from "../components/settings-select";
+import { GitHubIntegrationCard } from "./github-integration-card";
 
 const LINEAR_API_KEYS_URL = "https://linear.app/settings/account/security";
 
@@ -30,6 +31,7 @@ export function IntegrationsPanel() {
 	return (
 		<SettingsGroup>
 			<LinearIntegrationCard />
+			<GitHubIntegrationCard />
 		</SettingsGroup>
 	);
 }
