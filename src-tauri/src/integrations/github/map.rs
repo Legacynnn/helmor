@@ -9,44 +9,48 @@ pub const STATUS_OPEN: &str = "github:open";
 pub const STATUS_DONE: &str = "github:done";
 pub const STATUS_NOT_PLANNED: &str = "github:not_planned";
 
+fn status_open() -> TaskStatus {
+    TaskStatus {
+        id: STATUS_OPEN.into(),
+        name: "Open".into(),
+        kind: TaskStatusKind::Unstarted,
+        color: Some("#3fb950".into()),
+    }
+}
+
+fn status_done() -> TaskStatus {
+    TaskStatus {
+        id: STATUS_DONE.into(),
+        name: "Done".into(),
+        kind: TaskStatusKind::Completed,
+        color: Some("#8957e5".into()),
+    }
+}
+
+fn status_not_planned() -> TaskStatus {
+    TaskStatus {
+        id: STATUS_NOT_PLANNED.into(),
+        name: "Not planned".into(),
+        kind: TaskStatusKind::Canceled,
+        color: Some("#6e7681".into()),
+    }
+}
+
 /// The three fixed board columns for GitHub repo issues.
 pub fn fixed_statuses() -> Vec<TaskStatus> {
-    vec![
-        TaskStatus {
-            id: STATUS_OPEN.into(),
-            name: "Open".into(),
-            kind: TaskStatusKind::Unstarted,
-            color: Some("#3fb950".into()),
-        },
-        TaskStatus {
-            id: STATUS_DONE.into(),
-            name: "Done".into(),
-            kind: TaskStatusKind::Completed,
-            color: Some("#8957e5".into()),
-        },
-        TaskStatus {
-            id: STATUS_NOT_PLANNED.into(),
-            name: "Not planned".into(),
-            kind: TaskStatusKind::Canceled,
-            color: Some("#6e7681".into()),
-        },
-    ]
+    vec![status_open(), status_done(), status_not_planned()]
 }
 
 /// Map GitHub `state` + `stateReason` to one of the fixed statuses.
 pub fn status_for(state: &str, state_reason: Option<&str>) -> TaskStatus {
-    let all = fixed_statuses();
-    let id = match (
+    match (
         state.to_ascii_uppercase().as_str(),
         state_reason.map(|r| r.to_ascii_uppercase()),
     ) {
-        ("CLOSED", Some(r)) if r == "NOT_PLANNED" => STATUS_NOT_PLANNED,
-        ("CLOSED", _) => STATUS_DONE,
-        _ => STATUS_OPEN,
-    };
-    all.into_iter()
-        .find(|s| s.id == id)
-        .expect("fixed status exists")
+        ("CLOSED", Some(r)) if r == "NOT_PLANNED" => status_not_planned(),
+        ("CLOSED", _) => status_done(),
+        _ => status_open(),
+    }
 }
 
 /// A decoded GitHub issue search/list node. Field names match the GraphQL query.
@@ -215,5 +219,63 @@ mod tests {
         assert_eq!(task.assignee.as_ref().unwrap().name, "Ada");
         assert_eq!(task.labels[0].color.as_deref(), Some("#d73a4a"));
         assert_eq!(task.team_id.as_deref(), Some("acme/web"));
+    }
+
+    #[test]
+    fn closed_without_reason_maps_to_done() {
+        let s = status_for("CLOSED", None);
+        assert_eq!(s.id, STATUS_DONE);
+        assert_eq!(s.kind, TaskStatusKind::Completed);
+    }
+
+    #[test]
+    fn assignee_name_falls_back_to_login() {
+        let node = IssueNode {
+            id: "I_2".into(),
+            number: 3,
+            title: "No name".into(),
+            body: None,
+            url: "https://github.com/acme/web/issues/3".into(),
+            state: "OPEN".into(),
+            state_reason: None,
+            updated_at: None,
+            repository: RepoRef {
+                name_with_owner: "acme/web".into(),
+            },
+            assignees: NodeList {
+                nodes: vec![AssigneeNode {
+                    id: "U_2".into(),
+                    name: None,
+                    login: "octocat".into(),
+                    avatar_url: None,
+                }],
+            },
+            labels: NodeList { nodes: vec![] },
+        };
+        let task = map_issue(&node);
+        assert_eq!(task.assignee.unwrap().name, "octocat");
+    }
+
+    #[test]
+    fn deserializes_minimal_issue_json() {
+        use serde_json::json;
+
+        let node: IssueNode = serde_json::from_value(json!({
+            "id": "I_7",
+            "number": 7,
+            "title": "Minimal",
+            "url": "https://github.com/acme/web/issues/7",
+            "state": "OPEN",
+            "repository": { "nameWithOwner": "acme/web" },
+            "updatedAt": "2026-06-21T00:00:00Z"
+        }))
+        .expect("minimal issue JSON deserializes");
+
+        let task = map_issue(&node);
+        assert_eq!(task.identifier, "acme/web#7");
+        assert!(task.assignee.is_none());
+        assert!(task.labels.is_empty());
+        assert!(task.description.is_none());
+        assert_eq!(task.status.id, STATUS_OPEN);
     }
 }
