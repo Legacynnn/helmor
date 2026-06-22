@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { FileMap } from "./file-map";
 import { OpenQuestions } from "./open-questions";
 import { UnsupportedBlock } from "./placeholder";
 import { RiskCard } from "./risk-card";
@@ -50,5 +51,20 @@ describe("Steps", () => {
 		);
 		expect(screen.getByText("Steps")).toBeInTheDocument();
 		expect(screen.getByText("First do this")).toBeInTheDocument();
+	});
+});
+
+describe("FileMap", () => {
+	it("renders a header, count badge, and parsed entries", () => {
+		render(<FileMap>{"create src/a.ts\nmodify src/b.ts"}</FileMap>);
+		expect(screen.getByText("File changes")).toBeInTheDocument();
+		expect(screen.getByText("2")).toBeInTheDocument();
+		expect(screen.getByText("src/a.ts")).toBeInTheDocument();
+		expect(screen.getByText("src/b.ts")).toBeInTheDocument();
+	});
+
+	it("renders nothing when there are no valid entries", () => {
+		const { container } = render(<FileMap>{"not a real line"}</FileMap>);
+		expect(container.querySelector("section")).toBeNull();
 	});
 });
