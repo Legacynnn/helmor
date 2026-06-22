@@ -55,9 +55,9 @@ export function DataModel({ childBlocks = [] }: { childBlocks?: PlanBlock[] }) {
 				{entities.map((entity) => (
 					<div
 						key={entity.id}
-						className="overflow-hidden rounded-md border border-border/70"
+						className="overflow-hidden rounded-md border border-border/70 bg-background"
 					>
-						<div className="border-border/50 border-b bg-muted/30 px-3 py-1.5 font-medium text-small">
+						<div className="border-border/50 border-b bg-muted/50 px-3 py-1.5 font-medium text-small">
 							{entity.name}
 						</div>
 						<ul className="divide-y divide-border/40">

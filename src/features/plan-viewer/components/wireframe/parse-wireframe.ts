@@ -5,8 +5,11 @@ export type WireframeNode = {
 		| "row"
 		| "col"
 		| "box"
+		| "heading"
 		| "text"
+		| "field"
 		| "input"
+		| "pill"
 		| "button"
 		| "image"
 		| "divider";
@@ -18,8 +21,11 @@ const TYPES = new Set([
 	"row",
 	"col",
 	"box",
+	"heading",
 	"text",
+	"field",
 	"input",
+	"pill",
 	"button",
 	"image",
 	"divider",

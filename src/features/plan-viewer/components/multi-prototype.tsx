@@ -49,7 +49,7 @@ export function MultiPrototype({
 	return (
 		<PlanBlockShell accent="neutral" icon={LayersIcon} title="Prototypes">
 			<div
-				className="mb-3 flex flex-wrap gap-1"
+				className="mb-3 inline-flex max-w-full flex-wrap gap-0.5 rounded-md border border-border bg-background p-0.5"
 				role="tablist"
 				aria-label="Prototype variants"
 			>
@@ -61,10 +61,10 @@ export function MultiPrototype({
 						aria-selected={i === active}
 						onClick={() => setActive(i)}
 						className={cn(
-							"cursor-pointer rounded border px-2 py-1 text-micro transition-colors",
+							"cursor-pointer rounded px-2.5 py-1 text-micro transition-colors",
 							i === active
-								? "border-ring bg-accent text-accent-foreground"
-								: "border-border text-muted-foreground hover:bg-accent/50",
+								? "bg-primary font-medium text-primary-foreground"
+								: "text-muted-foreground hover:bg-muted",
 						)}
 					>
 						{variant.label}
@@ -72,7 +72,9 @@ export function MultiPrototype({
 					</button>
 				))}
 			</div>
-			<div>{renderBlocks(current.body)}</div>
+			<div className="rounded-md border border-border bg-background p-3">
+				{renderBlocks(current.body)}
+			</div>
 		</PlanBlockShell>
 	);
 }

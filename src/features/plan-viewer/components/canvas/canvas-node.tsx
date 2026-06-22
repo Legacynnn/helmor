@@ -24,7 +24,9 @@ export function CanvasNode({ data, selected }: NodeProps) {
 		<div
 			style={{ width: NODE_SIZE[kind].width }}
 			className={cn(
-				"max-h-[240px] overflow-hidden rounded-lg border bg-card shadow-sm transition-colors",
+				// Flat, bordered surface (no shadow); `styles.container` supplies the
+				// per-kind fill + border so the node never sits white-on-white.
+				"max-h-[240px] overflow-hidden rounded-lg border transition-colors",
 				styles.container,
 				selected ? "border-ring ring-2 ring-ring" : "hover:border-ring/60",
 			)}

@@ -24,7 +24,11 @@ export type AccentClasses = {
 
 const ACCENTS: Record<PlanAccent, AccentClasses> = {
 	neutral: {
-		container: "border-border/70 bg-card",
+		// `--card` equals the page background (pure white) in light theme, so a
+		// `bg-card` panel is white-on-white. `bg-muted/30` reads as a distinct
+		// flat surface in BOTH themes (light grey over white, dark grey over near
+		// black) without resorting to a shadow.
+		container: "border-border/70 bg-muted/30",
 		header: "text-foreground",
 		badge: "border-border/70 text-muted-foreground",
 	},

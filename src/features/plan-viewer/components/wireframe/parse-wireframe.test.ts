@@ -39,6 +39,13 @@ describe("parseWireframe", () => {
 		expect(parseWireframe("   \n  ")).toEqual([]);
 	});
 
+	it("recognizes heading, field, and pill element types", () => {
+		const roots = parseWireframe(
+			["heading Title", "field Name", "pill Tag"].join("\n"),
+		);
+		expect(roots.map((r) => r.type)).toEqual(["heading", "field", "pill"]);
+	});
+
 	it("treats a leading tab as the same depth as a two-space indent", () => {
 		const src = ["col", "\ttext Tabbed", "  input Spaced"].join("\n");
 		const roots = parseWireframe(src);

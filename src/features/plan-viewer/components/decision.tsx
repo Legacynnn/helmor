@@ -41,13 +41,19 @@ export function Decision({ childBlocks = [] }: { childBlocks?: PlanBlock[] }) {
 		<PlanBlockShell accent="neutral" icon={ScaleIcon} title="Decision">
 			<div className="grid gap-3 sm:grid-cols-2">
 				{options.map((option) => {
-					const styles = accentClasses(
-						option.recommended ? "success" : "neutral",
-					);
+					const styles = accentClasses("success");
 					return (
 						<div
 							key={option.id}
-							className={cn("rounded-md border p-3", styles.container)}
+							className={cn(
+								"rounded-md border p-3",
+								// Cards sit on the grey shell; an elevated `bg-background`
+								// surface keeps them crisp, and the recommended one gets the
+								// success tint + ring.
+								option.recommended
+									? cn(styles.container, "ring-1 ring-emerald-500/30")
+									: "border-border bg-background",
+							)}
 						>
 							<div className="mb-1 flex items-center gap-2">
 								<span className="font-medium text-small">{option.title}</span>

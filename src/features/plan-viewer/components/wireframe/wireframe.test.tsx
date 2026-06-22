@@ -32,4 +32,24 @@ describe("Wireframe", () => {
 		const { container } = renderMdx(["<Wireframe>", "</Wireframe>"].join("\n"));
 		expect(container.querySelector("section")).toBeNull();
 	});
+
+	it("renders the richer primitives inside a chosen surface", () => {
+		renderMdx(
+			[
+				'<Wireframe label="Settings" surface="panel">',
+				"heading Preferences",
+				"field Email",
+				"pill Beta",
+				"button Save",
+				"</Wireframe>",
+			].join("\n"),
+		);
+		expect(screen.getByText("Preferences")).toBeInTheDocument();
+		expect(screen.getByText("Email")).toBeInTheDocument();
+		expect(screen.getByText("Beta")).toBeInTheDocument();
+		// Primary button — themed via tokens, not white-on-white.
+		const save = screen.getByText("Save");
+		expect(save.className).toContain("bg-primary");
+		expect(save.className).toContain("text-primary-foreground");
+	});
 });
