@@ -5526,7 +5526,7 @@ export async function destroyStableUrl(): Promise<CompanionStatus> {
 // ── Task integrations (Linear, etc.) ────────────────────────────────────────
 
 /** Stable provider ids for task integrations. */
-export type IntegrationProvider = "linear";
+export type IntegrationProvider = "linear" | "github";
 
 /** Normalized lifecycle bucket for a task's status — drives the status icon. */
 export type TaskStatusKind =

@@ -25,10 +25,10 @@ const TABS: ProviderTab[] = [
 	},
 	// Future providers — visible but disabled until their modules land.
 	{
-		id: "github" as IntegrationProvider,
+		id: "github",
 		label: "GitHub Issues",
 		icon: <GithubBrandIcon size={15} />,
-		enabled: false,
+		enabled: true,
 	},
 	{
 		id: "clickup" as IntegrationProvider,
