@@ -1,10 +1,10 @@
+import { ListChecksIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { PlanBlockShell } from "./shell/plan-block-shell";
 
 /**
- * `Steps` wraps step-by-step plan content. Children are rendered plan blocks
- * (prose, or — under the recursive renderer — nested components). For a simple
- * step list, put a markdown (ordered/numbered) list inside `<Steps>`.
+ * `Steps` wraps step-by-step plan content. Children are rendered plan blocks;
+ * for a simple step list, put a markdown ordered list inside `<Steps>`.
  */
 export function Steps({
 	children,
@@ -14,13 +14,13 @@ export function Steps({
 	className?: string;
 }) {
 	return (
-		<div
-			className={cn(
-				"my-4 rounded-lg border border-border/70 bg-muted/20 p-4",
-				className,
-			)}
+		<PlanBlockShell
+			accent="neutral"
+			icon={ListChecksIcon}
+			title="Steps"
+			className={className}
 		>
 			{children}
-		</div>
+		</PlanBlockShell>
 	);
 }

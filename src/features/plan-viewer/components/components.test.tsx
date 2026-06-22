@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { OpenQuestions } from "./open-questions";
 import { UnsupportedBlock } from "./placeholder";
 import { RiskCard } from "./risk-card";
+import { Steps } from "./steps";
 
 describe("RiskCard", () => {
 	it("shows the high severity label", () => {
@@ -35,5 +36,19 @@ describe("OpenQuestions", () => {
 		expect(
 			screen.getByText("What database should we use?"),
 		).toBeInTheDocument();
+	});
+});
+
+describe("Steps", () => {
+	it("renders a Steps header and forwards children", () => {
+		render(
+			<Steps>
+				<ol>
+					<li>First do this</li>
+				</ol>
+			</Steps>,
+		);
+		expect(screen.getByText("Steps")).toBeInTheDocument();
+		expect(screen.getByText("First do this")).toBeInTheDocument();
 	});
 });
