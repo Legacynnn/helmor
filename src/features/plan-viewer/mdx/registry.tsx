@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from "react";
 import { AnnotatedCode } from "../components/annotated-code";
 import { BeforeAfter } from "../components/before-after";
 import { PlanCanvas } from "../components/canvas";
+import { DataModel } from "../components/data-model";
 import { Decision } from "../components/decision";
 import { Diagram } from "../components/diagram";
 import { Diff } from "../components/diff-view";
@@ -70,6 +71,8 @@ export const PLAN_COMPONENTS: Record<string, PlanComponentDef> = {
 	Wireframe: { render: Wireframe, childMode: "raw" },
 	MultiPrototype: { render: MultiPrototype, childMode: "structured" },
 	Variant: { render: SubComponentFallback, childMode: "blocks" },
+	DataModel: { render: DataModel, childMode: "structured" },
+	Entity: { render: SubComponentFallback, childMode: "raw" },
 };
 
 /** Resolve a component's child mode, or `null` when the name is unknown. */
