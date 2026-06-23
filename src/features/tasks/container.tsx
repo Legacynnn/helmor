@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, RefreshCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { HelmorLogoAnimated } from "@/components/helmor-logo-animated";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
 	type IntegrationProvider,
 	listTaskAssignees,
@@ -350,10 +350,12 @@ export function TasksContainer(_props: TasksScreenProps) {
 							{renderDetail(pageTask, "page")}
 						</div>
 					</div>
+				) : statusQuery.isLoading ? (
+					<TasksLoading />
 				) : !connected ? (
 					<TasksEmptyState provider={provider} />
 				) : tasksQuery.isLoading ? (
-					<TableSkeleton />
+					<TasksLoading />
 				) : tasks.length === 0 ? (
 					<EmptyTeamState
 						syncing={syncing}
@@ -436,12 +438,10 @@ export function TasksContainer(_props: TasksScreenProps) {
 	);
 }
 
-function TableSkeleton() {
+function TasksLoading() {
 	return (
-		<div className="space-y-2 p-4">
-			{["a", "b", "c", "d", "e", "f", "g", "h"].map((row) => (
-				<Skeleton key={row} className="h-8 w-full" />
-			))}
+		<div className="flex min-h-0 flex-1 items-center justify-center">
+			<HelmorLogoAnimated size={56} />
 		</div>
 	);
 }

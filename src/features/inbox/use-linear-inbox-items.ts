@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getIntegrationStatus, listLinearInboxItems } from "@/lib/api";
 import { helmorQueryKeys } from "@/lib/query-client";
 
-/** Linear "assigned to me" issues, gated on the Linear integration being connected. */
+/** Linear issues for the sidebar (assigned to me + the selected team's issues),
+ *  gated on the Linear integration being connected. */
 export function useLinearInboxItems() {
 	const statusQuery = useQuery({
 		queryKey: helmorQueryKeys.integrationStatus("linear"),

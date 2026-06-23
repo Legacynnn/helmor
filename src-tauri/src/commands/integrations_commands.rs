@@ -368,9 +368,11 @@ pub async fn create_task(app: AppHandle, input: CreateTaskInput) -> CmdResult<Ta
 
 // ── Linear inbox ────────────────────────────────────────────────────────────
 
-/// Linear "assigned to me" issues as sidebar inbox items. Linear's fetch
-/// paginates internally, so this returns a single page; `cursor` is accepted for
-/// shape parity with the forge inbox and ignored.
+/// Linear issues as sidebar inbox items. Combines the viewer's assigned issues
+/// (cross-team) with the full issue list of the selected team, so issues that
+/// aren't assigned to the user still surface. Deduped by external id. Linear's
+/// fetch paginates internally, so this returns a single page; `cursor` is
+/// accepted for shape parity with the forge inbox and ignored.
 #[tauri::command]
 pub async fn list_linear_inbox_items(_cursor: Option<String>) -> CmdResult<InboxPage> {
     run_blocking(move || {
@@ -383,7 +385,22 @@ pub async fn list_linear_inbox_items(_cursor: Option<String>) -> CmdResult<Inbox
                 })
             }
         };
-        let tasks = linear::list_assigned_issues(&key)?;
+        let mut tasks = linear::list_assigned_issues(&key)?;
+        // Fold in the selected team's full issue set (every assignee, including
+        // none), deduped against the assigned list.
+        if let Some(team_id) = conns::load_connection(LINEAR_PROVIDER)
+            .ok()
+            .flatten()
+            .and_then(|c| c.selected_team_id)
+        {
+            let mut seen: std::collections::HashSet<String> =
+                tasks.iter().map(|t| t.external_id.clone()).collect();
+            for task in linear::list_team_issues(&key, &team_id)? {
+                if seen.insert(task.external_id.clone()) {
+                    tasks.push(task);
+                }
+            }
+        }
         let mut items: Vec<_> = tasks.iter().map(linear::inbox::task_to_item).collect();
         items.sort_by_key(|i| std::cmp::Reverse(i.last_activity_at));
         Ok(InboxPage {

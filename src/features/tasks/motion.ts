@@ -20,9 +20,3 @@ export const cardLayoutTransition: Transition = {
 	duration: 0.26,
 	ease: EASE_OUT_QUART,
 };
-
-/** Staggered content reveal inside the detail drawer. */
-export const drawerItemTransition: Transition = {
-	duration: 0.34,
-	ease: EASE_OUT_EXPO,
-};

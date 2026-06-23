@@ -6,7 +6,6 @@ import {
 	SquareArrowOutUpRight,
 	X,
 } from "lucide-react";
-import { motion, useReducedMotion, type Variants } from "motion/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type {
@@ -17,7 +16,6 @@ import type {
 	TaskStatus,
 } from "@/lib/api";
 import { openUrl } from "@/lib/platform-bridge";
-import { drawerItemTransition } from "../motion";
 import { AssigneeSelect } from "./inline-edit/assignee-select";
 import { DescriptionEditor } from "./inline-edit/description-editor";
 import { EditableTitle } from "./inline-edit/editable-title";
@@ -25,15 +23,6 @@ import { LabelSelect } from "./inline-edit/label-select";
 import { PrioritySelect } from "./inline-edit/priority-select";
 import { StatusSelect } from "./inline-edit/status-select";
 import { ProjectIcon } from "./project-icon";
-
-const listVariants: Variants = {
-	hidden: {},
-	show: { transition: { staggerChildren: 0.045, delayChildren: 0.06 } },
-};
-const itemVariants: Variants = {
-	hidden: { opacity: 0, y: 8 },
-	show: { opacity: 1, y: 0, transition: drawerItemTransition },
-};
 
 export function TaskDetailView({
 	task,
@@ -62,7 +51,6 @@ export function TaskDetailView({
 	reviewPending?: boolean;
 	onStartWorkspace?: () => void;
 }) {
-	const reduce = useReducedMotion();
 	return (
 		<div className="flex h-full flex-col">
 			<header className="flex items-center gap-2 border-border/40 border-b px-4 py-3">
@@ -114,24 +102,14 @@ export function TaskDetailView({
 				</div>
 			</header>
 
-			<motion.div
-				className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4"
-				variants={reduce ? undefined : listVariants}
-				initial={reduce ? false : "hidden"}
-				animate={reduce ? false : "show"}
-			>
-				<motion.div variants={reduce ? undefined : itemVariants}>
-					<EditableTitle
-						value={task.title}
-						disabled={isUpdating}
-						onSave={(title) => onUpdate({ title })}
-					/>
-				</motion.div>
+			<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
+				<EditableTitle
+					value={task.title}
+					disabled={isUpdating}
+					onSave={(title) => onUpdate({ title })}
+				/>
 
-				<motion.div
-					variants={reduce ? undefined : itemVariants}
-					className="flex flex-wrap items-center gap-2"
-				>
+				<div className="flex flex-wrap items-center gap-2">
 					<StatusSelect
 						status={task.status}
 						options={statusOptions.length ? statusOptions : [task.status]}
@@ -157,18 +135,16 @@ export function TaskDetailView({
 							{task.project.name}
 						</Badge>
 					) : null}
-				</motion.div>
+				</div>
 
-				<motion.div variants={reduce ? undefined : itemVariants}>
-					<LabelSelect
-						value={task.labels}
-						options={labelOptions}
-						disabled={isUpdating}
-						onChange={(labelIds) => onUpdate({ labelIds })}
-					/>
-				</motion.div>
+				<LabelSelect
+					value={task.labels}
+					options={labelOptions}
+					disabled={isUpdating}
+					onChange={(labelIds) => onUpdate({ labelIds })}
+				/>
 
-				<motion.div variants={reduce ? undefined : itemVariants}>
+				<div>
 					<p className="mb-1 font-medium text-muted-foreground text-small uppercase tracking-wide">
 						Description
 					</p>
@@ -177,13 +153,10 @@ export function TaskDetailView({
 						disabled={isUpdating}
 						onSave={(description) => onUpdate({ description })}
 					/>
-				</motion.div>
+				</div>
 
 				{task.agentFeedback ? (
-					<motion.div
-						variants={reduce ? undefined : itemVariants}
-						className="rounded-lg border border-border/50 bg-muted/30 p-3"
-					>
+					<div className="rounded-lg border border-border/50 bg-muted/30 p-3">
 						<p className="mb-1 flex items-center gap-1.5 font-medium text-small text-foreground">
 							<Bot className="size-3.5" />
 							Agent feedback
@@ -191,9 +164,9 @@ export function TaskDetailView({
 						<p className="whitespace-pre-wrap text-muted-foreground text-small leading-relaxed">
 							{task.agentFeedback}
 						</p>
-					</motion.div>
+					</div>
 				) : null}
-			</motion.div>
+			</div>
 
 			{(onReview || onStartWorkspace) && (
 				<footer className="flex items-center gap-2 border-border/40 border-t px-4 py-3">
