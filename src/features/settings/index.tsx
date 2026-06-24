@@ -71,6 +71,7 @@ import { AppearancePanel } from "./panels/appearance";
 import { ArchiveCleanupPanel } from "./panels/archive-cleanup";
 import { ComponentsPanel } from "./panels/components";
 import { ConductorImportPanel } from "./panels/conductor-import";
+import { CustomizedPanel } from "./panels/customized";
 import { DevToolsPanel } from "./panels/dev-tools";
 import { InboxSettingsPanel } from "./panels/inbox";
 import { IntegrationsPanel } from "./panels/integrations";
@@ -99,6 +100,7 @@ const SECTION_LABEL_OVERRIDES: Partial<Record<SettingsSection, string>> = {
 	model: "Models",
 	account: "Accounts",
 	inbox: "Contexts",
+	customized: "Customized",
 };
 
 /// Optional muted-caption next to the title in the dialog header.
@@ -191,6 +193,7 @@ export const SettingsDialog = memo(function SettingsDialog({
 		"appearance",
 		"model",
 		"providers",
+		"customized",
 		"shortcuts",
 		...(conductorEnabled ? (["import"] as const) : []),
 		"account",
@@ -631,6 +634,8 @@ export const SettingsDialog = memo(function SettingsDialog({
 							)}
 
 							{activeSection === "providers" && <ProvidersPanel />}
+
+							{activeSection === "customized" && <CustomizedPanel />}
 
 							{activeSection === "experimental" && (
 								<SettingsGroup>

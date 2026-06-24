@@ -82,6 +82,7 @@ export const helmorQueryKeys = {
 	agentLoginStatus: ["agentLoginStatus"] as const,
 	agentCliStatus: ["agentCliStatus"] as const,
 	providerConfigInspections: ["providerConfigInspections"] as const,
+	customizedGithubLogins: ["customizedGithubLogins"] as const,
 	agentVersions: ["agentVersions"] as const,
 	providerCapabilities: ["providerCapabilities"] as const,
 	workspaceDetail: (workspaceId: string) =>

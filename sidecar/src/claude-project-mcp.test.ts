@@ -84,6 +84,32 @@ describe("loadProjectMcpServers", () => {
 		});
 	});
 
+	// The Customized hub installs global MCPs into top-level `mcpServers`. The
+	// SDK auto-loads those user-scope servers itself, so the project-injection
+	// path must never read them — otherwise a global install would get funneled
+	// into `options.mcpServers` and risk replacing the auto-loaded set.
+	it("ignores top-level (global) mcpServers", () => {
+		writeConfig(
+			JSON.stringify({
+				mcpServers: { globalGithub: { type: "stdio", command: "gh" } },
+			}),
+		);
+		expect(loadProjectMcpServers(REPO)).toBeUndefined();
+	});
+
+	it("returns only project-scope servers when a global install also exists", () => {
+		const projectServer = { type: "stdio" as const, command: "node" };
+		writeConfig(
+			JSON.stringify({
+				mcpServers: { globalGithub: { type: "stdio", command: "gh" } },
+				projects: { [REPO]: { mcpServers: { proj: projectServer } } },
+			}),
+		);
+		// Global server is absent from the injected set; only project-scope is
+		// returned, so the SDK still auto-loads the user-scope global on its own.
+		expect(loadProjectMcpServers(REPO)).toEqual({ proj: projectServer });
+	});
+
 	it("uses CLAUDE_CONFIG_DIR override", () => {
 		// Different dir written to via CLAUDE_CONFIG_DIR set in beforeEach.
 		const altDir = mkdtempSync(join(tmpdir(), "claude-mcp-alt-"));

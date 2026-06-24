@@ -1057,6 +1057,47 @@ export async function inspectProviderConfigs(): Promise<
 	return await invoke<ProviderConfigInspection[]>("inspect_provider_configs");
 }
 
+// --- Customized hub: install (write) commands ------------------------------
+// All installs are global (user-scope); there is no per-repo scoping.
+
+/** Provider ids the Customized hub can install into. */
+export type CustomizedProvider = "claude" | "codex";
+
+/** Install (or replace) a curated MCP server globally for a provider. */
+export async function installMcpServer(
+	provider: CustomizedProvider,
+	serverId: string,
+	serverConfig: Record<string, unknown>,
+): Promise<void> {
+	await invoke("install_mcp_server", { provider, serverId, serverConfig });
+}
+
+/** Remove a curated MCP server for a provider. */
+export async function uninstallMcpServer(
+	provider: CustomizedProvider,
+	serverId: string,
+): Promise<void> {
+	await invoke("uninstall_mcp_server", { provider, serverId });
+}
+
+/** Install a curated skill globally for the selected providers. */
+export async function installCatalogSkill(request: {
+	skillId: string;
+	providers: CustomizedProvider[];
+	/** `skills` slug for remote skills; omit for Helmor-vendored skills. */
+	remoteSource?: string;
+}): Promise<void> {
+	await invoke("install_catalog_skill", { request });
+}
+
+/** Remove a Helmor-vendored skill for the selected providers. */
+export async function uninstallCatalogSkill(
+	skillId: string,
+	providers: CustomizedProvider[],
+): Promise<void> {
+	await invoke("uninstall_catalog_skill", { skillId, providers });
+}
+
 // Cursor is an SDK (no versioned CLI), so it has no entry.
 export type AgentVersionsResult = {
 	claude: string | null;

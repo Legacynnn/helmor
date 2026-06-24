@@ -511,15 +511,18 @@ fn ready_skill_agents(login: &AgentLoginStatus) -> Vec<&'static str> {
     agents
 }
 
-fn helmor_skills_install_args(agents: &[&str]) -> Vec<String> {
+/// `npx skills add` arg vector for an arbitrary skill source + name, always
+/// installed globally (`-g`) with `--copy`. The Helmor-CLI bootstrap and the
+/// Customized hub both route through this so the install shape stays identical.
+pub(crate) fn skills_add_args(source: &str, name: &str, agents: &[&str]) -> Vec<String> {
     let mut args = vec![
         "--yes".to_string(),
         "skills".to_string(),
         "add".to_string(),
-        HELMOR_SKILL_SOURCE.to_string(),
+        source.to_string(),
         "-g".to_string(),
         "-s".to_string(),
-        HELMOR_SKILL_NAME.to_string(),
+        name.to_string(),
         "-y".to_string(),
         "--copy".to_string(),
     ];
@@ -528,6 +531,41 @@ fn helmor_skills_install_args(agents: &[&str]) -> Vec<String> {
         args.push((*agent).to_string());
     }
     args
+}
+
+fn helmor_skills_install_args(agents: &[&str]) -> Vec<String> {
+    skills_add_args(HELMOR_SKILL_SOURCE, HELMOR_SKILL_NAME, agents)
+}
+
+/// Run `npx skills add` for an arbitrary catalog skill source, surfacing the
+/// installer's stdout/stderr on failure. Used by the Customized hub for skills
+/// pulled from a remote `skills` slug.
+pub(crate) fn run_skills_add(source: &str, name: &str, agents: &[&str]) -> anyhow::Result<()> {
+    let output = npx_command()
+        .args(skills_add_args(source, name, agents))
+        .output()
+        .with_context(|| format!("Failed to start skills installer for {name}"))?;
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!(
+            "Installing skill '{name}' failed.\n{}\n{}",
+            stdout.trim(),
+            stderr.trim(),
+        );
+    }
+    Ok(())
+}
+
+/// The global skills directory for a given `skills`-CLI agent name
+/// (`claude-code` / `codex`). Used by the Customized hub to drop vendored
+/// skills directly.
+pub(crate) fn global_skills_dir(agent: &str) -> Option<PathBuf> {
+    match agent {
+        "claude-code" => Some(claude_skills_dir()),
+        "codex" => Some(codex_skills_dir()),
+        _ => None,
+    }
 }
 
 /// A `Command` that runs `npx` cross-platform. `resolve_for_spawn` finds the
@@ -1395,6 +1433,17 @@ fn inspect_claude_config(inspection: &mut ProviderConfigInspection) {
     let root = home.join(".claude");
     push_root(inspection, "Claude home", &root);
     inspect_skill_dir(inspection, "Claude skills", &root.join("skills"));
+    // User-scope (global) config: the Agent SDK auto-loads top-level
+    // `mcpServers` from `~/.claude.json`, and Helmor's Customized hub writes
+    // there. Scan it so installed servers show up in the inventory.
+    inspect_json_file(
+        inspection,
+        "Global config",
+        &home.join(".claude.json"),
+        &["hooks"],
+        &["mcpServers"],
+        &["extensions", "plugins"],
+    );
     inspect_json_file(
         inspection,
         "Settings",

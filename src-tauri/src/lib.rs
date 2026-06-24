@@ -1,6 +1,6 @@
 pub mod agents;
 pub mod cli;
-pub(crate) mod codex_config;
+pub mod codex_config;
 pub(crate) mod commands;
 pub mod companion;
 pub mod data_dir;
@@ -645,6 +645,10 @@ pub fn run() {
             commands::system_commands::get_agent_login_status,
             commands::system_commands::get_agent_cli_status,
             commands::system_commands::inspect_provider_configs,
+            commands::customized_commands::install_mcp_server,
+            commands::customized_commands::uninstall_mcp_server,
+            commands::customized_commands::install_catalog_skill,
+            commands::customized_commands::uninstall_catalog_skill,
             commands::system_commands::get_agent_versions,
             commands::system_commands::get_helmor_skills_status,
             commands::system_commands::install_cli,

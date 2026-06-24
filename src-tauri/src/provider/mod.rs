@@ -2,6 +2,7 @@
 
 pub mod builtin_claude;
 pub mod claude;
+pub mod claude_config_writer;
 pub mod codex;
 // Kimi configures providers through its own `kimi provider` CLI + `~/.kimi-code/
 // config.toml` (catalog/registry/raw-endpoint modes), so it does NOT implement

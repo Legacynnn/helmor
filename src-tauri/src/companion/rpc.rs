@@ -67,6 +67,7 @@ async fn dispatch(
             Ok(Value::Null)
         }
         "create_plan" => to_value(crate::commands::plans::create_plan(arg_string(&args, "sessionId")?, arg_string(&args, "slug")?, arg_string(&args, "title")?).await?),
+        "delete_plan" => to_value(crate::commands::plans::delete_plan(app.clone(), arg_string(&args, "sessionId")?, arg_string(&args, "slug")?).await?),
         "create_repo_run_action" => to_value(crate::commands::script_commands::create_repo_run_action(app.clone(), arg_string(&args, "repoId")?, arg_string(&args, "name")?, arg_string(&args, "command")?, arg_string(&args, "mode")?, arg_opt_string(&args, "stopCommand")).await?),
         "create_session" => to_value(crate::commands::session_commands::create_session(arg_string(&args, "workspaceId")?, arg_opt_json(&args, "actionKind")?, arg_opt_string(&args, "permissionMode"), arg_opt_string(&args, "model"), arg_opt_string(&args, "effortLevel"), arg_opt_bool(&args, "fastMode"), arg_opt_string(&args, "seedSessionId"), arg_opt_string(&args, "sessionKind"), arg_opt_string(&args, "agentType")).await?),
         "create_workspace_from_repo" => to_value(crate::commands::workspace_commands::create_workspace_from_repo(app.clone(), arg_string(&args, "repoId")?).await?),
@@ -517,6 +518,12 @@ async fn dispatch(
         |         "exit_onboarding_window_mode"
         |         "install_cli"
         |         "install_helmor_skills"
+        // The Customized hub (Settings → Customized) is a desktop surface that
+        // writes to the host's global MCP/skill config; no phone UI.
+        |         "install_mcp_server"
+        |         "uninstall_mcp_server"
+        |         "install_catalog_skill"
+        |         "uninstall_catalog_skill"
         |         "open_agent_login_terminal"
         |         "open_file_in_editor"
         |         "open_workspace_in_editor"
