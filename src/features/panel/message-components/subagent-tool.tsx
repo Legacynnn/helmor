@@ -43,7 +43,7 @@ export function isSubagentSpawnPart(part: ToolCallPart): boolean {
 	return part.toolName === "subagent_spawn";
 }
 
-interface AgentState {
+export interface AgentState {
 	threadId: string;
 	nickname: string | null;
 	role: string | null;
@@ -51,7 +51,7 @@ interface AgentState {
 	message: string | null;
 }
 
-function readAgentsStates(args: Record<string, unknown>): AgentState[] {
+export function readAgentsStates(args: Record<string, unknown>): AgentState[] {
 	const raw = args.agentsStates;
 	if (!raw || typeof raw !== "object") return [];
 	const out: AgentState[] = [];

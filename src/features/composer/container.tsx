@@ -73,6 +73,7 @@ import {
 import type { PermissionPanelProps } from "./permission-panel";
 import { SessionContextInjector } from "./session-context-injector";
 import type { StartSubmitMode } from "./start-submit-mode";
+import { SubagentStrip } from "./subagent-strip";
 import { SubmitQueueList } from "./submit-queue-list";
 import { TriageQuickActions } from "./triage-quick-actions";
 import type { UserInputResponseHandler } from "./user-input";
@@ -1319,6 +1320,7 @@ export const WorkspaceComposerContainer = memo(
 							onEdit={(id) => onEditQueued?.(id)}
 							disabled={composerUnavailable}
 						/>
+						<SubagentStrip sessionId={displayedSessionId} />
 					</div>
 					<WorkspaceComposer
 						contextKey={composerContextKey}
