@@ -15,6 +15,11 @@ import {
 import { useStickToBottom } from "use-stick-to-bottom";
 import { HelmorLogoAnimated } from "@/components/helmor-logo-animated";
 import { Button } from "@/components/ui/button";
+import {
+	selectSubagentBlock,
+	summarizeSubagent,
+} from "@/features/composer/subagent-strip/extract-subagents";
+import { useActiveSubagentFilter } from "@/features/conversation/state/subagent-filter-store";
 import type { ThreadMessageLike } from "@/lib/api";
 import { HelmorProfiler } from "@/lib/dev-react-profiler";
 import { estimateThreadRowHeights } from "@/lib/message-layout-estimator";
@@ -32,6 +37,7 @@ import {
 	resetAnchoredToggle,
 	UserMessageExpansionProvider,
 } from "./message-components";
+import { SubagentFilterBanner } from "./subagent-filter-banner";
 import { useEscapeBottomLock } from "./thread-viewport/use-escape-bottom-lock";
 import { useStreamingIndicatorSync } from "./thread-viewport/use-streaming-indicator-sync";
 
@@ -117,6 +123,24 @@ export function ActiveThreadViewport({
 	onInitializeScript?: (scriptType: WorkspaceScriptType) => void;
 }) {
 	const stackRef = useRef<HTMLDivElement | null>(null);
+	const subagentFilter = useActiveSubagentFilter(pane.sessionId);
+	// When a subagent filter is active, collapse the thread to that subagent's
+	// outputs (Claude `Task` children / Codex `subagent_*` rows). Transforming
+	// the source array — not hiding DOM rows — keeps virtualization measurements
+	// correct. An unresolved key yields an empty thread; the banner stays so the
+	// filter is always clearable.
+	const filteredMessages = useMemo(() => {
+		if (!subagentFilter) return pane.messages;
+		const block = selectSubagentBlock(pane.messages, subagentFilter.key);
+		return block ? [block] : [];
+	}, [subagentFilter, pane.messages]);
+	const subagentSummary = useMemo(
+		() =>
+			subagentFilter
+				? summarizeSubagent(pane.messages, subagentFilter.key)
+				: null,
+		[subagentFilter, pane.messages],
+	);
 	const [widthBucket, setWidthBucket] = useState(0);
 	const pendingBucketRef = useRef<number | null>(null);
 	// 32px buckets so estimator/measureHeights caches only invalidate when
@@ -179,16 +203,20 @@ export function ActiveThreadViewport({
 			ref={stackRef}
 			className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
 		>
+			<SubagentFilterBanner
+				sessionId={pane.sessionId}
+				summary={subagentSummary}
+			/>
 			<div className="relative z-10 flex min-h-0 min-w-0 flex-1">
 				<ChatThread
 					hasSession={hasSession}
 					workspaceName={workspaceName}
-					messages={pane.messages}
+					messages={filteredMessages}
 					missingScriptTypes={missingScriptTypes}
 					onInitializeScript={onInitializeScript}
 					paneWidth={paneWidth}
 					sessionId={pane.sessionId}
-					sending={pane.sending}
+					sending={subagentFilter ? false : pane.sending}
 				/>
 			</div>
 		</div>
