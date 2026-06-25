@@ -10,6 +10,9 @@ import type { ComponentType } from "react";
 import { stopEventPropagation, useEditor } from "tldraw";
 import type { CanvasPanelType } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { parsePanelConfig } from "./panel-config";
+import { ConversationPanelBody } from "./panels/conversation-panel";
+import { TerminalPanelBody } from "./panels/terminal-panel";
 import type { PanelShape } from "./shapes/panel-shape";
 
 type PanelMeta = {
@@ -74,10 +77,34 @@ export function PanelHost({ shape }: { shape: PanelShape }) {
 }
 
 function PanelBody({ shape }: { shape: PanelShape }) {
-	// Phase 1: placeholder body for every panel type. Phases 2 & 4 swap in
-	// live conversation / terminal / notes / editor surfaces here, keyed off
-	// shape.props.panelType + the bound id in shape.props.config.
-	const meta = PANEL_META[shape.props.panelType] ?? PANEL_META.placeholder;
+	const config = parsePanelConfig(shape.props.config);
+
+	if (shape.props.panelType === "conversation") {
+		return config.sessionId ? (
+			<ConversationPanelBody sessionId={config.sessionId} />
+		) : (
+			<PlaceholderBody type="conversation" note="No session bound." />
+		);
+	}
+	if (shape.props.panelType === "terminal") {
+		return config.instanceId ? (
+			<TerminalPanelBody instanceId={config.instanceId} />
+		) : (
+			<PlaceholderBody type="terminal" note="No terminal bound." />
+		);
+	}
+	// Notes / drawing / file-manager / editor land in Phase 4.
+	return <PlaceholderBody type={shape.props.panelType} />;
+}
+
+function PlaceholderBody({
+	type,
+	note = "Live content arrives in a later phase.",
+}: {
+	type: CanvasPanelType;
+	note?: string;
+}) {
+	const meta = PANEL_META[type] ?? PANEL_META.placeholder;
 	const Icon = meta.icon;
 	return (
 		<div
@@ -88,9 +115,7 @@ function PanelBody({ shape }: { shape: PanelShape }) {
 		>
 			<Icon className="size-8 opacity-40" />
 			<div className="font-medium text-sm">{meta.label} panel</div>
-			<div className="text-xs opacity-70">
-				Placeholder — live content arrives in a later phase.
-			</div>
+			<div className="text-xs opacity-70">{note}</div>
 		</div>
 	);
 }

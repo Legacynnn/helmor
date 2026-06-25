@@ -1,4 +1,5 @@
 import type { Editor, TLShapeId } from "tldraw";
+import { closeTerminal } from "@/features/terminal/terminal-session-store";
 import {
 	type CanvasPanel,
 	type CanvasPanelType,
@@ -7,6 +8,7 @@ import {
 	saveCanvasPanel,
 	saveCanvasViewState,
 } from "@/lib/api";
+import { parsePanelConfig } from "./panel-config";
 import type { PanelShape } from "./shapes/panel-shape";
 
 const PANEL_SAVE_DEBOUNCE_MS = 350;
@@ -140,6 +142,15 @@ export function attachCanvasSync(
 			}
 			for (const record of Object.values(removed)) {
 				if (record.typeName === "shape" && record.type === "panel") {
+					// Tear down a terminal panel's PTY on real deletion (NOT on a
+					// canvas-mode-toggle unmount — that path keeps the shape, so the
+					// store buffer survives). Deleting a conversation panel leaves its
+					// session + history intact (non-destructive).
+					const panel = record as PanelShape;
+					if (panel.props.panelType === "terminal") {
+						const { instanceId } = parsePanelConfig(panel.props.config);
+						if (instanceId) closeTerminal(instanceId);
+					}
 					queuePanelDelete(record.id);
 				}
 			}
