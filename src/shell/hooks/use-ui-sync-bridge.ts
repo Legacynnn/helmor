@@ -121,6 +121,16 @@ function handleUiMutation(
 				queryKey: helmorQueryKeys.sessionMessages(event.sessionId),
 			});
 			return;
+		case "canvasChanged":
+			// Mark the canvas snapshot stale WITHOUT refetching: the tldraw store
+			// owns the live on-screen state and persists its own edits, so an
+			// active refetch would fight local interactions. A canvas re-entry
+			// (query remount) pulls fresh state; Phase 6 adds live CLI reconcile.
+			void queryClient.invalidateQueries({
+				queryKey: helmorQueryKeys.canvasState(event.workspaceId),
+				refetchType: "none",
+			});
+			return;
 		case "sessionTurnPersisted": {
 			// A turn's terminal rows landed in the DB. While THIS client has a
 			// live stream (or an in-flight send) for the session, the local

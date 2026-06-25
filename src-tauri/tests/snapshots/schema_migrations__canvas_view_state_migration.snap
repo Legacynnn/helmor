@@ -1,0 +1,44 @@
+---
+source: tests/schema_migrations.rs
+expression: "table_columns(&connection, \"canvas_view_state\")"
+---
+- - workspace_id
+  - TEXT
+  - 0
+  - ~
+- - pan_x
+  - REAL
+  - 1
+  - "0"
+- - pan_y
+  - REAL
+  - 1
+  - "0"
+- - zoom
+  - REAL
+  - 1
+  - "1"
+- - translucency
+  - REAL
+  - 1
+  - "1"
+- - background_pattern
+  - TEXT
+  - 1
+  - "'dots'"
+- - background_color
+  - TEXT
+  - 0
+  - ~
+- - background_theme
+  - TEXT
+  - 1
+  - "'system'"
+- - snap_to_grid
+  - INTEGER
+  - 1
+  - "0"
+- - updated_at
+  - TEXT
+  - 1
+  - "datetime('now')"

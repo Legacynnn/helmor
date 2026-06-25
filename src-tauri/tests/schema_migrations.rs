@@ -570,3 +570,104 @@ fn repo_run_actions_stop_command_migration_adds_column_when_missing() {
         repo_run_actions_stop_columns(&connection)
     );
 }
+
+fn table_columns(
+    connection: &rusqlite::Connection,
+    table: &str,
+) -> Vec<(String, String, i64, Option<String>)> {
+    let mut statement = connection
+        .prepare(&format!(
+            "SELECT name, type, \"notnull\", dflt_value
+             FROM pragma_table_info('{table}')
+             ORDER BY cid"
+        ))
+        .unwrap();
+    statement
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap()
+}
+
+#[test]
+fn canvas_tables_migration_creates_tables_on_legacy_dbs() {
+    let connection = rusqlite::Connection::open_in_memory().unwrap();
+    // Bare pre-feature schema: no canvas tables at all. Seed the minimal
+    // workspaces shape the other migrations expect.
+    connection
+        .execute_batch(
+            r#"
+            CREATE TABLE workspaces (
+                id TEXT PRIMARY KEY,
+                repository_id TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            "#,
+        )
+        .unwrap();
+
+    schema::ensure_schema(&connection).unwrap();
+    // Idempotency — second pass must be a no-op.
+    schema::ensure_schema(&connection).unwrap();
+
+    // A panel + connection + view-state row must round-trip through the new
+    // tables without coercion errors (REAL coords, INTEGER booleans, JSON blobs).
+    connection
+        .execute(
+            "INSERT INTO canvas_panels (id, workspace_id, panel_type, x, y, width, height, z, locked, title, config)
+             VALUES ('p1', 'w1', 'placeholder', 10.5, 20.5, 480, 360, 0, 0, 'Panel', '{\"k\":\"v\"}')",
+            [],
+        )
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO canvas_connections (id, workspace_id, from_panel_id, to_panel_id, kind, meta)
+             VALUES ('c1', 'w1', 'p1', 'p2', 'generic', NULL)",
+            [],
+        )
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO canvas_view_state (workspace_id, pan_x, pan_y, zoom, translucency)
+             VALUES ('w1', 0, 0, 1.5, 0.8)",
+            [],
+        )
+        .unwrap();
+
+    let (panel_type, x, locked, config): (String, f64, i64, String) = connection
+        .query_row(
+            "SELECT panel_type, x, locked, config FROM canvas_panels WHERE id = 'p1'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .unwrap();
+    assert_eq!(panel_type, "placeholder");
+    assert_eq!(x, 10.5);
+    assert_eq!(locked, 0);
+    assert_eq!(config, "{\"k\":\"v\"}");
+
+    let zoom: f64 = connection
+        .query_row(
+            "SELECT zoom FROM canvas_view_state WHERE workspace_id = 'w1'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(zoom, 1.5);
+
+    assert_yaml_snapshot!(
+        "canvas_panels_migration",
+        table_columns(&connection, "canvas_panels")
+    );
+    assert_yaml_snapshot!(
+        "canvas_connections_migration",
+        table_columns(&connection, "canvas_connections")
+    );
+    assert_yaml_snapshot!(
+        "canvas_view_state_migration",
+        table_columns(&connection, "canvas_view_state")
+    );
+}

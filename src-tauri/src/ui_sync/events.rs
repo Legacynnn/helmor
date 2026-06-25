@@ -166,6 +166,13 @@ pub enum UiMutationEvent {
         workspace_id: String,
         slug: String,
     },
+    /// A workspace's Infinite Canvas (epic #61) changed — a panel or
+    /// connection was created/moved/resized/deleted, or the view state was
+    /// saved (including CLI-driven mutations). Frontends invalidate the
+    /// `canvasState` query for that workspace and re-sync the renderer.
+    CanvasChanged {
+        workspace_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -5,7 +5,13 @@
 // is pure structure + wiring, no state of its own. Lifted verbatim out of
 // AppShell's return; the header memo nodes stay computed upstream and ride in
 // via `workspacePane`.
-import type { ComponentProps, KeyboardEvent, PointerEvent } from "react";
+import {
+	type ComponentProps,
+	type KeyboardEvent,
+	lazy,
+	type PointerEvent,
+	Suspense,
+} from "react";
 import { FeedbackDialog } from "@/features/feedback";
 import type { WorkspaceDetail } from "@/lib/api";
 import type { ActiveScreen } from "@/shell/controllers/use-screen-controller";
@@ -17,6 +23,13 @@ import { ShellInspectorPane } from "./shell-inspector-pane";
 import { ShellResizeSeparator } from "./shell-resize-separator";
 import { ShellSidebarPane } from "./shell-sidebar-pane";
 import { WorkspacePaneSurface } from "./workspace-pane-surface";
+
+// Lazy: tldraw is heavy and pulled in only when canvas mode is active. Keeps it
+// out of the main bundle AND out of every shell test's module graph (tldraw
+// touches CSS.supports at import, which jsdom lacks).
+const CanvasSurface = lazy(() =>
+	import("@/features/canvas").then((m) => ({ default: m.CanvasSurface })),
+);
 
 type ResizeTarget = "sidebar" | "inspector";
 
@@ -30,6 +43,10 @@ type Props = {
 	>["onSubmitPrompt"];
 	workspaceViewMode: ShellViewMode;
 	activeScreen: ActiveScreen;
+	// Infinite Canvas mode (epic #61): replaces the center + inspector with a
+	// full-bleed canvas surface when active for the selected workspace.
+	canvasActive: boolean;
+	selectedWorkspaceId: string | null;
 	// Left sidebar + its resize separator.
 	sidebar: ComponentProps<typeof ShellSidebarPane>;
 	sidebarCollapsed: boolean;
@@ -61,6 +78,8 @@ export function AppShellLayout({
 	onSubmitFeedbackPrompt,
 	workspaceViewMode,
 	activeScreen,
+	canvasActive,
+	selectedWorkspaceId,
 	sidebar,
 	sidebarCollapsed,
 	isSidebarResizing,
@@ -113,31 +132,50 @@ export function AppShellLayout({
 						</>
 					)}
 
-					{activeScreen === "none" ? (
-						<WorkspacePaneSurface {...workspacePane} />
-					) : (
-						<ScreenHost
-							activeScreen={activeScreen}
-							selectionActions={workspacePane.selectionActions}
-							screenActions={sidebar.screenActions}
-						/>
-					)}
-
-					{activeScreen === "none" &&
-						rightSidebarAvailable &&
-						selectedWorkspaceDetail?.mode !== "chat" && (
-							<>
-								<ShellResizeSeparator
-									side="inspector"
-									collapsed={inspectorCollapsed}
-									resizing={isInspectorResizing}
-									width={inspectorWidth}
-									onPointerDown={handleResizeStart("inspector")}
-									onKeyDown={handleResizeKeyDown("inspector")}
+					{canvasActive && selectedWorkspaceId ? (
+						<div className="relative min-w-0 flex-1">
+							<Suspense
+								fallback={
+									<div className="flex size-full items-center justify-center bg-app-base text-app-muted-foreground text-sm">
+										Loading canvas…
+									</div>
+								}
+							>
+								<CanvasSurface
+									key={selectedWorkspaceId}
+									workspaceId={selectedWorkspaceId}
 								/>
-								<ShellInspectorPane {...inspector} />
-							</>
-						)}
+							</Suspense>
+						</div>
+					) : (
+						<>
+							{activeScreen === "none" ? (
+								<WorkspacePaneSurface {...workspacePane} />
+							) : (
+								<ScreenHost
+									activeScreen={activeScreen}
+									selectionActions={workspacePane.selectionActions}
+									screenActions={sidebar.screenActions}
+								/>
+							)}
+
+							{activeScreen === "none" &&
+								rightSidebarAvailable &&
+								selectedWorkspaceDetail?.mode !== "chat" && (
+									<>
+										<ShellResizeSeparator
+											side="inspector"
+											collapsed={inspectorCollapsed}
+											resizing={isInspectorResizing}
+											width={inspectorWidth}
+											onPointerDown={handleResizeStart("inspector")}
+											onKeyDown={handleResizeKeyDown("inspector")}
+										/>
+										<ShellInspectorPane {...inspector} />
+									</>
+								)}
+						</>
+					)}
 				</div>
 			</main>
 			<AppOverlays {...overlays} />

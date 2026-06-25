@@ -1,3 +1,4 @@
+pub mod canvas;
 pub mod db;
 pub mod integration_connections;
 pub mod paired_devices;

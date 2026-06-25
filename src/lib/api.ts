@@ -2660,7 +2660,8 @@ export type UiMutationEvent =
 			type: "workspaceRevealRequested";
 			workspaceId: string;
 			sessionId: string | null;
-	  };
+	  }
+	| { type: "canvasChanged"; workspaceId: string };
 
 export type TriageConfig = {
 	enabled: boolean;
@@ -5932,4 +5933,116 @@ export async function createWorkspaceFromTask(
 			describeInvokeError(error, "Unable to start a workspace from the task."),
 		);
 	}
+}
+
+// ── Infinite Canvas (epic #61) ──────────────────────────────────────────────
+
+/** Surface kinds a canvas panel can host. `placeholder` is the Phase 1 stub. */
+export type CanvasPanelType =
+	| "placeholder"
+	| "conversation"
+	| "terminal"
+	| "notes"
+	| "drawing"
+	| "file-manager"
+	| "editor";
+
+/** One placed surface on a workspace's canvas. `id` mirrors the tldraw shape
+ * id (frontend-generated UUID). `config` is opaque JSON owned by the renderer
+ * (e.g. the bound sessionId for a conversation/terminal panel). */
+export type CanvasPanel = {
+	id: string;
+	workspaceId: string;
+	panelType: CanvasPanelType;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	z: number;
+	locked: boolean;
+	title?: string | null;
+	config?: string | null;
+	createdAt: string;
+	updatedAt: string;
+};
+
+/** A generic typed edge between two panels. Chains are just multiple edges. */
+export type CanvasConnection = {
+	id: string;
+	workspaceId: string;
+	fromPanelId: string;
+	toPanelId: string;
+	kind: string;
+	meta?: string | null;
+	createdAt: string;
+};
+
+export type CanvasBackgroundPattern = "blank" | "dots" | "lines";
+export type CanvasBackgroundTheme = "light" | "dark" | "system";
+
+/** Per-workspace viewport + appearance. */
+export type CanvasViewState = {
+	workspaceId: string;
+	panX: number;
+	panY: number;
+	zoom: number;
+	/** Global DOM-panel translucency, 0..=1 (1 = opaque). */
+	translucency: number;
+	backgroundPattern: CanvasBackgroundPattern;
+	backgroundColor?: string | null;
+	backgroundTheme: CanvasBackgroundTheme;
+	snapToGrid: boolean;
+	updatedAt: string;
+};
+
+/** Full canvas snapshot for a workspace — loaded on canvas entry. */
+export type CanvasState = {
+	panels: CanvasPanel[];
+	connections: CanvasConnection[];
+	viewState: CanvasViewState;
+};
+
+/** Load the persisted canvas for a workspace (defaults when never entered). */
+export async function loadCanvasState(
+	workspaceId: string,
+): Promise<CanvasState> {
+	return invoke<CanvasState>("load_canvas_state", { workspaceId });
+}
+
+/** Insert-or-update a panel. Broadcasts `canvasChanged`. */
+export async function saveCanvasPanel(panel: CanvasPanel): Promise<void> {
+	return invoke<void>("save_canvas_panel", { panel });
+}
+
+/** Delete a panel and any edges touching it. Broadcasts `canvasChanged`. */
+export async function deleteCanvasPanel(
+	workspaceId: string,
+	panelId: string,
+): Promise<void> {
+	return invoke<void>("delete_canvas_panel", { workspaceId, panelId });
+}
+
+/** Persist viewport + appearance. Broadcasts `canvasChanged`. */
+export async function saveCanvasViewState(
+	view: CanvasViewState,
+): Promise<void> {
+	return invoke<void>("save_canvas_view_state", { view });
+}
+
+/** Insert-or-update a connection. Broadcasts `canvasChanged`. */
+export async function saveCanvasConnection(
+	connection: CanvasConnection,
+): Promise<void> {
+	return invoke<void>("save_canvas_connection", { connection });
+}
+
+/** Delete a connection. Broadcasts `canvasChanged`. */
+export async function deleteCanvasConnection(
+	workspaceId: string,
+	connectionId: string,
+): Promise<void> {
+	return invoke<void>("delete_canvas_connection", {
+		workspaceId,
+		connectionId,
+	});
 }

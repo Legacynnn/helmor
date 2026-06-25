@@ -41,6 +41,7 @@ import {
 	loadArchivedWorkspaces,
 	loadAutoCloseActionKinds,
 	loadAutoCloseOptInAsked,
+	loadCanvasState,
 	loadProviderCapabilities,
 	loadSessionThreadMessages,
 	loadWorkspaceDetail,
@@ -173,6 +174,7 @@ export const helmorQueryKeys = {
 	workspaceCandidateDirectories: (excludeWorkspaceId: string | null) =>
 		["workspaceCandidateDirectories", excludeWorkspaceId ?? ""] as const,
 	activeStreams: ["activeStreams"] as const,
+	canvasState: (workspaceId: string) => ["canvasState", workspaceId] as const,
 	slackWorkspaces: ["slackWorkspaces"] as const,
 	slackInbox: (teamId: string) => ["slackInbox", teamId] as const,
 	slackSearch: (teamId: string, query: string, sort: string) =>
@@ -643,6 +645,19 @@ export function sessionPlanStateQueryOptions(sessionId: string) {
 		queryKey: helmorQueryKeys.sessionPlanState(sessionId),
 		queryFn: () => getSessionPlanState(sessionId),
 		staleTime: 0,
+	});
+}
+
+/** Infinite Canvas snapshot for a workspace. Loaded once on canvas entry and
+ * treated as the hydration source — the tldraw store owns the live state
+ * thereafter. `canvasChanged` marks this stale (no auto-refetch) so local
+ * edits never trigger a reconcile loop; a re-entry pulls fresh state. */
+export function canvasStateQueryOptions(workspaceId: string) {
+	return queryOptions({
+		queryKey: helmorQueryKeys.canvasState(workspaceId),
+		queryFn: () => loadCanvasState(workspaceId),
+		staleTime: Number.POSITIVE_INFINITY,
+		gcTime: 5 * 60_000,
 	});
 }
 

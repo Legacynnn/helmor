@@ -835,6 +835,11 @@ fn run_migrations(connection: &Connection) -> Result<()> {
         .execute_batch(RUNTIME_PROCESSES_DDL)
         .context("Failed to create runtime_processes table")?;
 
+    // Infinite Canvas tables (epic #61). Idempotent CREATE TABLE IF NOT EXISTS.
+    connection
+        .execute_batch(CANVAS_DDL)
+        .context("Failed to create canvas tables")?;
+
     // 'from_branch' = fork a new branch; 'use_branch' = attach as-is.
     if has_table(connection, "workspaces") && !has_column(connection, "workspaces", "branch_intent")
     {
@@ -986,6 +991,59 @@ CREATE TABLE IF NOT EXISTS session_plan_state (
     status TEXT NOT NULL DEFAULT 'active',
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+"#;
+
+// Infinite Canvas mode (epic #61). Greenfield, per-workspace spatial layout.
+//   - canvas_panels:       every surface placed on the canvas (UUID-keyed).
+//   - canvas_connections:  generic typed edges between panels (chains allowed).
+//   - canvas_view_state:   per-workspace pan/zoom/translucency + background.
+// `config` / `meta` are opaque JSON blobs owned by the frontend so panel and
+// connection kinds can evolve without schema churn. Idempotent CREATE TABLE so
+// existing DBs pick them up on next launch.
+const CANVAS_DDL: &str = r#"
+CREATE TABLE IF NOT EXISTS canvas_panels (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    panel_type TEXT NOT NULL,
+    x REAL NOT NULL DEFAULT 0,
+    y REAL NOT NULL DEFAULT 0,
+    width REAL NOT NULL DEFAULT 480,
+    height REAL NOT NULL DEFAULT 360,
+    z INTEGER NOT NULL DEFAULT 0,
+    locked INTEGER NOT NULL DEFAULT 0,
+    title TEXT,
+    config TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS canvas_connections (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    from_panel_id TEXT NOT NULL,
+    to_panel_id TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'generic',
+    meta TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS canvas_view_state (
+    workspace_id TEXT PRIMARY KEY,
+    pan_x REAL NOT NULL DEFAULT 0,
+    pan_y REAL NOT NULL DEFAULT 0,
+    zoom REAL NOT NULL DEFAULT 1,
+    translucency REAL NOT NULL DEFAULT 1,
+    background_pattern TEXT NOT NULL DEFAULT 'dots',
+    background_color TEXT,
+    background_theme TEXT NOT NULL DEFAULT 'system',
+    snap_to_grid INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_canvas_panels_workspace
+    ON canvas_panels(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_canvas_connections_workspace
+    ON canvas_connections(workspace_id);
 "#;
 
 // Idempotent `ALTER TABLE ... ADD COLUMN`; no-op when the column already exists.

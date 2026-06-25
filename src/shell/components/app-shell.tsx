@@ -7,6 +7,7 @@
 // the `useAppShellState` result (`s` + its `sel` / `data` / `chrome` / `panels`
 // groups).
 import { useCallback, useMemo } from "react";
+import { useIsCanvasMode } from "@/features/canvas/use-canvas-mode";
 import type { SettingsSection } from "@/features/settings";
 import { useScreenController } from "@/shell/controllers/use-screen-controller";
 import { useAppShellState } from "@/shell/hooks/use-app-shell-state";
@@ -30,6 +31,9 @@ export function AppShell({
 	// threads into the data/chrome layers, so the P1-A header memo deps below
 	// see byte-identical values, just sourced from the router.
 	const selectedWorkspaceId = s.selectedWorkspaceId;
+	// Infinite Canvas mode (epic #61): when active for the selected workspace,
+	// the canvas surface replaces the center + inspector (the sidebar stays).
+	const canvasActive = useIsCanvasMode(selectedWorkspaceId);
 	// Top-level screen state (Dashboard/Tasks/History), also router-backed now —
 	// it lives in the `?screen` search param (see `useScreenController`).
 	const screen = useScreenController();
@@ -113,6 +117,8 @@ export function AppShell({
 			onSubmitFeedbackPrompt={data.submitFeedbackPrompt}
 			workspaceViewMode={s.workspaceViewMode}
 			activeScreen={screen.activeScreen}
+			canvasActive={canvasActive}
+			selectedWorkspaceId={selectedWorkspaceId}
 			sidebar={{
 				activeScreen: screen.activeScreen,
 				screenActions: screen.screenActions,

@@ -1,0 +1,32 @@
+---
+source: tests/schema_migrations.rs
+expression: "table_columns(&connection, \"canvas_connections\")"
+---
+- - id
+  - TEXT
+  - 0
+  - ~
+- - workspace_id
+  - TEXT
+  - 1
+  - ~
+- - from_panel_id
+  - TEXT
+  - 1
+  - ~
+- - to_panel_id
+  - TEXT
+  - 1
+  - ~
+- - kind
+  - TEXT
+  - 1
+  - "'generic'"
+- - meta
+  - TEXT
+  - 0
+  - ~
+- - created_at
+  - TEXT
+  - 1
+  - "datetime('now')"
