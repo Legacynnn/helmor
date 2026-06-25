@@ -125,6 +125,7 @@ pub(super) fn stream_via_sidecar(
             .and_then(|(_, _, workspace_id)| workspace_id.as_deref()),
         working_directory,
         request.permission_mode.as_deref(),
+        request.sibling_session_ids.as_deref(),
     );
 
     // Combine the optional hidden preamble with the user's prompt. Only
@@ -1468,10 +1469,11 @@ pub(crate) fn build_helmor_system_prompt_for_workspace(
     workspace_id: Option<&str>,
     working_directory: &std::path::Path,
     permission_mode: Option<&str>,
+    sibling_session_ids: Option<&[String]>,
 ) -> Option<String> {
     use crate::agents::system_prompt::{
         build_helmor_chat_prompt, build_helmor_system_prompt, HelmorChatPromptContext,
-        HelmorSystemPromptContext,
+        HelmorSystemPromptContext, SiblingSessionInfo,
     };
 
     let workspace_id = workspace_id?;
@@ -1555,6 +1557,29 @@ pub(crate) fn build_helmor_system_prompt_for_workspace(
             Ok(Some(ref v)) if v == "true"
         );
 
+    // Resolve sibling pane titles from the same workspace. The frontend
+    // sends only the sibling session IDs (the split-canvas layout it owns);
+    // we look up their titles here so the addendum reads naturally. Unknown
+    // IDs (e.g. a just-deleted pane) are skipped. Best-effort: a failed
+    // lookup just elides the addendum rather than failing the send.
+    let sibling_sessions = match sibling_session_ids {
+        Some(ids) if !ids.is_empty() => {
+            let titles: std::collections::HashMap<String, String> =
+                crate::models::sessions::list_workspace_sessions(workspace_id)
+                    .map(|sessions| sessions.into_iter().map(|s| (s.id, s.title)).collect())
+                    .unwrap_or_default();
+            ids.iter()
+                .filter_map(|id| {
+                    titles.get(id).map(|title| SiblingSessionInfo {
+                        id: id.clone(),
+                        title: title.clone(),
+                    })
+                })
+                .collect()
+        }
+        _ => Vec::new(),
+    };
+
     let ctx = HelmorSystemPromptContext {
         workspace_label,
         workspace_root_path: working_directory.display().to_string(),
@@ -1565,6 +1590,7 @@ pub(crate) fn build_helmor_system_prompt_for_workspace(
         stack,
         permission_mode: permission_mode.map(str::to_string),
         mdx_planning,
+        sibling_sessions,
     };
     Some(build_helmor_system_prompt(&ctx))
 }

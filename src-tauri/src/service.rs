@@ -301,6 +301,8 @@ pub fn send_message(
         Some(&workspace_id),
         std::path::Path::new(&cwd),
         params.permission_mode.as_deref(),
+        // CLI-launched sends carry no split-canvas, so no sibling addendum.
+        None,
     );
     let wire_prompt = match helmor_prefix.as_deref() {
         Some(helmor) => format!("{helmor}\n\nUser request:\n{}", params.prompt),

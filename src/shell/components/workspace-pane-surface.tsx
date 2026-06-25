@@ -24,7 +24,7 @@ import type {
 	ShellViewMode,
 } from "@/shell/controllers/use-selection-controller";
 import type { StartSurfaceActions } from "@/shell/controllers/use-start-surface-controller";
-import { ShellWorkspaceConversation } from "./shell-workspace-conversation";
+import { ShellCanvasConversation } from "./shell-canvas-conversation";
 import { StartSurfacePane } from "./start-surface-pane";
 
 type ConversationProps = WorkspaceConversationContainerProps;
@@ -207,7 +207,7 @@ export function WorkspacePaneSurface({
 							composerAtBottom={startComposerAtBottom}
 						/>
 					) : (
-						<ShellWorkspaceConversation
+						<ShellCanvasConversation
 							repoId={repoId}
 							sessionSelectionHistory={sessionSelectionHistory}
 							onSelectSession={onSelectSession}

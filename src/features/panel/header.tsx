@@ -6,6 +6,7 @@ import {
 	ChevronDown,
 	ClipboardList,
 	Clock3,
+	Columns2,
 	Copy,
 	GitBranch,
 	History,
@@ -14,6 +15,7 @@ import {
 	MessageCircle,
 	Pencil,
 	RotateCcw,
+	Rows2,
 	Trash2,
 	X,
 } from "lucide-react";
@@ -31,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -83,6 +86,20 @@ export type PlanTab = {
 	title: string;
 };
 
+/** Split-canvas: when the conversation is split into multiple panes, the
+ *  member sessions collapse into ONE "group" tab in the single tab bar (a
+ *  title + a badge with the pane count) instead of one tab per pane — the panes
+ *  are all on screen at once, so they don't each need a sub-tab. */
+export type CanvasGroupTab = {
+	/** Sessions that are panes of the current canvas — collapsed into one tab. */
+	sessionIds: string[];
+	/** Number of panes (drives the badge). */
+	count: number;
+	/** The focused pane's session — the group tab's value + highlight target.
+	 *  Its title labels the group tab (resolved here, where titles are known). */
+	activeSessionId: string;
+};
+
 /** Tab value prefix for a plan tab. The slug is appended so the existing
  *  `onValueChange` handler can decode which plan was selected — mirroring the
  *  hardcoded `__context_preview__` context-preview tab value.
@@ -128,6 +145,16 @@ type WorkspacePanelHeaderProps = {
 	onSelectWorkspace?: (workspaceId: string) => void;
 	newSessionShortcut?: string | null;
 	newSessionMenuShortcut?: string | null;
+	/** When set, the listed sessions render as a SINGLE collapsed "split" tab
+	 *  (title + pane-count badge) instead of one tab each. Absent ⇒ normal
+	 *  one-tab-per-session behaviour (single-pane). */
+	canvasGroup?: CanvasGroupTab | null;
+	/** Split-canvas: split the current conversation toward the given direction
+	 *  (`row` = side by side, `col` = stacked). When provided, the header shows
+	 *  split controls next to the history button. */
+	onCanvasSplit?: (direction: "row" | "col") => void;
+	/** Disable the split controls (e.g. at the 4-pane cap). */
+	canvasSplitDisabled?: boolean;
 };
 
 const SESSION_TITLE_TOOLTIP_MAX_CHARS = 240;
@@ -165,7 +192,16 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 	onSelectWorkspace,
 	newSessionShortcut,
 	newSessionMenuShortcut,
+	canvasGroup = null,
+	onCanvasSplit,
+	canvasSplitDisabled = false,
 }: WorkspacePanelHeaderProps) {
+	const canvasSessionIdSet = canvasGroup
+		? new Set(canvasGroup.sessionIds)
+		: null;
+	// Emit the collapsed group tab exactly once, at the position of the first
+	// canvas-member session in the strip.
+	let canvasGroupEmitted = false;
 	const branchTone = getWorkspaceBranchTone({
 		workspaceState: workspace?.state,
 		status: workspace?.status,
@@ -612,6 +648,50 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 										</Tooltip>
 									) : null}
 									{sessions.map((session) => {
+										// Split-canvas: collapse all canvas-member sessions into a
+										// single "split" tab (rendered once, at the first member).
+										if (canvasSessionIdSet?.has(session.id) && canvasGroup) {
+											if (canvasGroupEmitted) {
+												return null;
+											}
+											canvasGroupEmitted = true;
+											const groupSelected = canvasSessionIdSet.has(
+												selectedSessionId ?? "",
+											);
+											const activeGroupSession = sessions.find(
+												(s) => s.id === canvasGroup.activeSessionId,
+											);
+											const groupTitle = activeGroupSession
+												? displaySessionTitle(activeGroupSession)
+												: "Split view";
+											return (
+												<TabsTrigger
+													key="__canvas_group__"
+													value={canvasGroup.activeSessionId}
+													aria-label={`Split view, ${canvasGroup.count} panes`}
+													className="group/tab relative h-full w-auto min-w-[6.5rem] max-w-[14rem] shrink-0 flex-none justify-start gap-1.5 overflow-hidden text-ui text-muted-foreground data-[state=active]:text-foreground"
+												>
+													<Columns2
+														className="size-3.5 shrink-0"
+														strokeWidth={2}
+													/>
+													<span className="min-w-0 flex-1 truncate">
+														{groupTitle}
+													</span>
+													<span
+														aria-hidden="true"
+														className={cn(
+															"flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-1 text-[0.625rem] font-semibold leading-none tabular-nums",
+															groupSelected
+																? "bg-foreground/15 text-foreground"
+																: "bg-muted text-muted-foreground",
+														)}
+													>
+														{canvasGroup.count}
+													</span>
+												</TabsTrigger>
+											);
+										}
 										const selected = session.id === selectedSessionId;
 										const isActivelySending =
 											busySessionIds?.has(session.id) === true ||
@@ -632,6 +712,12 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 												<TooltipTrigger asChild>
 													<TabsTrigger
 														value={session.id}
+														// Split-canvas drag source: a pointer-drag of this
+														// tab onto a pane edge splits/moves it into the
+														// canvas. `useCanvasTabDnd` reads this attribute
+														// globally — no callback threading. A plain click is
+														// unaffected (drag needs a movement threshold).
+														data-canvas-drag-session={session.id}
 														onMouseEnter={() => {
 															onPrefetchSession?.(session.id);
 														}}
@@ -822,83 +908,118 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 					disabled={!workspace}
 				/>
 
-				<DropdownMenu
-					open={hiddenHistory.showHistory}
-					onOpenChange={hiddenHistory.toggleHistory}
-				>
-					<DropdownMenuTrigger asChild>
-						<Button
-							aria-label="Session history"
-							variant="ghost"
-							size="icon-sm"
-							className={cn(
-								"ml-1 shrink-0 text-muted-foreground hover:bg-accent/60 hover:text-foreground focus-visible:border-transparent focus-visible:ring-0",
-								hiddenHistory.showHistory && "bg-accent/60 text-foreground",
-							)}
-						>
-							<History className="size-3.5" strokeWidth={1.8} />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent
-						align="end"
-						className="max-h-96 w-56 overscroll-contain"
-					>
-						{hiddenHistory.hiddenSessions.length > 0 ? (
-							hiddenHistory.hiddenSessions.map((session) => (
-								<Tooltip key={session.id}>
-									<TooltipTrigger asChild>
-										<div className="flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-small text-muted-foreground hover:bg-accent/60">
-											<div className="flex min-w-0 items-center gap-1.5">
-												<SessionProviderIcon
-													agentType={session.agentType}
-													active={false}
-												/>
-												<span className="truncate">
-													{displaySessionTitle(session)}
-												</span>
-											</div>
-											<div className="flex shrink-0 items-center gap-0.5">
-												<Button
-													aria-label="Restore session"
-													onClick={() => hiddenHistory.unhide(session.id)}
-													variant="ghost"
-													size="icon-xs"
-													className="text-muted-foreground hover:text-foreground"
-												>
-													<RotateCcw className="size-3" strokeWidth={1.8} />
-												</Button>
-												<Button
-													aria-label="Delete session permanently"
-													onClick={() =>
-														sessionActions.deleteHiddenSession(session.id)
-													}
-													variant="ghost"
-													size="icon-xs"
-													className="text-muted-foreground hover:text-destructive"
-												>
-													<Trash2 className="size-3" strokeWidth={1.8} />
-												</Button>
-											</div>
-										</div>
-									</TooltipTrigger>
-									<TooltipContent
-										side="left"
-										sideOffset={4}
-										className={SESSION_TITLE_TOOLTIP_CLASS}
+				{onCanvasSplit ? (
+					<DropdownMenu>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<DropdownMenuTrigger asChild>
+									<Button
+										aria-label="Split conversation"
+										variant="ghost"
+										size="icon-sm"
+										disabled={canvasSplitDisabled}
+										className="ml-1 shrink-0 text-muted-foreground hover:bg-accent/60 hover:text-foreground focus-visible:border-transparent focus-visible:ring-0"
 									>
-										<span className={SESSION_TITLE_TOOLTIP_TEXT_CLASS}>
-											{displayTooltipTitle(displaySessionTitle(session))}
-										</span>
-									</TooltipContent>
-								</Tooltip>
-							))
-						) : (
-							<div className="px-2.5 py-1.5 text-mini text-muted-foreground">
-								No hidden sessions
-							</div>
-						)}
-					</DropdownMenuContent>
-				</DropdownMenu>
+										<Columns2 className="size-3.5" strokeWidth={1.8} />
+									</Button>
+								</DropdownMenuTrigger>
+							</TooltipTrigger>
+							<TooltipContent side="bottom" sideOffset={4}>
+								Split conversation
+							</TooltipContent>
+						</Tooltip>
+						<DropdownMenuContent align="end" className="w-44">
+							<DropdownMenuItem onSelect={() => onCanvasSplit("row")}>
+								<Columns2 className="size-3.5" strokeWidth={1.8} />
+								Split right
+							</DropdownMenuItem>
+							<DropdownMenuItem onSelect={() => onCanvasSplit("col")}>
+								<Rows2 className="size-3.5" strokeWidth={1.8} />
+								Split down
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				) : null}
+
+				{onCanvasSplit ? null : (
+					<DropdownMenu
+						open={hiddenHistory.showHistory}
+						onOpenChange={hiddenHistory.toggleHistory}
+					>
+						<DropdownMenuTrigger asChild>
+							<Button
+								aria-label="Session history"
+								variant="ghost"
+								size="icon-sm"
+								className={cn(
+									"ml-1 shrink-0 text-muted-foreground hover:bg-accent/60 hover:text-foreground focus-visible:border-transparent focus-visible:ring-0",
+									hiddenHistory.showHistory && "bg-accent/60 text-foreground",
+								)}
+							>
+								<History className="size-3.5" strokeWidth={1.8} />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent
+							align="end"
+							className="max-h-96 w-56 overscroll-contain"
+						>
+							{hiddenHistory.hiddenSessions.length > 0 ? (
+								hiddenHistory.hiddenSessions.map((session) => (
+									<Tooltip key={session.id}>
+										<TooltipTrigger asChild>
+											<div className="flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-small text-muted-foreground hover:bg-accent/60">
+												<div className="flex min-w-0 items-center gap-1.5">
+													<SessionProviderIcon
+														agentType={session.agentType}
+														active={false}
+													/>
+													<span className="truncate">
+														{displaySessionTitle(session)}
+													</span>
+												</div>
+												<div className="flex shrink-0 items-center gap-0.5">
+													<Button
+														aria-label="Restore session"
+														onClick={() => hiddenHistory.unhide(session.id)}
+														variant="ghost"
+														size="icon-xs"
+														className="text-muted-foreground hover:text-foreground"
+													>
+														<RotateCcw className="size-3" strokeWidth={1.8} />
+													</Button>
+													<Button
+														aria-label="Delete session permanently"
+														onClick={() =>
+															sessionActions.deleteHiddenSession(session.id)
+														}
+														variant="ghost"
+														size="icon-xs"
+														className="text-muted-foreground hover:text-destructive"
+													>
+														<Trash2 className="size-3" strokeWidth={1.8} />
+													</Button>
+												</div>
+											</div>
+										</TooltipTrigger>
+										<TooltipContent
+											side="left"
+											sideOffset={4}
+											className={SESSION_TITLE_TOOLTIP_CLASS}
+										>
+											<span className={SESSION_TITLE_TOOLTIP_TEXT_CLASS}>
+												{displayTooltipTitle(displaySessionTitle(session))}
+											</span>
+										</TooltipContent>
+									</Tooltip>
+								))
+							) : (
+								<div className="px-2.5 py-1.5 text-mini text-muted-foreground">
+									No hidden sessions
+								</div>
+							)}
+						</DropdownMenuContent>
+					</DropdownMenu>
+				)}
 			</div>
 		</header>
 	);

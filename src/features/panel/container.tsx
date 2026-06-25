@@ -30,6 +30,7 @@ import {
 	type WorkspaceScriptType,
 } from "@/lib/workspace-script-actions";
 import { publishShellEvent } from "@/shell/event-bus";
+import type { CanvasGroupTab } from "./header";
 import { WorkspacePanel } from "./index";
 import type { SessionCloseRequest } from "./use-confirm-session-close";
 
@@ -79,6 +80,17 @@ type WorkspacePanelContainerProps = {
 	 *  before the real send actually fires, swapped out as soon as the real
 	 *  user message lands in DB. */
 	optimisticPendingSubmit?: OptimisticPendingSubmit | null;
+	/** Split-canvas: collapse the listed sessions into one "split" tab. */
+	canvasGroup?: CanvasGroupTab | null;
+	/** Split-canvas: split the current conversation (header control). */
+	onCanvasSplit?: (direction: "row" | "col") => void;
+	canvasSplitDisabled?: boolean;
+	/** Render ONLY the header — used as the single shared tab bar above a
+	 *  multi-pane canvas. Suppresses the body + workspace-level side effects
+	 *  (auto-create, plan surfacing) that the panes themselves own. */
+	headerOnly?: boolean;
+	/** Render the body but NOT the header (each canvas pane). */
+	hideHeader?: boolean;
 };
 
 export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
@@ -104,6 +116,11 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	headerActions,
 	headerLeading,
 	optimisticPendingSubmit = null,
+	canvasGroup = null,
+	onCanvasSplit,
+	canvasSplitDisabled = false,
+	headerOnly = false,
+	hideHeader = false,
 }: WorkspacePanelContainerProps) {
 	const queryClient = useQueryClient();
 	const { settings } = useSettings();
@@ -138,6 +155,10 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	const autoCreatingWorkspaceRef = useRef<Set<string>>(new Set());
 
 	useEffect(() => {
+		// Header-only host doesn't own workspace lifecycle — the panes do.
+		if (headerOnly) {
+			return;
+		}
 		if (!displayedWorkspaceId || selectedWorkspaceId !== displayedWorkspaceId) {
 			return;
 		}
@@ -260,6 +281,7 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			cancelled = true;
 		};
 	}, [
+		headerOnly,
 		displayedWorkspaceId,
 		detailQuery.isFetchedAfterMount,
 		queryClient,
@@ -354,7 +376,9 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	// Selecting a plan tab is local panel state — distinct from the session
 	// selection so switching back to a session is a single click.
 	const planListQuery = usePlanList(
-		settings.mdxPlanningEnabled ? threadSessionId : null,
+		// The header-only host renders no thread, so it owns no plan surface —
+		// the panes do. Skip plan surfacing here to avoid a duplicate watcher.
+		!headerOnly && settings.mdxPlanningEnabled ? threadSessionId : null,
 	);
 	// The plan surface shows AT MOST ONE plan at a time. Opening another plan
 	// SWAPS it into the same single tab rather than stacking a new one, so there
@@ -818,6 +842,11 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			missingScriptTypes={missingScriptTypes}
 			onInitializeScript={handleInitializeScript}
 			changeRequest={workspaceChangeRequest}
+			canvasGroup={canvasGroup}
+			onCanvasSplit={onCanvasSplit}
+			canvasSplitDisabled={canvasSplitDisabled}
+			headerOnly={headerOnly}
+			hideHeader={hideHeader}
 		/>
 	);
 });
