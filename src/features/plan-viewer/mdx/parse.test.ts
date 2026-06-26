@@ -238,6 +238,43 @@ Second.`;
 		// b3 = Second — the counter is shared across recursion.
 		expect(parsed.blocks.map((b) => b.id)).toEqual(["b0", "b1", "b3"]);
 	});
+
+	it("still parses components when an agent leaks tool-call wrapper tags", () => {
+		// A `Write` call whose closing tags leaked into the saved plan body. The
+		// stray `</content></invoke>` make remark-mdx throw on a closing tag with
+		// no opener; without scrubbing them the WHOLE plan falls back to plain
+		// Markdown and the canvas never renders.
+		const src = [
+			"---",
+			'title: "Leaked"',
+			"status: draft",
+			"---",
+			"",
+			"Intro.",
+			"",
+			'<PlanCanvas theme="repo">',
+			'<CanvasNode id="a" title="A">body</CanvasNode>',
+			"</PlanCanvas>",
+			"",
+			"## Verification",
+			"- Confirm it works.",
+			"</content>",
+			"</invoke>",
+		].join("\n");
+
+		const parsed = parsePlanMdx(src);
+		const canvas = parsed.blocks.find(
+			(b) => b.kind === "component" && b.name === "PlanCanvas",
+		);
+		expect(canvas?.kind).toBe("component");
+		// The stray wrapper tags are gone, not rendered as prose.
+		const prose = parsed.blocks
+			.filter((b) => b.kind === "prose")
+			.map((b) => (b.kind === "prose" ? b.markdown : ""))
+			.join("\n");
+		expect(prose).not.toContain("</invoke>");
+		expect(prose).not.toContain("</content>");
+	});
 });
 
 describe("PlanCanvas structured parsing", () => {
@@ -273,5 +310,102 @@ describe("PlanCanvas structured parsing", () => {
 		expect(first.props.id).toBe("a");
 		expect(first.props.connects).toBe("b");
 		expect(first.childBlocks.some((c) => c.kind === "prose")).toBe(true);
+	});
+
+	it("masks and reattaches a Preview/Wireframe nested inside a CanvasNode", () => {
+		const src = [
+			"---",
+			'title: "T"',
+			"status: draft",
+			'summary: "S"',
+			"---",
+			"",
+			'<PlanCanvas theme="wireframe">',
+			'<CanvasNode id="login" title="Sign in" x="40" y="80">',
+			"<Wireframe>",
+			"section",
+			"  field Email",
+			"  button Continue",
+			"</Wireframe>",
+			"</CanvasNode>",
+			'<CanvasNode id="home" title="Home" x="460" y="80">',
+			"<Preview>",
+			"function App() {",
+			"  return <div onClick={() => {}}>hi</div>",
+			"}",
+			"</Preview>",
+			"</CanvasNode>",
+			"</PlanCanvas>",
+			"",
+		].join("\n");
+
+		const { blocks } = parsePlanMdx(src);
+		const canvas = blocks.find(
+			(b) => b.kind === "component" && b.name === "PlanCanvas",
+		);
+		if (canvas?.kind !== "component") throw new Error("expected component");
+		const nodes = canvas.childBlocks.filter(
+			(b) => b.kind === "component" && b.name === "CanvasNode",
+		);
+		expect(nodes).toHaveLength(2);
+
+		const login = nodes[0];
+		if (login.kind !== "component") throw new Error("expected component");
+		const wireframe = login.childBlocks.find(
+			(c) => c.kind === "component" && c.name === "Wireframe",
+		);
+		if (wireframe?.kind !== "component") throw new Error("expected wireframe");
+		// The raw masker lifted the body verbatim despite the nesting depth.
+		expect(wireframe.rawText).toContain("field Email");
+		expect(wireframe.rawText).toContain("button Continue");
+
+		const home = nodes[1];
+		if (home.kind !== "component") throw new Error("expected component");
+		const preview = home.childBlocks.find(
+			(c) => c.kind === "component" && c.name === "Preview",
+		);
+		if (preview?.kind !== "component") throw new Error("expected preview");
+		// The JS body (which would crash acorn) survived masking intact.
+		expect(preview.rawText).toContain("function App()");
+		expect(preview.rawText).toContain("onClick={() => {}}");
+	});
+
+	it("parses self-closing CanvasFlow and CanvasGroup with their props", () => {
+		const src = [
+			"---",
+			'title: "T"',
+			"status: draft",
+			'summary: "S"',
+			"---",
+			"",
+			'<PlanCanvas theme="wireframe">',
+			'<CanvasGroup id="auth" title="Onboarding" contains="login,home" />',
+			'<CanvasNode id="login" title="Sign in" x="40" y="80" />',
+			'<CanvasNode id="home" title="Home" x="460" y="80" />',
+			'<CanvasFlow from="login" to="home" label="Submit" kind="primary" />',
+			"</PlanCanvas>",
+			"",
+		].join("\n");
+
+		const { blocks } = parsePlanMdx(src);
+		const canvas = blocks.find(
+			(b) => b.kind === "component" && b.name === "PlanCanvas",
+		);
+		if (canvas?.kind !== "component") throw new Error("expected component");
+		const flow = canvas.childBlocks.find(
+			(b) => b.kind === "component" && b.name === "CanvasFlow",
+		);
+		if (flow?.kind !== "component") throw new Error("expected flow");
+		expect(flow.props).toMatchObject({
+			from: "login",
+			to: "home",
+			label: "Submit",
+			kind: "primary",
+		});
+		const group = canvas.childBlocks.find(
+			(b) => b.kind === "component" && b.name === "CanvasGroup",
+		);
+		if (group?.kind !== "component") throw new Error("expected group");
+		expect(group.props.contains).toBe("login,home");
 	});
 });
