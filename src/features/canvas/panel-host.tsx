@@ -14,6 +14,10 @@ import { useConnectionsStore } from "./connections/connections-store";
 import { PanelConnections } from "./connections/panel-connections";
 import { parsePanelConfig } from "./panel-config";
 import { ConversationPanelBody } from "./panels/conversation-panel";
+import { DrawingPanelBody } from "./panels/drawing-panel";
+import { EditorPanelBody } from "./panels/editor-panel";
+import { FileManagerPanelBody } from "./panels/file-manager-panel";
+import { NotesPanelBody } from "./panels/notes-panel";
 import { TerminalPanelBody } from "./panels/terminal-panel";
 import type { PanelShape } from "./shapes/panel-shape";
 
@@ -102,7 +106,18 @@ function PanelBody({ shape }: { shape: PanelShape }) {
 			<PlaceholderBody type="terminal" note="No terminal bound." />
 		);
 	}
-	// Notes / drawing / file-manager / editor land in Phase 4.
+	if (shape.props.panelType === "notes") {
+		return <NotesPanelBody shape={shape} />;
+	}
+	if (shape.props.panelType === "drawing") {
+		return <DrawingPanelBody shape={shape} />;
+	}
+	if (shape.props.panelType === "file-manager") {
+		return <FileManagerPanelBody shape={shape} />;
+	}
+	if (shape.props.panelType === "editor") {
+		return <EditorPanelBody shape={shape} />;
+	}
 	return <PlaceholderBody type={shape.props.panelType} />;
 }
 

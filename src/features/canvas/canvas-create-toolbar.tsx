@@ -1,4 +1,13 @@
-import { LayoutGrid, MessageSquare, Plus, SquareTerminal } from "lucide-react";
+import {
+	FolderTree,
+	LayoutGrid,
+	MessageSquare,
+	NotebookPen,
+	Pencil,
+	Plus,
+	SquarePen,
+	SquareTerminal,
+} from "lucide-react";
 import type { ComponentType } from "react";
 import { createShapeId, type Editor } from "tldraw";
 import { type CanvasPanelType, createSession } from "@/lib/api";
@@ -15,11 +24,14 @@ type PaletteEntry = {
 	icon: ComponentType<{ className?: string }>;
 };
 
-// Phase 2 ships the placeholder + the two live core panel kinds. The full
-// palette (notes/drawing/editor/…) lands with the right rail in Phase 5.
+// The full panel palette. The Phase 5 right "Create" rail will dress this up.
 const PALETTE: PaletteEntry[] = [
 	{ type: "conversation", label: "Conversation", icon: MessageSquare },
 	{ type: "terminal", label: "Terminal", icon: SquareTerminal },
+	{ type: "notes", label: "Notes", icon: NotebookPen },
+	{ type: "drawing", label: "Drawing", icon: Pencil },
+	{ type: "file-manager", label: "Files", icon: FolderTree },
+	{ type: "editor", label: "Editor", icon: SquarePen },
 	{ type: "placeholder", label: "Panel", icon: LayoutGrid },
 ];
 
