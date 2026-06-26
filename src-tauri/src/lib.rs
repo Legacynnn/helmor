@@ -733,6 +733,7 @@ pub fn run() {
             commands::canvas_commands::save_canvas_view_state,
             commands::canvas_commands::save_canvas_connection,
             commands::canvas_commands::delete_canvas_connection,
+            commands::canvas_commands::save_canvas_background,
             commands::terminal_commands::spawn_terminal,
             commands::terminal_commands::stop_terminal,
             commands::terminal_commands::write_terminal_stdin,

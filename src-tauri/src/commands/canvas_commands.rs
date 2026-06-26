@@ -6,6 +6,9 @@
 //! `canvasState` query stale without refetching (echo-free local edits); a
 //! re-entry or external mutation pulls fresh state.
 
+use anyhow::Context;
+use uuid::Uuid;
+
 use crate::models::canvas::{self, CanvasConnection, CanvasPanel, CanvasState, CanvasViewState};
 use crate::ui_sync::{self, UiMutationEvent};
 
@@ -85,6 +88,38 @@ pub async fn delete_canvas_connection(
         crate::models::db::write_transaction(|tx| canvas::delete_connection(tx, &connection_id))?;
         notify(&app, workspace_id);
         Ok(())
+    })
+    .await
+}
+
+/// Persist an uploaded background image to `{data_dir}/canvas-backgrounds/` and
+/// return its absolute path. Used by the canvas chrome's "set background" flow,
+/// which then stores the returned path in the view state.
+#[tauri::command]
+pub async fn save_canvas_background(
+    workspace_id: String,
+    bytes: Vec<u8>,
+    ext: String,
+) -> CmdResult<String> {
+    run_blocking(move || {
+        let ext = match ext.to_lowercase().as_str() {
+            e @ ("png" | "jpg" | "jpeg" | "webp" | "gif") => e.to_string(),
+            _ => "png".to_string(),
+        };
+
+        let dir = crate::data_dir::data_dir()?.join("canvas-backgrounds");
+        std::fs::create_dir_all(&dir).with_context(|| {
+            format!(
+                "Failed to create canvas backgrounds directory {}",
+                dir.display()
+            )
+        })?;
+
+        let path = dir.join(format!("{workspace_id}-{}.{ext}", Uuid::new_v4()));
+        std::fs::write(&path, &bytes)
+            .with_context(|| format!("Failed to write canvas background {}", path.display()))?;
+
+        Ok(path.to_string_lossy().into_owned())
     })
     .await
 }
