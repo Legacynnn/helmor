@@ -31,9 +31,12 @@ export function AppShell({
 	// threads into the data/chrome layers, so the P1-A header memo deps below
 	// see byte-identical values, just sourced from the router.
 	const selectedWorkspaceId = s.selectedWorkspaceId;
-	// Infinite Canvas mode (epic #61): when active for the selected workspace,
-	// the canvas surface replaces the center + inspector (the sidebar stays).
-	const canvasActive = useIsCanvasMode(selectedWorkspaceId);
+	// Infinite Canvas mode (epic #61): when active for the selected workspace
+	// AND the experimental opt-in is on, the canvas surface replaces the
+	// center + inspector (the sidebar stays). Disabling the opt-in forces any
+	// canvas-active workspace back to the normal layout.
+	const canvasActive =
+		useIsCanvasMode(selectedWorkspaceId) && s.appSettings.canvasModeEnabled;
 	// Top-level screen state (Dashboard/Tasks/History), also router-backed now —
 	// it lives in the `?screen` search param (see `useScreenController`).
 	const screen = useScreenController();

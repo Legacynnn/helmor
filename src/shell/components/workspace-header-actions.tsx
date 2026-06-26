@@ -32,6 +32,7 @@ import {
 	openWorkspaceInEditor,
 	openWorkspaceInFinder,
 } from "@/lib/api";
+import { useSettings } from "@/lib/settings";
 import type { PushWorkspaceToast } from "@/lib/workspace-toast-context";
 import { EditorIcon } from "@/shell/editor-icon";
 import { PREFERRED_EDITOR_STORAGE_KEY } from "@/shell/layout";
@@ -67,32 +68,36 @@ export function WorkspaceHeaderActions({
 }: Props) {
 	const hasEditorActions =
 		!isChatMode && installedEditors.length > 0 && preferredEditor !== null;
+	const { settings } = useSettings();
 
 	return (
 		<div className="flex items-center gap-1">
 			{/* Infinite Canvas (epic #61): enter the per-workspace spatial canvas.
-			 *  Exiting happens from the canvas's own top-left chrome. */}
-			<Tooltip>
-				<TooltipTrigger asChild>
-					<Button
-						aria-label="Open canvas mode"
-						onClick={() =>
-							useCanvasModeStore.getState().setMode(workspaceId, true)
-						}
-						variant="ghost"
-						size="icon-xs"
-						className="text-muted-foreground hover:text-foreground"
+			 *  Gated on the experimental opt-in; exiting happens from the canvas's
+			 *  own top-left chrome. */}
+			{settings.canvasModeEnabled ? (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							aria-label="Open canvas mode"
+							onClick={() =>
+								useCanvasModeStore.getState().setMode(workspaceId, true)
+							}
+							variant="ghost"
+							size="icon-xs"
+							className="text-muted-foreground hover:text-foreground"
+						>
+							<LayoutGrid className="size-4" strokeWidth={1.8} />
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent
+						side="bottom"
+						className="flex h-[24px] items-center rounded-md px-2 text-small leading-none"
 					>
-						<LayoutGrid className="size-4" strokeWidth={1.8} />
-					</Button>
-				</TooltipTrigger>
-				<TooltipContent
-					side="bottom"
-					className="flex h-[24px] items-center rounded-md px-2 text-small leading-none"
-				>
-					<span>Canvas mode</span>
-				</TooltipContent>
-			</Tooltip>
+						<span>Canvas mode</span>
+					</TooltipContent>
+				</Tooltip>
+			) : null}
 			{hasEditorActions ? (
 				<div className="flex -translate-x-[9px] items-center gap-0 max-[960px]:-translate-x-[1px] max-[640px]:hidden">
 					<Tooltip>
