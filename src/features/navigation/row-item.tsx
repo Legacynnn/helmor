@@ -5,6 +5,7 @@ import {
 	FolderOpen,
 	GitBranch,
 	Laptop,
+	LayoutGrid,
 	LoaderCircle,
 	Pin,
 	PinOff,
@@ -40,12 +41,14 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useCanvasModeStore } from "@/features/canvas/use-canvas-mode";
 import {
 	isAnyRunScriptRunning,
 	subscribeWorkspaceRunStatus,
 } from "@/features/inspector/script-store";
 import type { WorkspaceRow, WorkspaceStatus } from "@/lib/api";
 import { recordSidebarRowRender } from "@/lib/dev-render-debug";
+import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { getWorkspaceBranchTone } from "@/lib/workspace-helpers";
 import { WorkspaceAvatar } from "./avatar";
@@ -175,6 +178,12 @@ export const WorkspaceRowItem = memo(
 			recordSidebarRowRender(row.id);
 		}, [row.id]);
 		const isRunScriptRunning = useIsRunScriptRunning(row.id);
+		// Infinite Canvas (epic #61) per-workspace toggle, surfaced in this row's
+		// context menu when the experimental opt-in is on.
+		const canvasModeEnabled = useSettings().settings.canvasModeEnabled;
+		const isCanvasActive = useCanvasModeStore((s) =>
+			Boolean(s.byWorkspace[row.id]),
+		);
 
 		// Hover-intent debounce: skip prefetch when the mouse just sweeps over
 		// the row. ~120ms is short enough that the data is still warm by the
@@ -618,6 +627,22 @@ export const WorkspaceRowItem = memo(
 							)}
 							<span>{isPinned ? "Unpin" : "Pin"}</span>
 						</ContextMenuItem>
+
+						{canvasModeEnabled && !isRestoreAction ? (
+							<ContextMenuItem
+								onClick={() => {
+									if (isCanvasActive) {
+										useCanvasModeStore.getState().setMode(row.id, false);
+									} else {
+										onSelect?.(row.id);
+										useCanvasModeStore.getState().setMode(row.id, true);
+									}
+								}}
+							>
+								<LayoutGrid className="size-4 shrink-0" strokeWidth={1.6} />
+								<span>{isCanvasActive ? "Exit canvas" : "Open in canvas"}</span>
+							</ContextMenuItem>
+						) : null}
 
 						<ContextMenuSub>
 							<ContextMenuSubTrigger>
