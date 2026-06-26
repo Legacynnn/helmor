@@ -102,8 +102,15 @@ pub async fn save_canvas_background(
     ext: String,
 ) -> CmdResult<String> {
     run_blocking(move || {
+        // `workspace_id` arrives as a raw IPC string and is interpolated into a
+        // filesystem path below; validate it is a real UUID so a crafted value
+        // (e.g. "../../etc") can't escape the backgrounds directory.
+        let workspace_id = Uuid::parse_str(&workspace_id)
+            .with_context(|| format!("Invalid workspace_id: {workspace_id}"))?
+            .to_string();
+
         let ext = match ext.to_lowercase().as_str() {
-            e @ ("png" | "jpg" | "jpeg" | "webp" | "gif") => e.to_string(),
+            "png" | "jpg" | "jpeg" | "webp" | "gif" => ext.to_lowercase(),
             _ => "png".to_string(),
         };
 
