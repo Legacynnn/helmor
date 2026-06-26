@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { stopEventPropagation } from "tldraw";
 import { readEditorFile, writeEditorFile } from "@/lib/api";
 import { createFileEditor } from "@/lib/monaco-runtime";
 import { useCanvasWorkspace } from "../canvas-workspace-context";
 import { parsePanelConfig } from "../panel-config";
-import type { PanelShape } from "../shapes/panel-shape";
 
 type FileEditorController = Awaited<ReturnType<typeof createFileEditor>>;
 
@@ -16,13 +14,12 @@ function joinPath(root: string, rel: string): string {
 
 type Status = "empty" | "loading" | "ready" | "error";
 
-/** Monaco file editor bound to one workspace-relative file. Loads content from
- * disk on mount and debounce-saves edits back. `automaticLayout` handles panel
- * resizes. The open file is persisted in `config.filePath` so it reopens on
- * reload. */
-export function EditorPanelBody({ shape }: { shape: PanelShape }) {
+/** Monaco file editor bound to one workspace-relative file (`config.filePath`).
+ * Loads content from disk on mount and debounce-saves edits back.
+ * `automaticLayout` handles panel resizes. */
+export function EditorPanelBody({ config }: { config: string }) {
 	const { workspaceRootPath } = useCanvasWorkspace();
-	const filePath = parsePanelConfig(shape.props.config).filePath ?? null;
+	const filePath = parsePanelConfig(config).filePath ?? null;
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [status, setStatus] = useState<Status>("empty");
 
@@ -76,12 +73,7 @@ export function EditorPanelBody({ shape }: { shape: PanelShape }) {
 
 	return (
 		<div className="relative size-full bg-app-base">
-			<div
-				ref={containerRef}
-				className="size-full"
-				onPointerDown={stopEventPropagation}
-				onWheelCapture={stopEventPropagation}
-			/>
+			<div ref={containerRef} className="size-full" />
 			{status === "loading" ? (
 				<Overlay text="Loading…" />
 			) : status === "error" ? (

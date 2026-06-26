@@ -1,3 +1,4 @@
+import { useNodes, useReactFlow } from "@xyflow/react";
 import {
 	Circle,
 	FolderTree,
@@ -12,9 +13,7 @@ import {
 	SquarePen,
 	SquareTerminal,
 } from "lucide-react";
-import type { ComponentType } from "react";
-import { useState } from "react";
-import { type Editor, type TLShapeId, useValue } from "tldraw";
+import { type ComponentType, useState } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import type {
@@ -25,7 +24,7 @@ import type {
 import { cn } from "@/lib/utils";
 import { useCanvasViewStore } from "../canvas-view-store";
 import { useConnectionsStore } from "../connections/connections-store";
-import type { PanelShape } from "../shapes/panel-shape";
+import type { PanelNode } from "../types";
 
 const PANEL_ICONS: Record<
 	CanvasPanelType,
@@ -52,11 +51,12 @@ const PATTERNS: {
 
 const THEMES: CanvasBackgroundTheme[] = ["system", "light", "dark"];
 
-/** Left "Manage" rail: organize what already exists — panel list with
- * jump-to, the global translucency slider, background controls, and a
- * snap-to-grid toggle. Collapses out of the way. */
-export function CanvasManageRail({ editor }: { editor: Editor }) {
+/** Left "Manage" rail: panel list with jump-to, the global translucency
+ * slider, background controls, and a snap-to-grid toggle. Collapses away. */
+export function CanvasManageRail() {
 	const [collapsed, setCollapsed] = useState(false);
+	const rf = useReactFlow<PanelNode>();
+	const nodes = useNodes<PanelNode>();
 	const translucency = useCanvasViewStore((s) => s.translucency);
 	const pattern = useCanvasViewStore((s) => s.backgroundPattern);
 	const theme = useCanvasViewStore((s) => s.backgroundTheme);
@@ -64,19 +64,10 @@ export function CanvasManageRail({ editor }: { editor: Editor }) {
 	const setAppearance = useCanvasViewStore((s) => s.setAppearance);
 	const connectionCount = useConnectionsStore((s) => s.connections.length);
 
-	const panels = useValue<PanelShape[]>(
-		"canvas-panel-list",
-		() =>
-			editor
-				.getCurrentPageShapes()
-				.filter((s): s is PanelShape => s.type === "panel")
-				.sort((a, b) => a.y - b.y),
-		[editor],
-	);
+	const panels = [...nodes].sort((a, b) => a.position.y - b.position.y);
 
 	const jumpTo = (id: string) => {
-		editor.select(id as TLShapeId);
-		editor.zoomToSelection({ animation: { duration: 200 } });
+		void rf.fitView({ nodes: [{ id }], duration: 200, maxZoom: 1.2 });
 	};
 
 	if (collapsed) {
@@ -178,7 +169,7 @@ export function CanvasManageRail({ editor }: { editor: Editor }) {
 							</div>
 						) : (
 							panels.map((p) => {
-								const Icon = PANEL_ICONS[p.props.panelType] ?? LayoutGrid;
+								const Icon = PANEL_ICONS[p.data.panelType] ?? LayoutGrid;
 								return (
 									<button
 										key={p.id}
@@ -188,7 +179,7 @@ export function CanvasManageRail({ editor }: { editor: Editor }) {
 									>
 										<Icon className="size-3.5 shrink-0 opacity-60" />
 										<span className="min-w-0 flex-1 truncate">
-											{p.props.title || p.props.panelType}
+											{p.data.title || p.data.panelType}
 										</span>
 									</button>
 								);

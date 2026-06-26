@@ -15,7 +15,6 @@ vi.mock("@/lib/api", async (importOriginal) => {
 	};
 });
 
-// randomUUID is deterministic-enough here; just ensure uniqueness per call.
 let uuidCounter = 0;
 vi.stubGlobal("crypto", {
 	...globalThis.crypto,
@@ -42,11 +41,10 @@ it("derives edge kind from endpoint types", () => {
 	expect(deriveKind("placeholder", "terminal")).toBe("generic");
 });
 
-it("completes a click-to-connect and persists the edge", () => {
-	const store = useConnectionsStore.getState();
-	store.startConnect("a", "conversation");
-	store.completeConnect("b", "terminal");
-
+it("addConnection persists an edge with the derived kind", () => {
+	useConnectionsStore
+		.getState()
+		.addConnection("a", "b", "conversation", "terminal");
 	const conns = useConnectionsStore.getState().connections;
 	expect(conns).toHaveLength(1);
 	expect(conns[0]).toMatchObject({
@@ -55,28 +53,22 @@ it("completes a click-to-connect and persists the edge", () => {
 		kind: "conversation-terminal",
 	});
 	expect(apiMocks.saveCanvasConnection).toHaveBeenCalledOnce();
-	expect(useConnectionsStore.getState().pendingSource).toBeNull();
 });
 
 it("ignores self-connection and duplicates", () => {
 	const store = useConnectionsStore.getState();
-	store.startConnect("a", "conversation");
-	store.completeConnect("a", "conversation"); // self
+	store.addConnection("a", "a", "conversation", "conversation"); // self
 	expect(useConnectionsStore.getState().connections).toHaveLength(0);
 
-	store.startConnect("a", "conversation");
-	store.completeConnect("b", "terminal");
-	store.startConnect("a", "conversation");
-	store.completeConnect("b", "terminal"); // duplicate
+	store.addConnection("a", "b", "conversation", "terminal");
+	store.addConnection("a", "b", "conversation", "terminal"); // duplicate
 	expect(useConnectionsStore.getState().connections).toHaveLength(1);
 });
 
 it("setPrimaryTerminal makes the choice exclusive among a source's terminals", () => {
 	const store = useConnectionsStore.getState();
-	store.startConnect("conv", "conversation");
-	store.completeConnect("t1", "terminal");
-	store.startConnect("conv", "conversation");
-	store.completeConnect("t2", "terminal");
+	store.addConnection("conv", "t1", "conversation", "terminal");
+	store.addConnection("conv", "t2", "conversation", "terminal");
 
 	const [e1, e2] = useConnectionsStore.getState().connections;
 	store.setPrimaryTerminal("conv", e2.id);
@@ -87,7 +79,6 @@ it("setPrimaryTerminal makes the choice exclusive among a source's terminals", (
 	);
 	expect(connectionMeta(after.find((c) => c.id === e2.id)!).primary).toBe(true);
 
-	// Re-pick the first — exclusivity flips.
 	store.setPrimaryTerminal("conv", e1.id);
 	const after2 = useConnectionsStore.getState().connections;
 	expect(connectionMeta(after2.find((c) => c.id === e1.id)!).primary).toBe(
@@ -100,8 +91,7 @@ it("setPrimaryTerminal makes the choice exclusive among a source's terminals", (
 
 it("disconnect removes the edge and calls the backend", () => {
 	const store = useConnectionsStore.getState();
-	store.startConnect("a", "conversation");
-	store.completeConnect("b", "terminal");
+	store.addConnection("a", "b", "conversation", "terminal");
 	const id = useConnectionsStore.getState().connections[0].id;
 
 	store.disconnect(id);
@@ -111,10 +101,8 @@ it("disconnect removes the edge and calls the backend", () => {
 
 it("pruneForPanel drops every edge touching a deleted panel", () => {
 	const store = useConnectionsStore.getState();
-	store.startConnect("a", "conversation");
-	store.completeConnect("b", "terminal");
-	store.startConnect("b", "conversation");
-	store.completeConnect("c", "terminal");
+	store.addConnection("a", "b", "conversation", "terminal");
+	store.addConnection("b", "c", "conversation", "terminal");
 	expect(useConnectionsStore.getState().connections).toHaveLength(2);
 
 	store.pruneForPanel("b");

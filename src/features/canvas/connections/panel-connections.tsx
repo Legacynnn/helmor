@@ -1,5 +1,5 @@
+import { useReactFlow } from "@xyflow/react";
 import { Check, Link2, Link2Off, Unlink } from "lucide-react";
-import { stopEventPropagation, type TLShapeId, useEditor } from "tldraw";
 import {
 	Popover,
 	PopoverContent,
@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/popover";
 import type { CanvasConnection, CanvasPanelType } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { PanelShape } from "../shapes/panel-shape";
+import type { PanelNode } from "../types";
 import {
 	connectionMeta,
 	useConnectionsForPanel,
@@ -25,99 +25,58 @@ const PANEL_LABELS: Record<CanvasPanelType, string> = {
 };
 
 function usePanelLabel(id: string): string {
-	const editor = useEditor();
-	const shape = editor.getShape(id as TLShapeId) as PanelShape | undefined;
-	if (shape?.type !== "panel") return "Panel";
-	return shape.props.title || PANEL_LABELS[shape.props.panelType];
+	const { getNode } = useReactFlow<PanelNode>();
+	const node = getNode(id);
+	if (!node) return "Panel";
+	return node.data.title || PANEL_LABELS[node.data.panelType];
 }
 
-/** Header controls for connecting a panel and reviewing/managing its edges.
- * Click-to-connect: the link button arms this panel as the source, then
- * clicking another panel's link button completes the edge. */
-export function PanelConnections({ shape }: { shape: PanelShape }) {
-	const pendingSource = useConnectionsStore((s) => s.pendingSource);
-	const startConnect = useConnectionsStore((s) => s.startConnect);
-	const completeConnect = useConnectionsStore((s) => s.completeConnect);
-	const cancelConnect = useConnectionsStore((s) => s.cancelConnect);
-	const { outgoing, incoming } = useConnectionsForPanel(shape.id);
-
-	const isSource = pendingSource?.id === shape.id;
-	const isTarget = pendingSource != null && !isSource;
+/** Header control: a connections count → popover listing this panel's edges
+ * with disconnect + the conversation→terminal routing selector. Connecting
+ * itself is done by dragging from the node's edge handles. */
+export function PanelConnections({
+	nodeId,
+	panelType,
+}: {
+	nodeId: string;
+	panelType: CanvasPanelType;
+}) {
+	const { outgoing, incoming } = useConnectionsForPanel(nodeId);
 	const total = outgoing.length + incoming.length;
-
-	const handleConnectClick = (e: React.MouseEvent | React.PointerEvent) => {
-		stopEventPropagation(e);
-		if (pendingSource == null) {
-			startConnect(shape.id, shape.props.panelType);
-		} else if (isSource) {
-			cancelConnect();
-		} else {
-			completeConnect(shape.id, shape.props.panelType);
-		}
-	};
+	if (total === 0) return null;
 
 	return (
-		<div className="flex shrink-0 items-center gap-0.5">
-			{total > 0 ? (
-				<Popover>
-					<PopoverTrigger asChild>
-						<button
-							type="button"
-							aria-label="Panel connections"
-							className="flex h-5 items-center gap-1 rounded px-1 text-[10px] text-app-muted-foreground hover:bg-app-muted hover:text-app-foreground"
-							onPointerDown={stopEventPropagation}
-							onClick={stopEventPropagation}
-						>
-							<Link2 className="size-3" />
-							{total}
-						</button>
-					</PopoverTrigger>
-					<PopoverContent
-						align="end"
-						className="w-64 p-2"
-						onPointerDown={stopEventPropagation}
-					>
-						<ConnectionsList
-							shape={shape}
-							outgoing={outgoing}
-							incoming={incoming}
-						/>
-					</PopoverContent>
-				</Popover>
-			) : null}
-			<button
-				type="button"
-				aria-label={
-					isSource
-						? "Cancel connection"
-						: isTarget
-							? "Connect to this panel"
-							: "Connect panel"
-				}
-				className={cn(
-					"flex size-5 cursor-pointer items-center justify-center rounded text-app-muted-foreground hover:bg-app-muted hover:text-app-foreground",
-					isSource && "bg-[var(--color-selected,#3b82f6)] text-white",
-					isTarget && "text-[var(--color-selected,#3b82f6)]",
-				)}
-				onPointerDown={stopEventPropagation}
-				onClick={handleConnectClick}
-			>
-				{isSource ? (
-					<Link2Off className="size-3.5" />
-				) : (
-					<Link2 className="size-3.5" />
-				)}
-			</button>
-		</div>
+		<Popover>
+			<PopoverTrigger asChild>
+				<button
+					type="button"
+					aria-label="Panel connections"
+					className="nodrag flex h-5 shrink-0 items-center gap-1 rounded px-1 text-[10px] text-app-muted-foreground hover:bg-app-muted hover:text-app-foreground"
+				>
+					<Link2 className="size-3" />
+					{total}
+				</button>
+			</PopoverTrigger>
+			<PopoverContent align="end" className="w-64 p-2">
+				<ConnectionsList
+					nodeId={nodeId}
+					panelType={panelType}
+					outgoing={outgoing}
+					incoming={incoming}
+				/>
+			</PopoverContent>
+		</Popover>
 	);
 }
 
 function ConnectionsList({
-	shape,
+	nodeId,
+	panelType,
 	outgoing,
 	incoming,
 }: {
-	shape: PanelShape;
+	nodeId: string;
+	panelType: CanvasPanelType;
 	outgoing: CanvasConnection[];
 	incoming: CanvasConnection[];
 }) {
@@ -130,7 +89,7 @@ function ConnectionsList({
 
 	return (
 		<div className="flex flex-col gap-2 text-xs">
-			{shape.props.panelType === "conversation" && terminalEdges.length > 0 ? (
+			{panelType === "conversation" && terminalEdges.length > 0 ? (
 				<div className="flex flex-col gap-1">
 					<div className="font-medium text-app-muted-foreground text-[10px] uppercase tracking-wide">
 						Run with terminal
@@ -140,7 +99,7 @@ function ConnectionsList({
 							key={c.id}
 							connection={c}
 							primary={connectionMeta(c).primary === true}
-							onPick={() => setPrimaryTerminal(shape.id, c.id)}
+							onPick={() => setPrimaryTerminal(nodeId, c.id)}
 						/>
 					))}
 					{!hasPrimary ? (

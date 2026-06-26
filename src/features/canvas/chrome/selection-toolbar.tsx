@@ -1,3 +1,4 @@
+import { useOnSelectionChange } from "@xyflow/react";
 import {
 	ArrowDownToLine,
 	ArrowUpToLine,
@@ -7,87 +8,48 @@ import {
 	Trash2,
 	Unlock,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { createShapeId, type Editor, type TLShapeId, useValue } from "tldraw";
+import { useCallback, useEffect, useState } from "react";
 import {
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
-import { createSession } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { useCanvasWorkspace } from "../canvas-workspace-context";
-import { parsePanelConfig, stringifyPanelConfig } from "../panel-config";
-import type { PanelShape } from "../shapes/panel-shape";
-
-/** Duplicate a panel safely: live-bound types (conversation/terminal) get a
- * fresh session/instance instead of cloning the binding; everything else
- * copies its config verbatim. */
-async function duplicatePanel(
-	editor: Editor,
-	workspaceId: string,
-	shape: PanelShape,
-) {
-	let config = shape.props.config;
-	if (shape.props.panelType === "conversation") {
-		const { sessionId } = await createSession(workspaceId);
-		config = stringifyPanelConfig({
-			...parsePanelConfig(shape.props.config),
-			sessionId,
-		});
-	} else if (shape.props.panelType === "terminal") {
-		config = stringifyPanelConfig({
-			...parsePanelConfig(shape.props.config),
-			instanceId: crypto.randomUUID(),
-		});
-	}
-	const id = createShapeId();
-	editor.createShape<PanelShape>({
-		id,
-		type: "panel",
-		x: shape.x + 32,
-		y: shape.y + 32,
-		props: { ...shape.props, config },
-	});
-	editor.select(id);
-}
+import { useCanvasActions } from "../canvas-actions-context";
+import { parsePanelConfig } from "../panel-config";
+import type { PanelNode } from "../types";
 
 /** Floating contextual toolbar shown when exactly one panel is selected. */
-export function CanvasSelectionToolbar({ editor }: { editor: Editor }) {
-	const { workspaceId } = useCanvasWorkspace();
-	const selected = useValue<PanelShape | null>("canvas-selected-panel", () => {
-		const ids = editor.getSelectedShapeIds();
-		if (ids.length !== 1) return null;
-		const shape = editor.getShape(ids[0]) as PanelShape | undefined;
-		return shape?.type === "panel" ? shape : null;
-	}, [editor]);
+export function CanvasSelectionToolbar() {
+	const actions = useCanvasActions();
+	const [selected, setSelected] = useState<PanelNode | null>(null);
+
+	const onChange = useCallback(({ nodes }: { nodes: PanelNode[] }) => {
+		setSelected(nodes.length === 1 ? nodes[0] : null);
+	}, []);
+	useOnSelectionChange({ onChange });
 
 	if (!selected) return null;
-	const id = selected.id as TLShapeId;
-	const opacity = parsePanelConfig(selected.props.config).opacity ?? 1;
+	const id = selected.id;
+	const opacity = parsePanelConfig(selected.data.config).opacity ?? 1;
 
-	const updateConfig = (patch: Record<string, unknown>) => {
-		const next = { ...parsePanelConfig(selected.props.config), ...patch };
-		editor.updateShape<PanelShape>({
-			id,
-			type: "panel",
-			props: { config: stringifyPanelConfig(next) },
-		});
+	const setOpacity = (v: number) => {
+		const next = { ...parsePanelConfig(selected.data.config), opacity: v };
+		actions.patchNodeData(id, { config: JSON.stringify(next) });
+		setSelected((s) =>
+			s && s.id === id
+				? { ...s, data: { ...s.data, config: JSON.stringify(next) } }
+				: s,
+		);
 	};
 
 	return (
 		<div className="-translate-x-1/2 pointer-events-auto absolute top-3 left-1/2 z-20 flex items-center gap-1 rounded-lg border border-app-border bg-app-base/95 px-1.5 py-1 shadow-lg backdrop-blur">
 			<RenameField
 				key={id}
-				initial={selected.props.title}
-				onCommit={(title) =>
-					editor.updateShape<PanelShape>({
-						id,
-						type: "panel",
-						props: { title },
-					})
-				}
+				initial={selected.data.title}
+				onCommit={(title) => actions.patchNodeData(id, { title })}
 			/>
 			<Divider />
 			<Popover>
@@ -108,33 +70,27 @@ export function CanvasSelectionToolbar({ editor }: { editor: Editor }) {
 						max={100}
 						step={5}
 						value={[opacity * 100]}
-						onValueChange={([v]) => updateConfig({ opacity: v / 100 })}
+						onValueChange={([v]) => setOpacity(v / 100)}
 					/>
 				</PopoverContent>
 			</Popover>
 			<ToolbarButton
 				label="Bring to front"
-				onClick={() => editor.bringToFront([id])}
+				onClick={() => actions.bringToFront(id)}
 			>
 				<ArrowUpToLine className="size-3.5" />
 			</ToolbarButton>
 			<ToolbarButton
 				label="Send to back"
-				onClick={() => editor.sendToBack([id])}
+				onClick={() => actions.sendToBack(id)}
 			>
 				<ArrowDownToLine className="size-3.5" />
 			</ToolbarButton>
 			<ToolbarButton
-				label={selected.isLocked ? "Unlock" : "Lock"}
-				onClick={() =>
-					editor.updateShape({
-						id,
-						type: "panel",
-						isLocked: !selected.isLocked,
-					})
-				}
+				label={selected.data.locked ? "Unlock" : "Lock"}
+				onClick={() => actions.setLocked(id, !selected.data.locked)}
 			>
-				{selected.isLocked ? (
+				{selected.data.locked ? (
 					<Unlock className="size-3.5" />
 				) : (
 					<Lock className="size-3.5" />
@@ -143,7 +99,7 @@ export function CanvasSelectionToolbar({ editor }: { editor: Editor }) {
 			<ToolbarButton
 				label="Duplicate"
 				onClick={() => {
-					void duplicatePanel(editor, workspaceId, selected);
+					void actions.duplicateNode(id);
 				}}
 			>
 				<Copy className="size-3.5" />
@@ -151,7 +107,7 @@ export function CanvasSelectionToolbar({ editor }: { editor: Editor }) {
 			<Divider />
 			<ToolbarButton
 				label="Delete"
-				onClick={() => editor.deleteShape(id)}
+				onClick={() => actions.removeNode(id)}
 				danger
 			>
 				<Trash2 className="size-3.5" />

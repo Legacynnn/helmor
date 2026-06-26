@@ -1,40 +1,49 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Editor, type TLComponents, Tldraw } from "tldraw";
-import "tldraw/tldraw.css";
+import {
+	Background,
+	BackgroundVariant,
+	type ColorMode,
+	type Connection,
+	Controls,
+	type Edge,
+	MiniMap,
+	ReactFlow,
+	ReactFlowProvider,
+	type Viewport,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { CanvasState } from "@/lib/api";
 import {
 	canvasStateQueryOptions,
 	workspaceDetailQueryOptions,
 } from "@/lib/query-client";
+import { CanvasActionsProvider } from "./canvas-actions-context";
 import { CanvasCreateToolbar } from "./canvas-create-toolbar";
 import { useCanvasViewStore } from "./canvas-view-store";
 import {
 	type CanvasWorkspaceInfo,
 	CanvasWorkspaceProvider,
 } from "./canvas-workspace-context";
-import { CanvasGrid } from "./chrome/canvas-grid";
 import { CanvasManageRail } from "./chrome/manage-rail";
 import { CanvasSelectionToolbar } from "./chrome/selection-toolbar";
 import { CanvasWorkspaceControls } from "./chrome/workspace-controls";
-import { CanvasZoomCluster } from "./chrome/zoom-cluster";
-import { useConnectionsStore } from "./connections/connections-store";
-import { CanvasEdgesLayer } from "./connections/edges-layer";
-import { PanelShapeUtil } from "./shapes/panel-shape";
-import { attachCanvasSync } from "./use-canvas-sync";
+import {
+	connectionMeta,
+	useConnectionsStore,
+} from "./connections/connections-store";
+import { PanelNode } from "./panel-node";
+import type { PanelNode as PanelNodeType } from "./types";
+import { useCanvasGraph } from "./use-canvas-graph";
 
-const SHAPE_UTILS = [PanelShapeUtil];
-const COMPONENTS: TLComponents = {
-	OnTheCanvas: CanvasEdgesLayer,
-	Grid: CanvasGrid,
-};
+const NODE_TYPES = { panel: PanelNode };
 
-/** Full-bleed Infinite Canvas surface for one workspace (epic #61).
- *
- * Replaces the 3-column chrome when canvas mode is active. Loads the persisted
- * canvas once, mounts a tldraw editor, bridges it to persistence via
- * {@link attachCanvasSync}, and floats the fixed control regions (workspace /
- * manage / create / selection / zoom) above the spatial surface. Keyed by
- * workspace id upstream so switching workspaces remounts a fresh editor. */
+const SELECTED_COLOR = "var(--color-selected, #3b82f6)";
+const EDGE_COLOR = "var(--xy-edge-stroke, #9ca3af)";
+
+/** Full-bleed Infinite Canvas surface for one workspace (epic #61), on React
+ * Flow. Replaces the 3-column chrome; loads the persisted canvas once and
+ * keeps it in sync. */
 export function CanvasSurface({
 	workspaceId,
 	onSelectWorkspace,
@@ -43,73 +52,6 @@ export function CanvasSurface({
 	onSelectWorkspace?: (workspaceId: string) => void;
 }) {
 	const { data, isLoading } = useQuery(canvasStateQueryOptions(workspaceId));
-	const { data: detail } = useQuery(workspaceDetailQueryOptions(workspaceId));
-	const [editor, setEditor] = useState<Editor | null>(null);
-
-	const workspaceInfo = useMemo<CanvasWorkspaceInfo>(
-		() => ({
-			workspaceId,
-			repoId: detail?.repoId ?? null,
-			workspaceRootPath: detail?.rootPath ?? null,
-			workspaceReady: detail?.state === "ready",
-		}),
-		[workspaceId, detail?.repoId, detail?.rootPath, detail?.state],
-	);
-	const handleRef = useRef<ReturnType<typeof attachCanvasSync> | null>(null);
-	const stateRef = useRef(data);
-	stateRef.current = data;
-	// The state object used to hydrate at mount — later query refetches (after a
-	// CLI `CanvasChanged`) produce a fresh object that we reconcile in.
-	const hydratedFrom = useRef<typeof data | null>(null);
-
-	const handleMount = useCallback(
-		(mounted: Editor) => {
-			setEditor(mounted);
-			const initial = stateRef.current;
-			if (!initial) return;
-			useConnectionsStore.getState().hydrate(workspaceId, initial.connections);
-			useCanvasViewStore.getState().hydrate(initial.viewState);
-			handleRef.current = attachCanvasSync(mounted, workspaceId, initial);
-			hydratedFrom.current = initial;
-		},
-		[workspaceId],
-	);
-
-	// Reconcile external (CLI) mutations: when the query refetches a new state
-	// object, diff it into the live store.
-	useEffect(() => {
-		if (!data || !handleRef.current) return;
-		if (data === hydratedFrom.current) return;
-		hydratedFrom.current = data;
-		handleRef.current.reconcile(data);
-	}, [data]);
-
-	useEffect(() => {
-		return () => {
-			handleRef.current?.dispose();
-			handleRef.current = null;
-		};
-	}, []);
-
-	// Live-apply appearance: tldraw color scheme + grid mode follow the view
-	// store; translucency rides a CSS var consumed by every DOM panel.
-	const translucency = useCanvasViewStore((s) => s.translucency);
-	const backgroundTheme = useCanvasViewStore((s) => s.backgroundTheme);
-	const backgroundPattern = useCanvasViewStore((s) => s.backgroundPattern);
-	const snapToGrid = useCanvasViewStore((s) => s.snapToGrid);
-
-	useEffect(() => {
-		if (!editor) return;
-		editor.user.updateUserPreferences({ colorScheme: backgroundTheme });
-	}, [editor, backgroundTheme]);
-
-	useEffect(() => {
-		if (!editor) return;
-		// Grid mode drives both the custom grid display and tldraw's snapping.
-		editor.updateInstanceState({
-			isGridMode: snapToGrid || backgroundPattern !== "blank",
-		});
-	}, [editor, snapToGrid, backgroundPattern]);
 
 	if (isLoading || !data) {
 		return (
@@ -120,33 +62,171 @@ export function CanvasSurface({
 	}
 
 	return (
+		<ReactFlowProvider>
+			<CanvasInner
+				workspaceId={workspaceId}
+				onSelectWorkspace={onSelectWorkspace}
+				initial={data}
+			/>
+		</ReactFlowProvider>
+	);
+}
+
+function CanvasInner({
+	workspaceId,
+	onSelectWorkspace,
+	initial,
+}: {
+	workspaceId: string;
+	onSelectWorkspace?: (workspaceId: string) => void;
+	initial: CanvasState;
+}) {
+	const { data: detail } = useQuery(workspaceDetailQueryOptions(workspaceId));
+	const wrapperRef = useRef<HTMLDivElement>(null);
+
+	const workspaceInfo = useMemo<CanvasWorkspaceInfo>(
+		() => ({
+			workspaceId,
+			repoId: detail?.repoId ?? null,
+			workspaceRootPath: detail?.rootPath ?? null,
+			workspaceReady: detail?.state === "ready",
+		}),
+		[workspaceId, detail?.repoId, detail?.rootPath, detail?.state],
+	);
+
+	// Hydrate the transient stores once from the initial snapshot.
+	const hydrated = useRef(false);
+	if (!hydrated.current) {
+		hydrated.current = true;
+		useConnectionsStore.getState().hydrate(workspaceId, initial.connections);
+		useCanvasViewStore.getState().hydrate(initial.viewState);
+	}
+
+	const { nodes, onNodesChange, actions, reconcile } = useCanvasGraph(
+		workspaceId,
+		initial,
+		wrapperRef,
+	);
+
+	// Reconcile external (CLI) mutations when the query refetches.
+	const { data: fresh } = useQuery(canvasStateQueryOptions(workspaceId));
+	const reconciledFrom = useRef<CanvasState>(initial);
+	useEffect(() => {
+		if (fresh && fresh !== reconciledFrom.current) {
+			reconciledFrom.current = fresh;
+			reconcile(fresh);
+		}
+	}, [fresh, reconcile]);
+
+	// Edges derived from the connections store.
+	const connections = useConnectionsStore((s) => s.connections);
+	const edges = useMemo<Edge[]>(
+		() =>
+			connections.map((c) => {
+				const primary = connectionMeta(c).primary === true;
+				return {
+					id: c.id,
+					source: c.fromPanelId,
+					target: c.toPanelId,
+					animated: primary,
+					style: {
+						stroke: primary ? SELECTED_COLOR : EDGE_COLOR,
+						strokeWidth: primary ? 2.5 : 1.5,
+						strokeDasharray: primary ? undefined : "6 4",
+					},
+				};
+			}),
+		[connections],
+	);
+
+	const onConnect = useCallback(
+		(c: Connection) => {
+			if (!c.source || !c.target) return;
+			const from = nodes.find((n) => n.id === c.source);
+			const to = nodes.find((n) => n.id === c.target);
+			if (!from || !to) return;
+			useConnectionsStore
+				.getState()
+				.addConnection(
+					c.source,
+					c.target,
+					from.data.panelType,
+					to.data.panelType,
+				);
+		},
+		[nodes],
+	);
+
+	// Appearance from the view store.
+	const translucency = useCanvasViewStore((s) => s.translucency);
+	const pattern = useCanvasViewStore((s) => s.backgroundPattern);
+	const theme = useCanvasViewStore((s) => s.backgroundTheme);
+	const snapToGrid = useCanvasViewStore((s) => s.snapToGrid);
+	const setCamera = useCanvasViewStore((s) => s.setCamera);
+
+	const onMoveEnd = useCallback(
+		(_e: unknown, vp: Viewport) => setCamera(vp.x, vp.y, vp.zoom),
+		[setCamera],
+	);
+
+	const onEdgesDelete = useCallback((deleted: Edge[]) => {
+		const store = useConnectionsStore.getState();
+		for (const e of deleted) store.disconnect(e.id);
+	}, []);
+
+	return (
 		<CanvasWorkspaceProvider value={workspaceInfo}>
-			<div
-				className="relative size-full overflow-hidden bg-app-base"
-				style={
-					{ "--canvas-panel-opacity": translucency } as React.CSSProperties
-				}
-			>
-				<Tldraw
-					hideUi
-					shapeUtils={SHAPE_UTILS}
-					components={COMPONENTS}
-					onMount={handleMount}
-					// Ephemeral store — Helmor owns persistence via attachCanvasSync.
-				/>
-				<CanvasWorkspaceControls
-					workspaceId={workspaceId}
-					onSelectWorkspace={onSelectWorkspace}
-				/>
-				{editor ? (
-					<>
-						<CanvasManageRail editor={editor} />
-						<CanvasSelectionToolbar editor={editor} />
-						<CanvasZoomCluster editor={editor} />
-					</>
-				) : null}
-				<CanvasCreateToolbar editor={editor} workspaceId={workspaceId} />
-			</div>
+			<CanvasActionsProvider value={actions}>
+				<div
+					ref={wrapperRef}
+					className="relative size-full overflow-hidden bg-app-base"
+					style={
+						{ "--canvas-panel-opacity": translucency } as React.CSSProperties
+					}
+				>
+					<ReactFlow<PanelNodeType>
+						nodes={nodes}
+						edges={edges}
+						onNodesChange={onNodesChange}
+						onConnect={onConnect}
+						onEdgesDelete={onEdgesDelete}
+						onMoveEnd={onMoveEnd}
+						nodeTypes={NODE_TYPES}
+						colorMode={theme as ColorMode}
+						snapToGrid={snapToGrid}
+						snapGrid={[16, 16]}
+						defaultViewport={{
+							x: initial.viewState.panX,
+							y: initial.viewState.panY,
+							zoom: initial.viewState.zoom || 1,
+						}}
+						minZoom={0.1}
+						maxZoom={2}
+						proOptions={{ hideAttribution: true }}
+						deleteKeyCode={["Backspace", "Delete"]}
+					>
+						{pattern !== "blank" ? (
+							<Background
+								variant={
+									pattern === "lines"
+										? BackgroundVariant.Lines
+										: BackgroundVariant.Dots
+								}
+								gap={16}
+							/>
+						) : null}
+						<Controls showInteractive={false} />
+						<MiniMap pannable zoomable />
+					</ReactFlow>
+					<CanvasWorkspaceControls
+						workspaceId={workspaceId}
+						onSelectWorkspace={onSelectWorkspace}
+					/>
+					<CanvasManageRail />
+					<CanvasSelectionToolbar />
+					<CanvasCreateToolbar />
+				</div>
+			</CanvasActionsProvider>
 		</CanvasWorkspaceProvider>
 	);
 }

@@ -8,9 +8,9 @@ import {
 } from "@/lib/api";
 
 // Transient canvas-connection state for the active workspace. Hydrated from the
-// loaded canvas snapshot; every mutation writes through to the DB (which
-// broadcasts `canvasChanged`). One canvas is active at a time, so a single
-// flat list is enough.
+// loaded snapshot; every mutation writes through to the DB (which broadcasts
+// `canvasChanged`). Connecting is driven by React Flow's native handle-drag
+// (`onConnect`); this store owns the persisted edge list + semantics.
 
 export type ConnectionKind =
 	| "generic"
@@ -36,27 +36,25 @@ export function deriveKind(
 	return "generic";
 }
 
-type PendingSource = { id: string; panelType: CanvasPanelType };
-
 type ConnectionsStore = {
 	workspaceId: string | null;
 	connections: CanvasConnection[];
-	/** Panel the user is currently connecting FROM (click-to-connect), or null
-	 * when not in connect mode. */
-	pendingSource: PendingSource | null;
 
 	hydrate: (workspaceId: string, connections: CanvasConnection[]) => void;
-	startConnect: (sourcePanelId: string, panelType: CanvasPanelType) => void;
-	cancelConnect: () => void;
-	/** Complete a click-to-connect against `targetPanelId`. No-op for self or an
-	 * already-existing identical edge. Kind derives from both endpoints. */
-	completeConnect: (targetPanelId: string, targetType: CanvasPanelType) => void;
+	/** Create an edge (from React Flow `onConnect`). No-op for self / duplicate
+	 * edges. Kind derives from both endpoint types. */
+	addConnection: (
+		fromPanelId: string,
+		toPanelId: string,
+		fromType: CanvasPanelType,
+		toType: CanvasPanelType,
+	) => void;
 	disconnect: (connectionId: string) => void;
 	/** Mark one conversation→terminal edge as the routing target, clearing the
 	 * primary flag on the source's other terminal edges. */
 	setPrimaryTerminal: (sourcePanelId: string, connectionId: string) => void;
-	/** Drop every edge touching a deleted panel from local state (the backend
-	 * cascade already removed them server-side). */
+	/** Drop every edge touching a deleted panel (the backend cascade already
+	 * removed them server-side). */
 	pruneForPanel: (panelId: string) => void;
 };
 
@@ -79,42 +77,26 @@ export function connectionMeta(conn: CanvasConnection): ConnectionMeta {
 export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
 	workspaceId: null,
 	connections: [],
-	pendingSource: null,
 
-	hydrate: (workspaceId, connections) =>
-		set({ workspaceId, connections, pendingSource: null }),
+	hydrate: (workspaceId, connections) => set({ workspaceId, connections }),
 
-	startConnect: (sourcePanelId, panelType) =>
-		set({ pendingSource: { id: sourcePanelId, panelType } }),
-	cancelConnect: () => set({ pendingSource: null }),
-
-	completeConnect: (targetPanelId, targetType) => {
-		const { pendingSource, connections, workspaceId } = get();
-		if (!pendingSource || !workspaceId || pendingSource.id === targetPanelId) {
-			set({ pendingSource: null });
-			return;
-		}
+	addConnection: (fromPanelId, toPanelId, fromType, toType) => {
+		const { connections, workspaceId } = get();
+		if (!workspaceId || fromPanelId === toPanelId) return;
 		const exists = connections.some(
-			(c) =>
-				c.fromPanelId === pendingSource.id && c.toPanelId === targetPanelId,
+			(c) => c.fromPanelId === fromPanelId && c.toPanelId === toPanelId,
 		);
-		if (exists) {
-			set({ pendingSource: null });
-			return;
-		}
+		if (exists) return;
 		const connection: CanvasConnection = {
 			id: crypto.randomUUID(),
 			workspaceId,
-			fromPanelId: pendingSource.id,
-			toPanelId: targetPanelId,
-			kind: deriveKind(pendingSource.panelType, targetType),
+			fromPanelId,
+			toPanelId,
+			kind: deriveKind(fromType, toType),
 			meta: null,
 			createdAt: "",
 		};
-		set({
-			connections: [...connections, connection],
-			pendingSource: null,
-		});
+		set({ connections: [...connections, connection] });
 		void saveCanvasConnection(connection).catch(() => {});
 	},
 

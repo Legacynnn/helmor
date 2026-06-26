@@ -1,19 +1,23 @@
 import { Eye, Pencil } from "lucide-react";
 import { Suspense, useState } from "react";
-import { stopEventPropagation } from "tldraw";
 import { LazyStreamdown } from "@/components/streamdown-loader";
 import { cn } from "@/lib/utils";
 import { parsePanelConfig } from "../panel-config";
-import type { PanelShape } from "../shapes/panel-shape";
 import { usePanelConfigWriter } from "../use-panel-config-writer";
 
 /** Markdown notes panel. The body is the source of truth while focused; edits
  * debounce-persist into `config.notes`. A preview toggle renders the markdown
  * with the same renderer the conversation thread uses. */
-export function NotesPanelBody({ shape }: { shape: PanelShape }) {
-	const write = usePanelConfigWriter(shape.id);
+export function NotesPanelBody({
+	nodeId,
+	config,
+}: {
+	nodeId: string;
+	config: string;
+}) {
+	const write = usePanelConfigWriter(nodeId, config);
 	const [value, setValue] = useState(
-		() => parsePanelConfig(shape.props.config).notes ?? "",
+		() => parsePanelConfig(config).notes ?? "",
 	);
 	const [preview, setPreview] = useState(false);
 
@@ -27,7 +31,6 @@ export function NotesPanelBody({ shape }: { shape: PanelShape }) {
 						"flex size-5 cursor-pointer items-center justify-center rounded text-app-muted-foreground hover:bg-app-muted hover:text-app-foreground",
 						preview && "bg-app-muted text-app-foreground",
 					)}
-					onPointerDown={stopEventPropagation}
 					onClick={() => setPreview((p) => !p)}
 				>
 					{preview ? (
@@ -51,7 +54,6 @@ export function NotesPanelBody({ shape }: { shape: PanelShape }) {
 					placeholder="Write markdown notes…"
 					value={value}
 					spellCheck={false}
-					onPointerDown={stopEventPropagation}
 					onChange={(e) => {
 						setValue(e.target.value);
 						write({ notes: e.target.value });

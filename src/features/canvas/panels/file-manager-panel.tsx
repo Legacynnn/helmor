@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { createShapeId, type TLShapeId, useEditor } from "tldraw";
 import {
 	FileTree,
 	FileTreeFile,
@@ -8,18 +7,10 @@ import {
 } from "@/components/ai/file-tree";
 import type { WorkspaceTreeEntry } from "@/lib/api";
 import { workspaceTreeQueryOptions } from "@/lib/query-client";
+import { useCanvasActions } from "../canvas-actions-context";
 import { useCanvasWorkspace } from "../canvas-workspace-context";
-import { stringifyPanelConfig } from "../panel-config";
-import {
-	PANEL_DEFAULT_HEIGHT,
-	PANEL_DEFAULT_WIDTH,
-	type PanelShape,
-} from "../shapes/panel-shape";
 
-type TreeNode = {
-	entry: WorkspaceTreeEntry;
-	children: TreeNode[];
-};
+type TreeNode = { entry: WorkspaceTreeEntry; children: TreeNode[] };
 
 /** Nest a flat, path-sorted entry list into a directory tree. */
 function buildTree(entries: WorkspaceTreeEntry[]): TreeNode[] {
@@ -38,7 +29,6 @@ function buildTree(entries: WorkspaceTreeEntry[]): TreeNode[] {
 }
 
 function renderNodes(nodes: TreeNode[]) {
-	// Folders first, then files, each alphabetical.
 	const ordered = [...nodes].sort((a, b) => {
 		if (a.entry.isDir !== b.entry.isDir) return a.entry.isDir ? -1 : 1;
 		return a.entry.name.localeCompare(b.entry.name);
@@ -63,11 +53,11 @@ function renderNodes(nodes: TreeNode[]) {
 }
 
 /** File-tree browser scoped to the workspace root. Clicking a file opens it in
- * a new Editor panel placed beside this one (or reuses an Editor panel this
- * one already feeds — Phase 4 keeps it simple: always open a fresh editor). */
-export function FileManagerPanelBody({ shape }: { shape: PanelShape }) {
-	const editor = useEditor();
+ * a new Editor panel. */
+export function FileManagerPanelBody({ nodeId }: { nodeId: string }) {
+	const { addPanel } = useCanvasActions();
 	const { workspaceRootPath } = useCanvasWorkspace();
+	void nodeId;
 	const { data, isLoading } = useQuery({
 		...workspaceTreeQueryOptions(workspaceRootPath ?? ""),
 		enabled: !!workspaceRootPath,
@@ -83,26 +73,7 @@ export function FileManagerPanelBody({ shape }: { shape: PanelShape }) {
 
 	const openFile = (filePath: string) => {
 		if (!filepaths.has(filePath)) return; // folder toggle, not a file
-		const self = editor.getShape(shape.id as TLShapeId);
-		const bounds = editor.getShapePageBounds(shape.id as TLShapeId);
-		const x = bounds ? bounds.x + bounds.w + 32 : (self?.x ?? 0) + 32;
-		const y = bounds ? bounds.y : (self?.y ?? 0);
-		const id = createShapeId();
-		editor.createShape<PanelShape>({
-			id,
-			type: "panel",
-			x,
-			y,
-			props: {
-				w: PANEL_DEFAULT_WIDTH,
-				h: PANEL_DEFAULT_HEIGHT,
-				panelType: "editor",
-				title: filePath.split("/").pop() ?? filePath,
-				config: stringifyPanelConfig({ filePath }),
-				locked: false,
-			},
-		});
-		editor.select(id);
+		void addPanel("editor", { config: { filePath } });
 	};
 
 	if (!workspaceRootPath) {
