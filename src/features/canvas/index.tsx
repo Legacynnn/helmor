@@ -55,9 +55,12 @@ export function CanvasSurface({
 		}),
 		[workspaceId, detail?.repoId, detail?.rootPath, detail?.state],
 	);
-	const disposeRef = useRef<(() => void) | null>(null);
+	const handleRef = useRef<ReturnType<typeof attachCanvasSync> | null>(null);
 	const stateRef = useRef(data);
 	stateRef.current = data;
+	// The state object used to hydrate at mount — later query refetches (after a
+	// CLI `CanvasChanged`) produce a fresh object that we reconcile in.
+	const hydratedFrom = useRef<typeof data | null>(null);
 
 	const handleMount = useCallback(
 		(mounted: Editor) => {
@@ -66,15 +69,25 @@ export function CanvasSurface({
 			if (!initial) return;
 			useConnectionsStore.getState().hydrate(workspaceId, initial.connections);
 			useCanvasViewStore.getState().hydrate(initial.viewState);
-			disposeRef.current = attachCanvasSync(mounted, workspaceId, initial);
+			handleRef.current = attachCanvasSync(mounted, workspaceId, initial);
+			hydratedFrom.current = initial;
 		},
 		[workspaceId],
 	);
 
+	// Reconcile external (CLI) mutations: when the query refetches a new state
+	// object, diff it into the live store.
+	useEffect(() => {
+		if (!data || !handleRef.current) return;
+		if (data === hydratedFrom.current) return;
+		hydratedFrom.current = data;
+		handleRef.current.reconcile(data);
+	}, [data]);
+
 	useEffect(() => {
 		return () => {
-			disposeRef.current?.();
-			disposeRef.current = null;
+			handleRef.current?.dispose();
+			handleRef.current = null;
 		};
 	}, []);
 

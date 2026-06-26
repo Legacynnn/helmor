@@ -122,13 +122,12 @@ function handleUiMutation(
 			});
 			return;
 		case "canvasChanged":
-			// Mark the canvas snapshot stale WITHOUT refetching: the tldraw store
-			// owns the live on-screen state and persists its own edits, so an
-			// active refetch would fight local interactions. A canvas re-entry
-			// (query remount) pulls fresh state; Phase 6 adds live CLI reconcile.
+			// Refetch the canvas snapshot so the live surface can reconcile
+			// external (CLI / other-window) mutations. The canvas's reconcile is
+			// diff-based + idempotent, so the originating window's own
+			// just-persisted edits land as no-ops (and are skipped mid-drag).
 			void queryClient.invalidateQueries({
 				queryKey: helmorQueryKeys.canvasState(event.workspaceId),
-				refetchType: "none",
 			});
 			return;
 		case "sessionTurnPersisted": {

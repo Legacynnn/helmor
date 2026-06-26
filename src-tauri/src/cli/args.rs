@@ -192,6 +192,12 @@ pub enum Commands {
         #[command(subcommand)]
         action: ConductorAction,
     },
+    /// Infinite Canvas — drive a workspace's spatial canvas (panels,
+    /// connections, view). Mutations update a running app live.
+    Canvas {
+        #[command(subcommand)]
+        action: CanvasAction,
+    },
     /// Shell completion scripts.
     Completions {
         #[arg(value_enum)]
@@ -879,4 +885,143 @@ pub enum CompletionShell {
     Fish,
     Powershell,
     Elvish,
+}
+
+const EXAMPLES_CANVAS_PANEL: &str =
+    "EXAMPLES (substitute `helmor` with the binary name in the Usage line above if it differs):
+
+  # List panels on a workspace's canvas
+  helmor canvas panel list --workspace my-repo/feature
+
+  # Create a live conversation panel (prints its panel id + bound session id)
+  helmor canvas panel create --workspace my-repo/feature --type conversation
+
+  # Create a terminal panel at a position
+  helmor canvas panel create --workspace my-repo/feature --type terminal --x 600 --y 0
+
+  # Move / resize / delete a panel
+  helmor canvas panel move --workspace my-repo/feature --id shape:abc --x 120 --y 240
+  helmor canvas panel resize --workspace my-repo/feature --id shape:abc --width 640 --height 480
+  helmor canvas panel delete --workspace my-repo/feature --id shape:abc";
+
+const EXAMPLES_CANVAS_CONNECT: &str =
+    "EXAMPLES (substitute `helmor` with the binary name in the Usage line above if it differs):
+
+  # Connect two panels (kind is inferred from endpoint types if omitted)
+  helmor canvas connect --workspace my-repo/feature --from shape:conv --to shape:term
+
+  # Orchestrate: spawn a sibling conversation, connect it, and drive it
+  id=$(helmor canvas panel create --workspace my-repo/feature --type conversation --quiet)
+  helmor canvas connect --workspace my-repo/feature --from shape:self --to \"$id\"
+  helmor send --session <session-id-from-create> 'Investigate the failing test'
+
+  # Disconnect by connection id
+  helmor canvas disconnect --workspace my-repo/feature --id <connection-id>";
+
+/// `helmor canvas` — drive a workspace's Infinite Canvas.
+#[derive(Subcommand)]
+pub enum CanvasAction {
+    /// Create, move, resize, list, and delete panels.
+    Panel {
+        #[command(subcommand)]
+        action: CanvasPanelAction,
+    },
+    /// Connect two panels (an edge; chains allowed).
+    #[command(after_help = EXAMPLES_CANVAS_CONNECT)]
+    Connect {
+        /// Workspace name or UUID.
+        #[arg(long)]
+        workspace: String,
+        /// Source panel id.
+        #[arg(long)]
+        from: String,
+        /// Target panel id.
+        #[arg(long)]
+        to: String,
+        /// Edge kind (generic, conversation-terminal, conversation-conversation).
+        /// Inferred from endpoint types when omitted.
+        #[arg(long)]
+        kind: Option<String>,
+    },
+    /// Remove a connection by its id.
+    Disconnect {
+        /// Workspace name or UUID.
+        #[arg(long)]
+        workspace: String,
+        /// Connection id (from `canvas connect` or `canvas panel list --json`).
+        #[arg(long)]
+        id: String,
+    },
+    /// Print a workspace's canvas view state (pan / zoom / background).
+    View {
+        /// Workspace name or UUID.
+        #[arg(long)]
+        workspace: String,
+    },
+}
+
+#[derive(Subcommand)]
+#[command(after_help = EXAMPLES_CANVAS_PANEL)]
+pub enum CanvasPanelAction {
+    /// List every panel on a workspace's canvas.
+    List {
+        /// Workspace name or UUID.
+        #[arg(long)]
+        workspace: String,
+    },
+    /// Create a panel. Conversation panels spawn a bound session; terminal
+    /// panels get a fresh PTY instance — both printed so you can drive them.
+    Create {
+        /// Workspace name or UUID.
+        #[arg(long)]
+        workspace: String,
+        /// Panel type: conversation, terminal, notes, drawing, file-manager,
+        /// editor, placeholder.
+        #[arg(long = "type")]
+        panel_type: String,
+        /// X position (page units). Defaults to 0.
+        #[arg(long)]
+        x: Option<f64>,
+        /// Y position (page units). Defaults to 0.
+        #[arg(long)]
+        y: Option<f64>,
+        /// Width. Defaults to 480.
+        #[arg(long)]
+        width: Option<f64>,
+        /// Height. Defaults to 360.
+        #[arg(long)]
+        height: Option<f64>,
+        /// Optional panel title.
+        #[arg(long)]
+        title: Option<String>,
+    },
+    /// Move a panel to a new position.
+    Move {
+        #[arg(long)]
+        workspace: String,
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        x: f64,
+        #[arg(long)]
+        y: f64,
+    },
+    /// Resize a panel.
+    Resize {
+        #[arg(long)]
+        workspace: String,
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        width: f64,
+        #[arg(long)]
+        height: f64,
+    },
+    /// Delete a panel (cascades its connections).
+    Delete {
+        #[arg(long)]
+        workspace: String,
+        #[arg(long)]
+        id: String,
+    },
 }

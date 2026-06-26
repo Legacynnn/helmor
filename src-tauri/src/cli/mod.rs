@@ -12,6 +12,7 @@
 //! / human formatting) and `refs` (UUID / name disambiguation).
 
 pub mod args;
+mod canvas;
 mod conductor;
 mod data;
 mod files;
@@ -159,6 +160,7 @@ fn dispatch(cli: &Cli) -> Result<()> {
         C::Github { action } => github::dispatch(action, cli),
         C::Scripts { action } => scripts::dispatch(action, cli),
         C::Conductor { action } => conductor::dispatch(action, cli),
+        C::Canvas { action } => canvas::dispatch(action, cli),
         C::Mcp => crate::mcp::run_mcp_server(),
         C::TerminalHook { agent } => terminal_hook::run(agent, cli),
     }
