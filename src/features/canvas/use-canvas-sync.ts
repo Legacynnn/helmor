@@ -8,6 +8,7 @@ import {
 	saveCanvasPanel,
 	saveCanvasViewState,
 } from "@/lib/api";
+import { useConnectionsStore } from "./connections/connections-store";
 import { parsePanelConfig } from "./panel-config";
 import type { PanelShape } from "./shapes/panel-shape";
 
@@ -151,6 +152,9 @@ export function attachCanvasSync(
 						const { instanceId } = parsePanelConfig(panel.props.config);
 						if (instanceId) closeTerminal(instanceId);
 					}
+					// Backend delete_panel cascades edges server-side; drop them from
+					// local state too so the edges layer updates immediately.
+					useConnectionsStore.getState().pruneForPanel(record.id);
 					queuePanelDelete(record.id);
 				}
 			}

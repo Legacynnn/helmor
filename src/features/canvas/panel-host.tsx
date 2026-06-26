@@ -10,6 +10,8 @@ import type { ComponentType } from "react";
 import { stopEventPropagation, useEditor } from "tldraw";
 import type { CanvasPanelType } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useConnectionsStore } from "./connections/connections-store";
+import { PanelConnections } from "./connections/panel-connections";
 import { parsePanelConfig } from "./panel-config";
 import { ConversationPanelBody } from "./panels/conversation-panel";
 import { TerminalPanelBody } from "./panels/terminal-panel";
@@ -39,18 +41,25 @@ export function PanelHost({ shape }: { shape: PanelShape }) {
 	const editor = useEditor();
 	const meta = PANEL_META[shape.props.panelType] ?? PANEL_META.placeholder;
 	const Icon = meta.icon;
+	const pendingSource = useConnectionsStore((s) => s.pendingSource);
+	const isConnectTarget =
+		pendingSource != null && pendingSource.id !== shape.id;
 
 	return (
-		<div className="flex size-full flex-col overflow-hidden rounded-[10px] border border-app-border bg-app-base text-app-foreground shadow-lg">
+		<div
+			className={cn(
+				"flex size-full flex-col overflow-hidden rounded-[10px] border border-app-border bg-app-base text-app-foreground shadow-lg",
+				isConnectTarget &&
+					"ring-2 ring-[var(--color-selected,#3b82f6)] ring-offset-1",
+			)}
+		>
 			{/* Header is the drag handle — do NOT stop propagation here. */}
 			<div className="flex h-9 shrink-0 items-center gap-2 border-app-border border-b bg-app-subtle px-2.5">
 				<Icon className="size-3.5 shrink-0 opacity-70" />
 				<span className="min-w-0 flex-1 truncate font-medium text-xs">
 					{shape.props.title || meta.label}
 				</span>
-				<span className="shrink-0 rounded bg-app-muted px-1.5 py-0.5 text-[10px] text-app-muted-foreground uppercase tracking-wide">
-					{meta.label}
-				</span>
+				<PanelConnections shape={shape} />
 				<button
 					type="button"
 					aria-label="Close panel"

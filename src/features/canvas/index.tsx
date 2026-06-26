@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { PanelsTopLeft } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Editor, Tldraw } from "tldraw";
+import { type Editor, type TLComponents, Tldraw } from "tldraw";
 import "tldraw/tldraw.css";
 import {
 	canvasStateQueryOptions,
@@ -12,11 +12,14 @@ import {
 	type CanvasWorkspaceInfo,
 	CanvasWorkspaceProvider,
 } from "./canvas-workspace-context";
+import { useConnectionsStore } from "./connections/connections-store";
+import { CanvasEdgesLayer } from "./connections/edges-layer";
 import { PanelShapeUtil } from "./shapes/panel-shape";
 import { useCanvasModeStore } from "./use-canvas-mode";
 import { attachCanvasSync } from "./use-canvas-sync";
 
 const SHAPE_UTILS = [PanelShapeUtil];
+const COMPONENTS: TLComponents = { OnTheCanvas: CanvasEdgesLayer };
 
 /** Full-bleed Infinite Canvas surface for one workspace (epic #61, Phase 1).
  *
@@ -49,6 +52,9 @@ export function CanvasSurface({ workspaceId }: { workspaceId: string }) {
 			setEditor(mounted);
 			const initial = stateRef.current;
 			if (initial) {
+				useConnectionsStore
+					.getState()
+					.hydrate(workspaceId, initial.connections);
 				disposeRef.current = attachCanvasSync(mounted, workspaceId, initial);
 			}
 		},
@@ -76,6 +82,7 @@ export function CanvasSurface({ workspaceId }: { workspaceId: string }) {
 				<Tldraw
 					hideUi
 					shapeUtils={SHAPE_UTILS}
+					components={COMPONENTS}
 					onMount={handleMount}
 					// Ephemeral store — Helmor owns persistence via attachCanvasSync.
 				/>
