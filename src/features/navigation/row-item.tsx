@@ -255,10 +255,16 @@ export const WorkspaceRowItem = memo(
 		// ~3.25rem from the row's right edge (pr-2.5 + size-5 + gap-0.5 + size-5),
 		// so push the fade to end just past that so text hugs the leftmost icon
 		// instead of leaving a visible gap.
-		const hasTwoActions =
-			hasActionHandler && isRestoreAction && Boolean(onDeleteWorkspace);
 		const isArchiveConfirmVisible =
 			archiveConfirming && !isRestoreAction && !isBusy;
+		// Canvas toggle: hover icon beside the archive icon on active (non-
+		// archived) rows when the experimental opt-in is on. Hidden during the
+		// archive-confirm pill so the fade math stays bounded.
+		const showCanvasAction =
+			canvasModeEnabled && !isRestoreAction && !isArchiveConfirmVisible;
+		const hasTwoActions =
+			(hasActionHandler && isRestoreAction && Boolean(onDeleteWorkspace)) ||
+			(showCanvasAction && hasActionHandler);
 		const rowFadeStyle = isArchiveConfirmVisible
 			? ({
 					"--row-fade-transparent": "3.9rem",
@@ -511,7 +517,7 @@ export const WorkspaceRowItem = memo(
 					);
 				})()}
 
-				{hasActionHandler ? (
+				{hasActionHandler || showCanvasAction ? (
 					<span
 						data-workspace-row-actions="true"
 						className={cn(
@@ -520,60 +526,98 @@ export const WorkspaceRowItem = memo(
 							isBusy && "pointer-events-auto opacity-100",
 						)}
 					>
-						{(() => {
-							const actionButton = (
-								<Button
-									aria-label={actionLabel}
-									disabled={Boolean(workspaceActionsDisabled || isBusy)}
-									onClick={(event) => {
-										event.stopPropagation();
-										if (workspaceActionsDisabled || isBusy) return;
-										if (isRestoreAction) {
-											onRestoreWorkspace?.(row.id);
-										} else if (archiveConfirming) {
-											resetArchiveConfirm();
-											onArchiveWorkspace?.(row.id);
-										} else {
-											startArchiveConfirm();
+						{showCanvasAction ? (
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<Button
+										aria-label={
+											isCanvasActive ? "Exit canvas" : "Open in canvas"
 										}
-									}}
-									variant={isArchiveConfirmVisible ? "destructive" : "ghost"}
-									size="icon-xs"
-									className={cn(
-										"size-5 rounded-md p-0",
-										!isArchiveConfirmVisible && "text-muted-foreground",
-										isArchiveConfirmVisible &&
-											"h-5 w-auto min-w-11 px-1.5 text-mini font-medium leading-none transition-colors duration-100 hover:bg-destructive/10 hover:text-destructive active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-destructive/20",
-										workspaceActionsDisabled
-											? "cursor-not-allowed opacity-60"
-											: isArchiveConfirmVisible
-												? "cursor-interactive"
-												: "cursor-interactive hover:text-foreground",
-									)}
-								>
-									{isArchiveConfirmVisible ? "Confirm" : actionIcon}
-								</Button>
-							);
-							// Archived rows show restore + delete with no tooltips
-							// (the icons are already self-explanatory and the
-							// extra hover layer on a destructive control feels noisy).
-							return isRestoreAction ? (
-								actionButton
-							) : isArchiveConfirmVisible ? (
-								actionButton
-							) : (
-								<Tooltip>
-									<TooltipTrigger asChild>{actionButton}</TooltipTrigger>
-									<TooltipContent
-										side="top"
-										sideOffset={4}
-										className="flex h-[22px] items-center rounded-md px-1.5 text-mini leading-none"
+										onClick={(event) => {
+											event.stopPropagation();
+											if (isCanvasActive) {
+												useCanvasModeStore.getState().setMode(row.id, false);
+											} else {
+												onSelect?.(row.id);
+												useCanvasModeStore.getState().setMode(row.id, true);
+											}
+										}}
+										variant="ghost"
+										size="icon-xs"
+										className="size-5 cursor-interactive rounded-md p-0 text-muted-foreground hover:text-foreground"
 									>
-										<span>{actionLabel}</span>
-									</TooltipContent>
-								</Tooltip>
-							);
-						})()}
+										<LayoutGrid className="size-3.5" strokeWidth={1.9} />
+									</Button>
+								</TooltipTrigger>
+								<TooltipContent
+									side="top"
+									sideOffset={4}
+									className="flex h-[22px] items-center rounded-md px-1.5 text-mini leading-none"
+								>
+									<span>
+										{isCanvasActive ? "Exit canvas" : "Open in canvas"}
+									</span>
+								</TooltipContent>
+							</Tooltip>
+						) : null}
+						{hasActionHandler
+							? (() => {
+									const actionButton = (
+										<Button
+											aria-label={actionLabel}
+											disabled={Boolean(workspaceActionsDisabled || isBusy)}
+											onClick={(event) => {
+												event.stopPropagation();
+												if (workspaceActionsDisabled || isBusy) return;
+												if (isRestoreAction) {
+													onRestoreWorkspace?.(row.id);
+												} else if (archiveConfirming) {
+													resetArchiveConfirm();
+													onArchiveWorkspace?.(row.id);
+												} else {
+													startArchiveConfirm();
+												}
+											}}
+											variant={
+												isArchiveConfirmVisible ? "destructive" : "ghost"
+											}
+											size="icon-xs"
+											className={cn(
+												"size-5 rounded-md p-0",
+												!isArchiveConfirmVisible && "text-muted-foreground",
+												isArchiveConfirmVisible &&
+													"h-5 w-auto min-w-11 px-1.5 text-mini font-medium leading-none transition-colors duration-100 hover:bg-destructive/10 hover:text-destructive active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-destructive/20",
+												workspaceActionsDisabled
+													? "cursor-not-allowed opacity-60"
+													: isArchiveConfirmVisible
+														? "cursor-interactive"
+														: "cursor-interactive hover:text-foreground",
+											)}
+										>
+											{isArchiveConfirmVisible ? "Confirm" : actionIcon}
+										</Button>
+									);
+									// Archived rows show restore + delete with no tooltips
+									// (the icons are already self-explanatory and the
+									// extra hover layer on a destructive control feels noisy).
+									return isRestoreAction ? (
+										actionButton
+									) : isArchiveConfirmVisible ? (
+										actionButton
+									) : (
+										<Tooltip>
+											<TooltipTrigger asChild>{actionButton}</TooltipTrigger>
+											<TooltipContent
+												side="top"
+												sideOffset={4}
+												className="flex h-[22px] items-center rounded-md px-1.5 text-mini leading-none"
+											>
+												<span>{actionLabel}</span>
+											</TooltipContent>
+										</Tooltip>
+									);
+								})()
+							: null}
 						{isRestoreAction && onDeleteWorkspace ? (
 							<Button
 								aria-label="Delete permanently"

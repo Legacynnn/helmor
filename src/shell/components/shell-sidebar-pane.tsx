@@ -4,7 +4,6 @@
 import {
 	Columns3,
 	History as HistoryIcon,
-	LayoutGrid,
 	ListTodo,
 	PanelLeftClose,
 } from "lucide-react";
@@ -16,10 +15,6 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-	useCanvasModeStore,
-	useIsCanvasMode,
-} from "@/features/canvas/use-canvas-mode";
 import { FeedbackButton } from "@/features/feedback";
 import { WorkspacesSidebarContainer } from "@/features/navigation/container";
 import { ResourceWidget } from "@/features/resources";
@@ -109,10 +104,6 @@ export function ShellSidebarPane({
 	// store→router microtask gap that could let auto-select fight openStart).
 	const selectedWorkspaceId = useRouterSelectedWorkspaceId();
 	const isStart = useRouterIsStart();
-	// Infinite Canvas (epic #61) switcher: pinned at the top of the sidebar,
-	// toggling the selected workspace into/out of canvas mode. Gated on the
-	// experimental opt-in.
-	const canvasActive = useIsCanvasMode(selectedWorkspaceId);
 	// In Start mode nothing in the list is the active workspace — drop the
 	// highlight. Mirrors AppShell's old `viewMode === "start" ? null : id` prop.
 	const highlightedWorkspaceId = isStart ? null : selectedWorkspaceId;
@@ -193,38 +184,6 @@ export function ShellSidebarPane({
 						<TrafficLightSpacer side="left" width={94} />
 						<div data-tauri-drag-region className="h-full flex-1" />
 					</div>
-					{appSettings.canvasModeEnabled ? (
-						<div className="px-2 pb-1">
-							<Button
-								type="button"
-								variant="ghost"
-								aria-pressed={canvasActive}
-								disabled={!selectedWorkspaceId}
-								title={
-									selectedWorkspaceId
-										? canvasActive
-											? "Exit canvas mode"
-											: "Open the selected workspace in canvas mode"
-										: "Select a workspace to use canvas mode"
-								}
-								className={cn(
-									"h-8 w-full justify-start gap-2 px-2 font-medium text-muted-foreground text-sm hover:text-foreground",
-									canvasActive && "bg-accent text-accent-foreground",
-								)}
-								onClick={() => {
-									if (!selectedWorkspaceId) return;
-									useCanvasModeStore
-										.getState()
-										.setMode(selectedWorkspaceId, !canvasActive);
-								}}
-							>
-								<LayoutGrid className="size-4 shrink-0" />
-								<span className="truncate">
-									{canvasActive ? "Exit canvas" : "Canvas mode"}
-								</span>
-							</Button>
-						</div>
-					) : null}
 					<nav aria-label="Screens" className="flex flex-col gap-0.5 px-2 pb-2">
 						{SCREEN_NAV_ITEMS.map(({ id, label, Icon }) => {
 							const active = activeScreen === id;
