@@ -72,6 +72,8 @@ pub struct CanvasViewState {
     /// "light" | "dark" | "system".
     pub background_theme: String,
     pub snap_to_grid: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background_image: Option<String>,
     pub updated_at: String,
 }
 
@@ -88,6 +90,7 @@ impl CanvasViewState {
             background_color: None,
             background_theme: "system".to_string(),
             snap_to_grid: false,
+            background_image: None,
             updated_at: String::new(),
         }
     }
@@ -150,11 +153,12 @@ fn map_view_state(row: &rusqlite::Row<'_>) -> rusqlite::Result<CanvasViewState> 
         background_color: row.get(6)?,
         background_theme: row.get(7)?,
         snap_to_grid: row.get::<_, i64>(8)? != 0,
-        updated_at: row.get(9)?,
+        background_image: row.get(9)?,
+        updated_at: row.get(10)?,
     })
 }
 
-const VIEW_STATE_COLUMNS: &str = "workspace_id, pan_x, pan_y, zoom, translucency, background_pattern, background_color, background_theme, snap_to_grid, updated_at";
+const VIEW_STATE_COLUMNS: &str = "workspace_id, pan_x, pan_y, zoom, translucency, background_pattern, background_color, background_theme, snap_to_grid, background_image, updated_at";
 
 // ── Panels ─────────────────────────────────────────────────────────────────
 
@@ -272,8 +276,8 @@ pub fn upsert_view_state(conn: &Connection, view: &CanvasViewState) -> Result<()
         r#"
         INSERT INTO canvas_view_state
             (workspace_id, pan_x, pan_y, zoom, translucency, background_pattern,
-             background_color, background_theme, snap_to_grid, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))
+             background_color, background_theme, snap_to_grid, background_image, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now'))
         ON CONFLICT(workspace_id) DO UPDATE SET
             pan_x = excluded.pan_x,
             pan_y = excluded.pan_y,
@@ -283,6 +287,7 @@ pub fn upsert_view_state(conn: &Connection, view: &CanvasViewState) -> Result<()
             background_color = excluded.background_color,
             background_theme = excluded.background_theme,
             snap_to_grid = excluded.snap_to_grid,
+            background_image = excluded.background_image,
             updated_at = datetime('now')
         "#,
         rusqlite::params![
@@ -295,6 +300,7 @@ pub fn upsert_view_state(conn: &Connection, view: &CanvasViewState) -> Result<()
             view.background_color,
             view.background_theme,
             view.snap_to_grid as i64,
+            view.background_image,
         ],
     )?;
     Ok(())
@@ -436,6 +442,25 @@ mod tests {
         view.zoom = 3.0;
         upsert_view_state(&conn, &view).unwrap();
         assert_eq!(get_view_state(&conn, "ws1").unwrap().zoom, 3.0);
+    }
+
+    #[test]
+    fn view_state_round_trips_background_image() {
+        let conn = mem_conn();
+        let mut view = CanvasViewState::default_for("ws1");
+        view.background_image = Some("aurora".to_string());
+        upsert_view_state(&conn, &view).unwrap();
+        assert_eq!(
+            get_view_state(&conn, "ws1")
+                .unwrap()
+                .background_image
+                .as_deref(),
+            Some("aurora")
+        );
+
+        view.background_image = None;
+        upsert_view_state(&conn, &view).unwrap();
+        assert_eq!(get_view_state(&conn, "ws1").unwrap().background_image, None);
     }
 
     #[test]

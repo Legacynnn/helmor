@@ -963,6 +963,13 @@ fn run_migrations(connection: &Connection) -> Result<()> {
         add_column_if_missing(connection, "tasks", "project_color", "TEXT")?;
     }
 
+    // `canvas_view_state.background_image` added after the table shipped —
+    // backfill for dev DBs that created the table before the background-image
+    // facet existed. No-op on fresh installs (SCHEMA_SQL already includes it).
+    if has_table(connection, "canvas_view_state") {
+        add_column_if_missing(connection, "canvas_view_state", "background_image", "TEXT")?;
+    }
+
     Ok(())
 }
 
@@ -1037,6 +1044,7 @@ CREATE TABLE IF NOT EXISTS canvas_view_state (
     background_color TEXT,
     background_theme TEXT NOT NULL DEFAULT 'system',
     snap_to_grid INTEGER NOT NULL DEFAULT 0,
+    background_image TEXT,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
