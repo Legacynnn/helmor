@@ -48,6 +48,7 @@ export function PanelHost({ shape }: { shape: PanelShape }) {
 	const pendingSource = useConnectionsStore((s) => s.pendingSource);
 	const isConnectTarget =
 		pendingSource != null && pendingSource.id !== shape.id;
+	const perPanelOpacity = parsePanelConfig(shape.props.config).opacity;
 
 	return (
 		<div
@@ -56,6 +57,11 @@ export function PanelHost({ shape }: { shape: PanelShape }) {
 				isConnectTarget &&
 					"ring-2 ring-[var(--color-selected,#3b82f6)] ring-offset-1",
 			)}
+			style={{
+				// Per-panel override wins; otherwise inherit the canvas-wide
+				// translucency set on the surface container.
+				opacity: perPanelOpacity ?? "var(--canvas-panel-opacity, 1)",
+			}}
 		>
 			{/* Header is the drag handle — do NOT stop propagation here. */}
 			<div className="flex h-9 shrink-0 items-center gap-2 border-app-border border-b bg-app-subtle px-2.5">

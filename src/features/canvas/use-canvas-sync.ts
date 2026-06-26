@@ -6,18 +6,17 @@ import {
 	type CanvasState,
 	deleteCanvasPanel,
 	saveCanvasPanel,
-	saveCanvasViewState,
 } from "@/lib/api";
+import { useCanvasViewStore } from "./canvas-view-store";
 import { useConnectionsStore } from "./connections/connections-store";
 import { parsePanelConfig } from "./panel-config";
 import type { PanelShape } from "./shapes/panel-shape";
 
 const PANEL_SAVE_DEBOUNCE_MS = 350;
-const VIEW_SAVE_DEBOUNCE_MS = 500;
 
 /** Map a live tldraw panel shape to its persisted row. The shape id IS the
- * DB id, so identity round-trips. `z` ordering is refined in Phase 5; Phase 1
- * relies on creation order. */
+ * DB id, so identity round-trips. Lock state uses tldraw's native `isLocked`
+ * (mirrored into the `locked` column). */
 function shapeToPanel(shape: PanelShape, workspaceId: string): CanvasPanel {
 	return {
 		id: shape.id,
@@ -28,7 +27,7 @@ function shapeToPanel(shape: PanelShape, workspaceId: string): CanvasPanel {
 		width: shape.props.w,
 		height: shape.props.h,
 		z: 0,
-		locked: shape.props.locked,
+		locked: shape.isLocked,
 		title: shape.props.title,
 		config: shape.props.config,
 		createdAt: "",
@@ -50,7 +49,6 @@ export function attachCanvasSync(
 ): () => void {
 	let hydrating = true;
 	const panelTimers = new Map<string, ReturnType<typeof setTimeout>>();
-	let viewTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// ── Hydration ────────────────────────────────────────────────────────────
 	// Create persisted panels as shapes (ignore history so they aren't undoable
@@ -63,6 +61,7 @@ export function attachCanvasSync(
 					type: "panel",
 					x: panel.x,
 					y: panel.y,
+					isLocked: panel.locked,
 					props: {
 						w: panel.width,
 						h: panel.height,
@@ -107,20 +106,11 @@ export function attachCanvasSync(
 		void deleteCanvasPanel(workspaceId, id).catch(() => {});
 	};
 
+	// Camera changes route through the shared view store (which owns the
+	// debounced persist together with the appearance fields).
 	const queueViewSave = () => {
-		if (viewTimer) clearTimeout(viewTimer);
-		viewTimer = setTimeout(() => {
-			viewTimer = null;
-			const cam = editor.getCamera();
-			void saveCanvasViewState({
-				...initial.viewState,
-				workspaceId,
-				panX: cam.x,
-				panY: cam.y,
-				zoom: cam.z,
-				updatedAt: "",
-			}).catch(() => {});
-		}, VIEW_SAVE_DEBOUNCE_MS);
+		const cam = editor.getCamera();
+		useCanvasViewStore.getState().setCamera(cam.x, cam.y, cam.z);
 	};
 
 	// ── Change listener ───────────────────────────────────────────────────────
@@ -164,7 +154,6 @@ export function attachCanvasSync(
 
 	return () => {
 		clearTimeout(releaseTimer);
-		if (viewTimer) clearTimeout(viewTimer);
 		for (const timer of panelTimers.values()) clearTimeout(timer);
 		panelTimers.clear();
 		unlisten();

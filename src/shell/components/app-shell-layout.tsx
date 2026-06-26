@@ -47,6 +47,7 @@ type Props = {
 	// full-bleed canvas surface when active for the selected workspace.
 	canvasActive: boolean;
 	selectedWorkspaceId: string | null;
+	onSelectWorkspace: (workspaceId: string | null) => void;
 	// Left sidebar + its resize separator.
 	sidebar: ComponentProps<typeof ShellSidebarPane>;
 	sidebarCollapsed: boolean;
@@ -80,6 +81,7 @@ export function AppShellLayout({
 	activeScreen,
 	canvasActive,
 	selectedWorkspaceId,
+	onSelectWorkspace,
 	sidebar,
 	sidebarCollapsed,
 	isSidebarResizing,
@@ -144,6 +146,7 @@ export function AppShellLayout({
 								<CanvasSurface
 									key={selectedWorkspaceId}
 									workspaceId={selectedWorkspaceId}
+									onSelectWorkspace={onSelectWorkspace}
 								/>
 							</Suspense>
 						</div>

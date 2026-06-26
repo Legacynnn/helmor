@@ -35,12 +35,19 @@ export type FileManagerPanelConfig = {
 	rootSubpath?: string;
 };
 
+export type CommonPanelConfig = {
+	/** Per-panel translucency override (0..1). When unset the panel inherits
+	 * the canvas-wide translucency. */
+	opacity?: number;
+};
+
 export type PanelConfig = ConversationPanelConfig &
 	TerminalPanelConfig &
 	NotesPanelConfig &
 	DrawingPanelConfig &
 	EditorPanelConfig &
-	FileManagerPanelConfig;
+	FileManagerPanelConfig &
+	CommonPanelConfig;
 
 export function parsePanelConfig(raw: string | null | undefined): PanelConfig {
 	if (!raw) return {};

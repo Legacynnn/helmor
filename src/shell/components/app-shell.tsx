@@ -119,6 +119,7 @@ export function AppShell({
 			activeScreen={screen.activeScreen}
 			canvasActive={canvasActive}
 			selectedWorkspaceId={selectedWorkspaceId}
+			onSelectWorkspace={handleSelectWorkspace}
 			sidebar={{
 				activeScreen: screen.activeScreen,
 				screenActions: screen.screenActions,
