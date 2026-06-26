@@ -1,3 +1,5 @@
+import { render } from "@testing-library/react";
+import { createElement } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 
 // Mock the IPC writes so the store's write-through doesn't hit Tauri.
@@ -21,9 +23,12 @@ vi.stubGlobal("crypto", {
 	randomUUID: () => `id-${++uuidCounter}` as `${string}-${string}`,
 });
 
-const { useConnectionsStore, deriveKind, connectionMeta } = await import(
-	"./connections-store"
-);
+const {
+	useConnectionsStore,
+	useConnectionsForPanel,
+	deriveKind,
+	connectionMeta,
+} = await import("./connections-store");
 
 beforeEach(() => {
 	uuidCounter = 0;
@@ -97,6 +102,25 @@ it("disconnect removes the edge and calls the backend", () => {
 	store.disconnect(id);
 	expect(useConnectionsStore.getState().connections).toHaveLength(0);
 	expect(apiMocks.deleteCanvasConnection).toHaveBeenCalledWith("ws1", id);
+});
+
+it("useConnectionsForPanel keeps a stable snapshot (no infinite render loop)", () => {
+	// Regression: the selector returned freshly-filtered arrays each call, so
+	// useShallow's reference comparison never matched and React's
+	// useSyncExternalStore looped ("getSnapshot should be cached" → Maximum
+	// update depth exceeded), blanking the whole canvas on mount.
+	useConnectionsStore
+		.getState()
+		.addConnection("a", "b", "conversation", "terminal");
+
+	function Probe() {
+		const { outgoing, incoming } = useConnectionsForPanel("a");
+		return createElement("span", null, `${outgoing.length}:${incoming.length}`);
+	}
+
+	// A buggy hook throws "Maximum update depth exceeded" during this mount.
+	const { container } = render(createElement(Probe));
+	expect(container.textContent).toBe("1:0");
 });
 
 it("pruneForPanel drops every edge touching a deleted panel", () => {

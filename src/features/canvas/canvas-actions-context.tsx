@@ -15,11 +15,14 @@ export type CanvasActions = {
 	removeNode: (nodeId: string) => void;
 	/** Create a panel of `type`; conversation/terminal get a bound
 	 * session / PTY instance. `config` is merged over the generated config
-	 * (e.g. file-manager → editor passes `{ filePath }`). Returns the new id. */
+	 * (e.g. file-manager → editor passes `{ filePath }`). `position` / `size`
+	 * place + size the panel (drag-to-create); both fall back to defaults.
+	 * Returns the new id. */
 	addPanel: (
 		type: CanvasPanelType,
 		opts?: {
 			position?: { x: number; y: number };
+			size?: { width: number; height: number };
 			config?: Partial<PanelConfig>;
 		},
 	) => Promise<string>;

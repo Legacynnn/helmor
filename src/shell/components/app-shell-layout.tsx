@@ -120,7 +120,10 @@ export function AppShellLayout({
 				className="relative h-dvh overflow-hidden bg-background font-sans text-foreground antialiased"
 			>
 				<div className="relative flex h-full min-h-0 bg-background">
-					{workspaceViewMode !== "editor" && (
+					{/* Canvas mode is full-bleed: it hides the left sidebar entirely
+					 *  (the canvas carries its own workspace switcher + Exit control),
+					 *  so opening a canvas always closes the sidebar. */}
+					{workspaceViewMode !== "editor" && !canvasActive && (
 						<>
 							<ShellSidebarPane {...sidebar} />
 							<ShellResizeSeparator

@@ -8,7 +8,7 @@ import {
 	SquareTerminal,
 	X,
 } from "lucide-react";
-import type { ComponentType } from "react";
+import { type ComponentType, useState } from "react";
 import type { CanvasPanelType } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useCanvasActions } from "./canvas-actions-context";
@@ -50,14 +50,20 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 	const Icon = meta.icon;
 	const config = parsePanelConfig(data.config);
 	const opacity = config.opacity;
+	// Resize handles also show on hover — clicking a panel's (interactive) body
+	// doesn't select the node, so selection alone would hide them and make
+	// panels feel un-resizable.
+	const [hovered, setHovered] = useState(false);
 
 	return (
 		<div
 			className="flex size-full flex-col overflow-hidden rounded-[10px] border border-app-border bg-app-base text-app-foreground shadow-lg"
 			style={{ opacity: opacity ?? "var(--canvas-panel-opacity, 1)" }}
+			onPointerEnter={() => setHovered(true)}
+			onPointerLeave={() => setHovered(false)}
 		>
 			<NodeResizer
-				isVisible={selected && !data.locked}
+				isVisible={(selected || hovered) && !data.locked}
 				minWidth={PANEL_MIN_WIDTH}
 				minHeight={PANEL_MIN_HEIGHT}
 				lineClassName="!border-[var(--color-selected,#3b82f6)]"

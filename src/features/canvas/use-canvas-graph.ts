@@ -215,9 +215,10 @@ export function useCanvasGraph(
 				id,
 				type: "panel",
 				position,
-				width: PANEL_DEFAULT_WIDTH,
-				height: PANEL_DEFAULT_HEIGHT,
+				width: opts?.size?.width ?? PANEL_DEFAULT_WIDTH,
+				height: opts?.size?.height ?? PANEL_DEFAULT_HEIGHT,
 				dragHandle: DRAG_HANDLE,
+				draggable: true,
 				selected: true,
 				data: { panelType: type, title: "", config, locked: false },
 			};

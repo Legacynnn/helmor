@@ -32,8 +32,9 @@ export function AppShell({
 	// see byte-identical values, just sourced from the router.
 	const selectedWorkspaceId = s.selectedWorkspaceId;
 	// Infinite Canvas mode (epic #61): when active for the selected workspace
-	// AND the experimental opt-in is on, the canvas surface replaces the
-	// center + inspector (the sidebar stays). Disabling the opt-in forces any
+	// AND the experimental opt-in is on, the canvas surface goes full-bleed —
+	// replacing the center + inspector AND hiding the left sidebar (the canvas
+	// carries its own workspace switcher). Disabling the opt-in forces any
 	// canvas-active workspace back to the normal layout.
 	const canvasActive =
 		useIsCanvasMode(selectedWorkspaceId) && s.appSettings.canvasModeEnabled;

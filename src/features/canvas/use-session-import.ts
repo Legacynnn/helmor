@@ -2,13 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { workspaceSessionsQueryOptions } from "@/lib/query-client";
 import type { CanvasActions } from "./canvas-actions-context";
-import {
-	PANEL_DEFAULT_HEIGHT,
-	PANEL_DEFAULT_WIDTH,
-	type PanelNode,
-} from "./types";
+import type { PanelNode } from "./types";
 
-const GAP = 40;
+// Imported conversation panels are sized generously — they host a full chat
+// thread + composer, so they need more room than the default panel.
+const IMPORT_WIDTH = 640;
+const IMPORT_HEIGHT = 560;
+const GAP = 48;
 const COLS = 3;
 
 /** On first entry to an EMPTY canvas, transcribe the workspace's existing
@@ -44,9 +44,10 @@ export function useSessionImport(
 			void addPanel("conversation", {
 				config: { sessionId: session.id },
 				position: {
-					x: col * (PANEL_DEFAULT_WIDTH + GAP),
-					y: row * (PANEL_DEFAULT_HEIGHT + GAP),
+					x: col * (IMPORT_WIDTH + GAP),
+					y: row * (IMPORT_HEIGHT + GAP),
 				},
+				size: { width: IMPORT_WIDTH, height: IMPORT_HEIGHT },
 			});
 		});
 	}, [sessions, nodes.length, hadPanelsOnEntry, addPanel]);

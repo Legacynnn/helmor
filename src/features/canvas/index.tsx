@@ -25,6 +25,7 @@ import {
 	type CanvasWorkspaceInfo,
 	CanvasWorkspaceProvider,
 } from "./canvas-workspace-context";
+import { CanvasCreateOverlay } from "./chrome/create-overlay";
 import { CanvasManageRail } from "./chrome/manage-rail";
 import { CanvasSelectionToolbar } from "./chrome/selection-toolbar";
 import { CanvasWorkspaceControls } from "./chrome/workspace-controls";
@@ -228,6 +229,7 @@ function CanvasInner({
 						<Controls showInteractive={false} />
 						<MiniMap pannable zoomable />
 					</ReactFlow>
+					<CanvasCreateOverlay />
 					<CanvasWorkspaceControls
 						workspaceId={workspaceId}
 						onSelectWorkspace={onSelectWorkspace}

@@ -1,5 +1,5 @@
+import { useMemo } from "react";
 import { create } from "zustand";
-import { useShallow } from "zustand/react/shallow";
 import {
 	type CanvasConnection,
 	type CanvasPanelType,
@@ -139,10 +139,17 @@ export function useConnectionsForPanel(panelId: string): {
 	outgoing: CanvasConnection[];
 	incoming: CanvasConnection[];
 } {
-	return useConnectionsStore(
-		useShallow((s) => ({
-			outgoing: s.connections.filter((c) => c.fromPanelId === panelId),
-			incoming: s.connections.filter((c) => c.toPanelId === panelId),
-		})),
+	// Subscribe to the stable `connections` reference and derive the two lists
+	// in a memo. Returning freshly-`filter()`ed arrays straight from the store
+	// selector defeats `useShallow` (its reference check never matches), which
+	// makes `useSyncExternalStore` loop ("getSnapshot should be cached" →
+	// Maximum update depth exceeded) and blanks the canvas on mount.
+	const connections = useConnectionsStore((s) => s.connections);
+	return useMemo(
+		() => ({
+			outgoing: connections.filter((c) => c.fromPanelId === panelId),
+			incoming: connections.filter((c) => c.toPanelId === panelId),
+		}),
+		[connections, panelId],
 	);
 }
