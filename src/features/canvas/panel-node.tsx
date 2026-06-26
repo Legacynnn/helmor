@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { useCanvasActions } from "./canvas-actions-context";
 import { PanelConnections } from "./connections/panel-connections";
 import { parsePanelConfig } from "./panel-config";
+import { PanelErrorBoundary } from "./panel-error-boundary";
 import { ConversationPanelBody } from "./panels/conversation-panel";
 import { DrawingPanelBody } from "./panels/drawing-panel";
 import { EditorPanelBody } from "./panels/editor-panel";
@@ -102,11 +103,13 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 			{/* Body is interactive — nodrag/nowheel so React Flow doesn't pan,
 			 *  drag, or zoom while the user works inside it. */}
 			<div className="nodrag nowheel min-h-0 flex-1 overflow-hidden">
-				<PanelBody
-					nodeId={id}
-					panelType={data.panelType}
-					config={data.config}
-				/>
+				<PanelErrorBoundary>
+					<PanelBody
+						nodeId={id}
+						panelType={data.panelType}
+						config={data.config}
+					/>
+				</PanelErrorBoundary>
 			</div>
 		</div>
 	);
