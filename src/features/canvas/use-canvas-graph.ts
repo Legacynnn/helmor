@@ -72,10 +72,13 @@ async function buildConfig(
 ): Promise<{ config: string }> {
 	let base: PanelConfig = {};
 	if (type === "conversation") {
-		const { sessionId } = await createSession(workspaceId);
+		// Reuse an existing session when one is supplied (e.g. importing the
+		// workspace's open sessions); otherwise spawn a fresh one.
+		const sessionId =
+			override?.sessionId ?? (await createSession(workspaceId)).sessionId;
 		base = { sessionId };
 	} else if (type === "terminal") {
-		base = { instanceId: crypto.randomUUID() };
+		base = { instanceId: override?.instanceId ?? crypto.randomUUID() };
 	}
 	return { config: stringifyPanelConfig({ ...base, ...override }) };
 }
