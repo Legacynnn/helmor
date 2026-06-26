@@ -2,6 +2,7 @@ import { useNodes, useReactFlow } from "@xyflow/react";
 import {
 	Circle,
 	FolderTree,
+	GitBranch,
 	Grid3x3,
 	LayoutGrid,
 	MessageSquare,
@@ -37,6 +38,7 @@ const PANEL_ICONS: Record<
 	drawing: Pencil,
 	"file-manager": FolderTree,
 	editor: SquarePen,
+	git: GitBranch,
 };
 
 const PATTERNS: {

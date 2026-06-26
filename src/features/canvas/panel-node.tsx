@@ -1,5 +1,6 @@
 import { Handle, type NodeProps, NodeResizer, Position } from "@xyflow/react";
 import {
+	GitBranch,
 	LayoutGrid,
 	MessageSquare,
 	NotebookPen,
@@ -39,6 +40,7 @@ const PANEL_META: Record<
 	drawing: { label: "Drawing", icon: Pencil },
 	"file-manager": { label: "Files", icon: LayoutGrid },
 	editor: { label: "Editor", icon: SquarePen },
+	git: { label: "Git", icon: GitBranch },
 };
 
 const HANDLE_CLASS =

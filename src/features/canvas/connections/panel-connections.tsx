@@ -22,6 +22,7 @@ const PANEL_LABELS: Record<CanvasPanelType, string> = {
 	drawing: "Drawing",
 	"file-manager": "Files",
 	editor: "Editor",
+	git: "Git",
 };
 
 function usePanelLabel(id: string): string {

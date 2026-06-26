@@ -5945,7 +5945,8 @@ export type CanvasPanelType =
 	| "notes"
 	| "drawing"
 	| "file-manager"
-	| "editor";
+	| "editor"
+	| "git";
 
 /** One placed surface on a workspace's canvas. `id` mirrors the tldraw shape
  * id (frontend-generated UUID). `config` is opaque JSON owned by the renderer
@@ -5991,6 +5992,7 @@ export type CanvasViewState = {
 	backgroundPattern: CanvasBackgroundPattern;
 	backgroundColor?: string | null;
 	backgroundTheme: CanvasBackgroundTheme;
+	backgroundImage?: string | null;
 	snapToGrid: boolean;
 	updatedAt: string;
 };
@@ -6027,6 +6029,20 @@ export async function saveCanvasViewState(
 	view: CanvasViewState,
 ): Promise<void> {
 	return invoke<void>("save_canvas_view_state", { view });
+}
+
+/** Persist an uploaded canvas background image to the data dir; returns the
+ * absolute file path to store in `backgroundImage` and render via convertFileSrc. */
+export async function saveCanvasBackground(
+	workspaceId: string,
+	bytes: Uint8Array,
+	ext: string,
+): Promise<string> {
+	return invoke<string>("save_canvas_background", {
+		workspaceId,
+		bytes: Array.from(bytes),
+		ext,
+	});
 }
 
 /** Insert-or-update a connection. Broadcasts `canvasChanged`. */
