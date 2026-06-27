@@ -9,6 +9,7 @@ import {
 	MiniMap,
 	ReactFlow,
 	ReactFlowProvider,
+	SelectionMode,
 	type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -22,6 +23,8 @@ import {
 } from "@/lib/query-client";
 import { resolveBackgroundUrl } from "./backgrounds";
 import { CanvasActionsProvider } from "./canvas-actions-context";
+import { useCanvasCreateStore } from "./canvas-create-store";
+import { useCanvasInteractionStore } from "./canvas-interaction-store";
 import { useCanvasViewStore } from "./canvas-view-store";
 import {
 	type CanvasWorkspaceInfo,
@@ -90,6 +93,13 @@ function CanvasInner({
 	const { data: detail } = useQuery(workspaceDetailQueryOptions(workspaceId));
 	const wrapperRef = useRef<HTMLDivElement>(null);
 	const [customizeOpen, setCustomizeOpen] = useState(false);
+	const selectMode = useCanvasInteractionStore((s) => s.selectMode);
+	const pendingType = useCanvasCreateStore((s) => s.pendingType);
+
+	// Arming any create tool (from either rail) exits select mode.
+	useEffect(() => {
+		if (pendingType) useCanvasInteractionStore.getState().setSelectMode(false);
+	}, [pendingType]);
 
 	const workspaceInfo = useMemo<CanvasWorkspaceInfo>(
 		() => ({
@@ -233,6 +243,10 @@ function CanvasInner({
 						maxZoom={2}
 						proOptions={{ hideAttribution: true }}
 						deleteKeyCode={["Backspace", "Delete"]}
+						panOnDrag={selectMode ? [1, 2] : true}
+						selectionOnDrag={selectMode}
+						selectNodesOnDrag={false}
+						selectionMode={SelectionMode.Partial}
 					>
 						{pattern !== "blank" ? (
 							<Background
