@@ -19,6 +19,7 @@ export type CanvasAppearance = {
 	backgroundColor: string | null;
 	backgroundTheme: CanvasBackgroundTheme;
 	snapToGrid: boolean;
+	backgroundImage: string | null;
 };
 
 type CanvasViewStore = CanvasViewState & {
@@ -44,6 +45,7 @@ function scheduleSave(get: () => CanvasViewState) {
 			backgroundColor: s.backgroundColor,
 			backgroundTheme: s.backgroundTheme,
 			snapToGrid: s.snapToGrid,
+			backgroundImage: s.backgroundImage,
 			updatedAt: "",
 		}).catch(() => {});
 	}, SAVE_DEBOUNCE_MS);
@@ -59,6 +61,7 @@ export const useCanvasViewStore = create<CanvasViewStore>((set, get) => ({
 	backgroundColor: null,
 	backgroundTheme: "system",
 	snapToGrid: false,
+	backgroundImage: null,
 	updatedAt: "",
 
 	hydrate: (view) => set({ ...view }),
