@@ -88,7 +88,7 @@ describe("useCanvasGraph deleted-panel resurrection guard", () => {
 		vi.useRealTimers();
 	});
 
-	it("does not re-add a removed node when reconcile sees a stale snapshot containing it", () => {
+	it("does not re-add a removed node when reconcile sees a stale snapshot containing it", async () => {
 		const panel = makePanel("p1");
 		const state = makeState([panel]);
 		const { result } = renderGraph(state);
@@ -100,6 +100,11 @@ describe("useCanvasGraph deleted-panel resurrection guard", () => {
 			result.current.onNodesChange([{ type: "remove", id: "p1" }]);
 		});
 		expect(result.current.nodes).toHaveLength(0);
+		// The delete is dispatched through the per-id serial write queue (a
+		// microtask), so flush it before asserting.
+		await act(async () => {
+			await Promise.resolve();
+		});
 		expect(deleteCanvasPanel).toHaveBeenCalledWith(WORKSPACE, "p1");
 
 		// A backend snapshot that STILL contains the deleted panel must not
@@ -137,6 +142,34 @@ describe("useCanvasGraph deleted-panel resurrection guard", () => {
 		});
 
 		// Advancing past the debounce window must NOT trigger an upsert.
+		act(() => {
+			vi.advanceTimersByTime(400);
+		});
+
+		expect(saveCanvasPanel).not.toHaveBeenCalled();
+	});
+
+	it("never persists a panel again after it has been deleted", () => {
+		const panel = makePanel("p1");
+		const { result } = renderGraph(makeState([panel]));
+
+		// Delete the panel.
+		act(() => {
+			result.current.onNodesChange([{ type: "remove", id: "p1" }]);
+		});
+
+		// A late settled-drag change for the same id (e.g. a trailing React Flow
+		// event) must NOT schedule or fire a resurrecting upsert.
+		act(() => {
+			result.current.onNodesChange([
+				{
+					type: "position",
+					id: "p1",
+					position: { x: 50, y: 50 },
+					dragging: false,
+				},
+			]);
+		});
 		act(() => {
 			vi.advanceTimersByTime(400);
 		});

@@ -111,8 +111,15 @@ export function useCanvasGraph(
 	const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 	// Suppress persistence while applying a programmatic reconcile.
 	const suppress = useRef(false);
-	// Panel ids deleted locally, guarded against reconcile resurrection.
-	const recentlyDeleted = useRef(new Set<string>());
+	// Panel ids deleted locally this session. Permanent (ids are UUIDs, never
+	// reused) so a stale snapshot can never resurrect a deleted panel via
+	// reconcile, and `persist` never re-saves one.
+	const deleted = useRef(new Set<string>());
+	// Per-panel serial write queue. Every save/delete IPC for a given id is
+	// chained after the previous one so a debounced save that already fired
+	// can't land AFTER its delete and re-insert the row (write-after-delete
+	// race). The delete is always the last write to win.
+	const writeChains = useRef(new Map<string, Promise<void>>());
 
 	useEffect(() => {
 		const map = timers.current;
@@ -122,46 +129,65 @@ export function useCanvasGraph(
 		};
 	}, []);
 
+	// Chain an async DB write after the previous write for the same panel id.
+	// Serializing per id makes delete deterministically win over an in-flight
+	// save (write-after-delete race). Errors are swallowed so the chain survives.
+	const enqueueWrite = useCallback((id: string, op: () => Promise<void>) => {
+		const prev = writeChains.current.get(id) ?? Promise.resolve();
+		const run = () => op().catch(() => {});
+		const next = prev.then(run, run);
+		writeChains.current.set(id, next);
+		void next.finally(() => {
+			if (writeChains.current.get(id) === next) {
+				writeChains.current.delete(id);
+			}
+		});
+	}, []);
+
 	const persist = useCallback(
 		(id: string) => {
+			// Never resurrect a panel the user deleted this session.
+			if (deleted.current.has(id)) return;
 			const existing = timers.current.get(id);
 			if (existing) clearTimeout(existing);
 			timers.current.set(
 				id,
 				setTimeout(() => {
 					timers.current.delete(id);
+					if (deleted.current.has(id)) return;
 					const node = nodesRef.current.find((n) => n.id === id);
 					if (node) {
-						void saveCanvasPanel(nodeToPanel(node, workspaceId)).catch(
-							() => {},
-						);
+						const panel = nodeToPanel(node, workspaceId);
+						enqueueWrite(id, () => saveCanvasPanel(panel));
 					}
 				}, PERSIST_DEBOUNCE_MS),
 			);
 		},
-		[workspaceId],
+		[workspaceId, enqueueWrite],
 	);
 
 	const tearDown = useCallback(
 		(node: PanelNode) => {
-			// Cancel any pending debounced persist so a stale upsert can't
-			// re-insert the row after we delete it (write-after-delete race).
-			const pending = timers.current.get(node.id);
+			const id = node.id;
+			// Mark deleted FIRST: blocks any future persist + guards reconcile from
+			// resurrecting this id from a stale snapshot (permanent for the session).
+			deleted.current.add(id);
+			// Cancel any pending debounced persist so it never enqueues a save.
+			const pending = timers.current.get(id);
 			if (pending) {
 				clearTimeout(pending);
-				timers.current.delete(node.id);
+				timers.current.delete(id);
 			}
 			if (node.data.panelType === "terminal") {
 				const { instanceId } = parsePanelConfig(node.data.config);
 				if (instanceId) closeTerminal(instanceId);
 			}
-			useConnectionsStore.getState().pruneForPanel(node.id);
-			void deleteCanvasPanel(workspaceId, node.id).catch(() => {});
-			// Guard reconcile against resurrecting this id from a stale snapshot.
-			recentlyDeleted.current.add(node.id);
-			setTimeout(() => recentlyDeleted.current.delete(node.id), 5000);
+			useConnectionsStore.getState().pruneForPanel(id);
+			// Chain the delete AFTER any save already queued/in-flight for this id,
+			// so an upsert can never land after the delete and re-insert the row.
+			enqueueWrite(id, () => deleteCanvasPanel(workspaceId, id));
 		},
-		[workspaceId],
+		[workspaceId, enqueueWrite],
 	);
 
 	const handleNodesChange = useCallback(
@@ -322,9 +348,7 @@ export function useCanvasGraph(
 						} satisfies PanelNode;
 					});
 				const added = state.panels
-					.filter(
-						(p) => !liveIds.has(p.id) && !recentlyDeleted.current.has(p.id),
-					)
+					.filter((p) => !liveIds.has(p.id) && !deleted.current.has(p.id))
 					.map(panelToNode);
 				return [...updated, ...added];
 			});
