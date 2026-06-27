@@ -111,6 +111,8 @@ export function useCanvasGraph(
 	const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 	// Suppress persistence while applying a programmatic reconcile.
 	const suppress = useRef(false);
+	// Panel ids deleted locally, guarded against reconcile resurrection.
+	const recentlyDeleted = useRef(new Set<string>());
 
 	useEffect(() => {
 		const map = timers.current;
@@ -142,12 +144,22 @@ export function useCanvasGraph(
 
 	const tearDown = useCallback(
 		(node: PanelNode) => {
+			// Cancel any pending debounced persist so a stale upsert can't
+			// re-insert the row after we delete it (write-after-delete race).
+			const pending = timers.current.get(node.id);
+			if (pending) {
+				clearTimeout(pending);
+				timers.current.delete(node.id);
+			}
 			if (node.data.panelType === "terminal") {
 				const { instanceId } = parsePanelConfig(node.data.config);
 				if (instanceId) closeTerminal(instanceId);
 			}
 			useConnectionsStore.getState().pruneForPanel(node.id);
 			void deleteCanvasPanel(workspaceId, node.id).catch(() => {});
+			// Guard reconcile against resurrecting this id from a stale snapshot.
+			recentlyDeleted.current.add(node.id);
+			setTimeout(() => recentlyDeleted.current.delete(node.id), 5000);
 		},
 		[workspaceId],
 	);
@@ -310,7 +322,9 @@ export function useCanvasGraph(
 						} satisfies PanelNode;
 					});
 				const added = state.panels
-					.filter((p) => !liveIds.has(p.id))
+					.filter(
+						(p) => !liveIds.has(p.id) && !recentlyDeleted.current.has(p.id),
+					)
 					.map(panelToNode);
 				return [...updated, ...added];
 			});
