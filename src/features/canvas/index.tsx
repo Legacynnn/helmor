@@ -106,7 +106,11 @@ function CanvasInner({
 			workspaceId,
 			repoId: detail?.repoId ?? null,
 			workspaceRootPath: detail?.rootPath ?? null,
-			workspaceReady: detail?.state === "ready",
+			// Match normal-mode terminal readiness (features/panel): ready unless
+			// the workspace is still initializing. The stricter `=== "ready"` left
+			// canvas terminals stuck on "Preparing workspace…" (PTY never spawns)
+			// for every non-"ready" state the rest of the app treats as usable.
+			workspaceReady: Boolean(detail && detail.state !== "initializing"),
 		}),
 		[workspaceId, detail?.repoId, detail?.rootPath, detail?.state],
 	);
@@ -195,6 +199,17 @@ function CanvasInner({
 		[backgroundImage],
 	);
 
+	// In select mode the whole panel is a drag target (header-only dragging is
+	// near-impossible when zoomed out). Stripping `dragHandle` lets React Flow
+	// move a panel grabbed anywhere on its body; the body also drops `nodrag`
+	// (see PanelNode). Out of select mode, panels keep header-drag + interactive
+	// bodies so users can type/scroll inside them.
+	const rfNodes = useMemo(
+		() =>
+			selectMode ? nodes.map((n) => ({ ...n, dragHandle: undefined })) : nodes,
+		[nodes, selectMode],
+	);
+
 	const onMoveEnd = useCallback(
 		(_e: unknown, vp: Viewport) => setCamera(vp.x, vp.y, vp.zoom),
 		[setCamera],
@@ -224,8 +239,11 @@ function CanvasInner({
 						</div>
 					) : null}
 					<ReactFlow<PanelNodeType>
-						nodes={nodes}
+						nodes={rfNodes}
 						edges={edges}
+						style={
+							backgroundUrl ? { backgroundColor: "transparent" } : undefined
+						}
 						onNodesChange={onNodesChange}
 						onConnect={onConnect}
 						onEdgesDelete={onEdgesDelete}

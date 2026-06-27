@@ -13,6 +13,7 @@ import { type ComponentType, useState } from "react";
 import type { CanvasPanelType } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useCanvasActions } from "./canvas-actions-context";
+import { useCanvasInteractionStore } from "./canvas-interaction-store";
 import { PanelConnections } from "./connections/panel-connections";
 import { parsePanelConfig } from "./panel-config";
 import { PanelErrorBoundary } from "./panel-error-boundary";
@@ -53,6 +54,9 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 	const Icon = meta.icon;
 	const config = parsePanelConfig(data.config);
 	const opacity = config.opacity;
+	// In select mode the body becomes a drag surface (whole-panel move); in
+	// interact mode it stays `nodrag` so chats/terminals receive their own input.
+	const selectMode = useCanvasInteractionStore((s) => s.selectMode);
 	// Resize handles also show on hover — clicking a panel's (interactive) body
 	// doesn't select the node, so selection alone would hide them and make
 	// panels feel un-resizable.
@@ -111,7 +115,12 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 
 			{/* Body is interactive — nodrag/nowheel so React Flow doesn't pan,
 			 *  drag, or zoom while the user works inside it. */}
-			<div className="nodrag nowheel min-h-0 flex-1 overflow-hidden">
+			<div
+				className={cn(
+					"nowheel min-h-0 flex-1 overflow-hidden",
+					!selectMode && "nodrag",
+				)}
+			>
 				<PanelErrorBoundary>
 					<PanelBody
 						nodeId={id}
