@@ -45,7 +45,7 @@ export function GitPanelBody() {
 
 	const changesQuery = useQuery({
 		...workspaceChangesQueryOptions(workspaceRootPath ?? "", workspaceId),
-		enabled: !!workspaceRootPath,
+		enabled: !!workspaceRootPath && !!workspaceId,
 	});
 	const detailQuery = useQuery({
 		...workspaceDetailQueryOptions(workspaceId),
@@ -82,6 +82,10 @@ export function GitPanelBody() {
 			<div className="min-h-0 flex-1 overflow-auto">
 				{changesQuery.isLoading ? (
 					<div className="p-3 text-app-muted-foreground text-xs">Loading…</div>
+				) : changesQuery.isError ? (
+					<div className="p-3 text-app-muted-foreground text-xs">
+						Failed to load changes.
+					</div>
 				) : sorted.length === 0 ? (
 					<div className="p-3 text-app-muted-foreground text-xs">
 						No changes.
