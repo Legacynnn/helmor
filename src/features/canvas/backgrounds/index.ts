@@ -1,3 +1,4 @@
+import alpineLake from "./alpine-lake.webp";
 import aurora from "./aurora.svg";
 import dusk from "./dusk.svg";
 import mesh from "./mesh.svg";
@@ -11,6 +12,7 @@ export type CanvasBackgroundPreset = {
 };
 
 export const CANVAS_BACKGROUND_PRESETS: CanvasBackgroundPreset[] = [
+	{ key: "alpine-lake", label: "Alpine Lake", url: alpineLake },
 	{ key: "mesh", label: "Mesh", url: mesh },
 	{ key: "aurora", label: "Aurora", url: aurora },
 	{ key: "topography", label: "Topography", url: topography },
