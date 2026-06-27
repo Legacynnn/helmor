@@ -22,6 +22,7 @@ export function ConversationPanelBody({ sessionId }: { sessionId: string }) {
 	return (
 		<div className="flex size-full flex-col bg-app-base">
 			<WorkspaceConversationContainer
+				hideTabs
 				selectedWorkspaceId={workspaceId}
 				displayedWorkspaceId={workspaceId}
 				selectedSessionId={sessionId}

@@ -75,6 +75,7 @@ type WorkspacePanelContainerProps = {
 	onCloseContextPreview?: () => void;
 	headerActions?: React.ReactNode;
 	headerLeading?: React.ReactNode;
+	hideTabs?: boolean;
 	/** Optimistic user bubble for a workspace that's mid-finalize — rendered
 	 *  before the real send actually fires, swapped out as soon as the real
 	 *  user message lands in DB. */
@@ -103,6 +104,7 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	onCloseContextPreview,
 	headerActions,
 	headerLeading,
+	hideTabs,
 	optimisticPendingSubmit = null,
 }: WorkspacePanelContainerProps) {
 	const queryClient = useQueryClient();
@@ -810,6 +812,7 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			onRequestCloseSession={onRequestCloseSession}
 			headerActions={headerActions}
 			headerLeading={headerLeading}
+			hideTabs={hideTabs}
 			newSessionShortcut={getShortcut(settings.shortcuts, "session.new")}
 			newSessionMenuShortcut={getShortcut(
 				settings.shortcuts,

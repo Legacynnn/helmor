@@ -113,6 +113,10 @@ type WorkspacePanelHeaderProps = {
 	activePlanSlug?: string | null;
 	headerActions?: React.ReactNode;
 	headerLeading?: React.ReactNode;
+	/** Hide the session tab strip + new-session/history controls, leaving only
+	 *  the branch header. Used by embedded surfaces (e.g. a canvas conversation
+	 *  panel) that own exactly one pinned session. */
+	hideTabs?: boolean;
 	onSelectSession?: (sessionId: string) => void;
 	onSelectPlan?: (slug: string) => void;
 	onClosePlanTab?: (slug: string) => void;
@@ -152,6 +156,7 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 	activePlanSlug = null,
 	headerActions,
 	headerLeading,
+	hideTabs = false,
 	onSelectSession,
 	onSelectPlan,
 	onClosePlanTab,
@@ -521,385 +526,406 @@ export const WorkspacePanelHeader = memo(function WorkspacePanelHeader({
 				) : null}
 			</div>
 
-			<div className="flex items-center px-4 pb-1">
-				<div className="group/tabs-scroll relative min-w-0 flex-1">
-					{hasRightOverflow && (
-						<div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent" />
-					)}
-					<div
-						ref={tabsScrollRef}
-						onScroll={updateOverflow}
-						className="scrollbar-none min-w-0 flex-1 overflow-x-auto"
-					>
-						{loadingWorkspace ? (
-							<div className="flex h-[1.85rem] items-center gap-1.5 px-2 text-small text-muted-foreground">
-								<Clock3 className="size-3 animate-pulse" strokeWidth={1.8} />
-								Loading
-							</div>
-						) : sessions.length > 0 ||
-							contextPreviewCard ||
-							planTabs.length > 0 ? (
-							<Tabs
-								value={tabsValue}
-								onValueChange={(value) => {
-									if (value === contextTabValue) {
-										onSelectContextPreview?.();
-										return;
-									}
-									if (value.startsWith(PLAN_TAB_PREFIX)) {
-										onSelectPlan?.(value.slice(PLAN_TAB_PREFIX.length));
-										return;
-									}
-									onSelectSession?.(value);
-								}}
-								className="min-w-max gap-0"
+			{hideTabs ? null : (
+				<>
+					<div className="flex items-center px-4 pb-1">
+						<div className="group/tabs-scroll relative min-w-0 flex-1">
+							{hasRightOverflow && (
+								<div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent" />
+							)}
+							<div
+								ref={tabsScrollRef}
+								onScroll={updateOverflow}
+								className="scrollbar-none min-w-0 flex-1 overflow-x-auto"
 							>
-								<TabsList
-									aria-label="Sessions"
-									className="inline-flex min-w-full w-max justify-start self-start"
-								>
-									{contextPreviewCard ? (
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<TabsTrigger
-													value={contextTabValue}
-													aria-label="Context preview"
-													onKeyDownCapture={(event) => {
-														if (
-															event.key.toLowerCase() !== "w" ||
-															(!event.metaKey && !event.ctrlKey)
-														) {
-															return;
-														}
-														event.preventDefault();
-														event.stopPropagation();
-														onCloseContextPreview?.();
-													}}
-													className="group/tab relative h-full w-auto min-w-[6.5rem] max-w-[14rem] shrink-0 flex-none justify-start gap-1.5 overflow-hidden pr-5 text-ui text-muted-foreground data-[state=active]:text-foreground"
-												>
-													<span className="tab-content-fade flex min-w-0 flex-1 items-center gap-1.5">
-														<Layers className="size-3.5" strokeWidth={1.8} />
-														<span className="truncate font-medium">
-															{contextPreviewCard.title}
-														</span>
-													</span>
-													<span className="pointer-events-none invisible absolute inset-y-0 right-0 flex items-center pr-1 group-hover/tab:pointer-events-auto group-hover/tab:visible">
-														<span
-															role="button"
-															aria-label="Close context preview"
-															onPointerDown={stopTabActionPointerDown}
-															onClick={(event) => {
+								{loadingWorkspace ? (
+									<div className="flex h-[1.85rem] items-center gap-1.5 px-2 text-small text-muted-foreground">
+										<Clock3
+											className="size-3 animate-pulse"
+											strokeWidth={1.8}
+										/>
+										Loading
+									</div>
+								) : sessions.length > 0 ||
+									contextPreviewCard ||
+									planTabs.length > 0 ? (
+									<Tabs
+										value={tabsValue}
+										onValueChange={(value) => {
+											if (value === contextTabValue) {
+												onSelectContextPreview?.();
+												return;
+											}
+											if (value.startsWith(PLAN_TAB_PREFIX)) {
+												onSelectPlan?.(value.slice(PLAN_TAB_PREFIX.length));
+												return;
+											}
+											onSelectSession?.(value);
+										}}
+										className="min-w-max gap-0"
+									>
+										<TabsList
+											aria-label="Sessions"
+											className="inline-flex min-w-full w-max justify-start self-start"
+										>
+											{contextPreviewCard ? (
+												<Tooltip>
+													<TooltipTrigger asChild>
+														<TabsTrigger
+															value={contextTabValue}
+															aria-label="Context preview"
+															onKeyDownCapture={(event) => {
+																if (
+																	event.key.toLowerCase() !== "w" ||
+																	(!event.metaKey && !event.ctrlKey)
+																) {
+																	return;
+																}
 																event.preventDefault();
 																event.stopPropagation();
 																onCloseContextPreview?.();
 															}}
-															className="flex cursor-interactive items-center justify-center rounded-sm p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+															className="group/tab relative h-full w-auto min-w-[6.5rem] max-w-[14rem] shrink-0 flex-none justify-start gap-1.5 overflow-hidden pr-5 text-ui text-muted-foreground data-[state=active]:text-foreground"
 														>
-															<X className="size-3" strokeWidth={2} />
-														</span>
-													</span>
-												</TabsTrigger>
-											</TooltipTrigger>
-											<TooltipContent
-												side="bottom"
-												sideOffset={4}
-												className={SESSION_TITLE_TOOLTIP_CLASS}
-											>
-												<span className={SESSION_TITLE_TOOLTIP_TEXT_CLASS}>
-													{displayTooltipTitle(contextPreviewCard.title)}
-												</span>
-											</TooltipContent>
-										</Tooltip>
-									) : null}
-									{sessions.map((session) => {
-										const selected = session.id === selectedSessionId;
-										const isActivelySending =
-											busySessionIds?.has(session.id) === true ||
-											isSessionRunningStatus(session.status) ||
-											(selected && sending);
-										const hasUnread = session.unreadCount > 0;
-										const isInteractionRequired =
-											interactionRequiredSessionIds?.has(session.id) ?? false;
-										const isActive =
-											isActivelySending && !isInteractionRequired;
-										const hasStatusDot =
-											isInteractionRequired || (!selected && hasUnread);
-										const isEditing =
-											sessionActions.editingSessionId === session.id;
-
-										return (
-											<Tooltip key={session.id}>
-												<TooltipTrigger asChild>
-													<TabsTrigger
-														value={session.id}
-														onMouseEnter={() => {
-															onPrefetchSession?.(session.id);
-														}}
-														onFocus={() => {
-															onPrefetchSession?.(session.id);
-														}}
-														className="group/tab relative h-full w-auto min-w-[6.5rem] max-w-[14rem] shrink-0 flex-none justify-start gap-1.5 overflow-hidden pr-5 text-ui text-muted-foreground data-[state=active]:text-foreground"
-													>
-														{/* Content wrapper: text fades out on the right when hovered so
-														    the action icons can sit on the tab's own background. */}
-														<span className="tab-content-fade flex min-w-0 flex-1 items-center gap-1.5">
-															<SessionProviderIcon
-																agentType={
-																	sessionDisplayProviders?.[session.id] ??
-																	session.agentType
-																}
-																active={isActive}
-															/>
-															{isEditing ? (
-																<Input
-																	autoFocus
-																	value={sessionActions.editingTitle}
-																	onChange={(event) =>
-																		sessionActions.setEditingTitle(
-																			event.target.value,
-																		)
-																	}
-																	onKeyDown={(event) => {
-																		if (event.key === "Enter") {
-																			event.preventDefault();
-																			void sessionActions.commitRename();
-																		} else if (event.key === "Escape") {
-																			sessionActions.cancelRename();
-																		}
+															<span className="tab-content-fade flex min-w-0 flex-1 items-center gap-1.5">
+																<Layers
+																	className="size-3.5"
+																	strokeWidth={1.8}
+																/>
+																<span className="truncate font-medium">
+																	{contextPreviewCard.title}
+																</span>
+															</span>
+															<span className="pointer-events-none invisible absolute inset-y-0 right-0 flex items-center pr-1 group-hover/tab:pointer-events-auto group-hover/tab:visible">
+																<span
+																	role="button"
+																	aria-label="Close context preview"
+																	onPointerDown={stopTabActionPointerDown}
+																	onClick={(event) => {
+																		event.preventDefault();
+																		event.stopPropagation();
+																		onCloseContextPreview?.();
 																	}}
-																	onBlur={() =>
-																		void sessionActions.commitRename()
-																	}
-																	onClick={(event) => event.stopPropagation()}
-																	className="h-auto min-w-0 flex-1 truncate border-0 bg-transparent px-0 py-0 text-ui font-medium text-inherit shadow-none outline-none focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none"
-																/>
-															) : (
-																<span
-																	className={cn(
-																		"truncate font-medium",
-																		hasStatusDot && !selected
-																			? "text-foreground"
-																			: undefined,
-																	)}
-																>
-																	{displaySessionTitle(session)}
-																</span>
-															)}
-															{hasStatusDot && !isEditing ? (
-																<span
-																	aria-label={
-																		isInteractionRequired
-																			? "Interaction required"
-																			: "Unread session"
-																	}
-																	className={cn(
-																		"size-1.5 shrink-0 rounded-full",
-																		isInteractionRequired
-																			? "bg-yellow-500"
-																			: "bg-chart-2",
-																	)}
-																/>
-															) : null}
-														</span>
-														{!isEditing ? (
-															<span className="pointer-events-none invisible absolute inset-y-0 right-0 flex items-center gap-0.5 pr-1 group-hover/tab:pointer-events-auto group-hover/tab:visible">
-																<span
-																	role="button"
-																	aria-label="Rename session"
-																	onPointerDown={stopTabActionPointerDown}
-																	onClick={(event) =>
-																		sessionActions.startRename(session, event)
-																	}
-																	className="flex cursor-interactive items-center justify-center rounded-sm p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-																>
-																	<Pencil className="size-3" strokeWidth={2} />
-																</span>
-																<span
-																	role="button"
-																	aria-label="Close session"
-																	onPointerDown={stopTabActionPointerDown}
-																	onClick={(event) =>
-																		sessionActions.hideSession(
-																			session.id,
-																			event,
-																		)
-																	}
 																	className="flex cursor-interactive items-center justify-center rounded-sm p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
 																>
 																	<X className="size-3" strokeWidth={2} />
 																</span>
 															</span>
-														) : null}
-													</TabsTrigger>
-												</TooltipTrigger>
-												{!isEditing ? (
+														</TabsTrigger>
+													</TooltipTrigger>
 													<TooltipContent
 														side="bottom"
 														sideOffset={4}
 														className={SESSION_TITLE_TOOLTIP_CLASS}
 													>
 														<span className={SESSION_TITLE_TOOLTIP_TEXT_CLASS}>
-															{displayTooltipTitle(
-																displaySessionTitle(session),
-															)}
+															{displayTooltipTitle(contextPreviewCard.title)}
 														</span>
 													</TooltipContent>
-												) : null}
-											</Tooltip>
-										);
-									})}
-									{planTabs.map((plan) => (
-										<Tooltip key={plan.slug}>
-											<TooltipTrigger asChild>
-												<TabsTrigger
-													value={planTabValue(plan.slug)}
-													aria-label={`Plan: ${plan.title}`}
-													onKeyDownCapture={(event) => {
-														if (
-															event.key.toLowerCase() !== "w" ||
-															(!event.metaKey && !event.ctrlKey)
-														) {
-															return;
-														}
-														event.preventDefault();
-														event.stopPropagation();
-														dispatchClosePlan();
-													}}
-													className="group/tab relative h-full w-auto min-w-[6.5rem] max-w-[14rem] shrink-0 flex-none justify-start gap-1.5 overflow-hidden pr-5 text-ui text-muted-foreground data-[state=active]:text-foreground"
-												>
-													<span className="tab-content-fade flex min-w-0 flex-1 items-center gap-1.5">
-														<ClipboardList
-															className="size-3.5"
-															strokeWidth={1.8}
-														/>
-														<span className="truncate font-medium">
-															{plan.title}
-														</span>
-													</span>
-													<span className="pointer-events-none invisible absolute inset-y-0 right-0 flex items-center pr-1 group-hover/tab:pointer-events-auto group-hover/tab:visible">
-														<span
-															role="button"
-															aria-label="Close plan"
-															onPointerDown={stopTabActionPointerDown}
-															onClick={(event) => {
+												</Tooltip>
+											) : null}
+											{sessions.map((session) => {
+												const selected = session.id === selectedSessionId;
+												const isActivelySending =
+													busySessionIds?.has(session.id) === true ||
+													isSessionRunningStatus(session.status) ||
+													(selected && sending);
+												const hasUnread = session.unreadCount > 0;
+												const isInteractionRequired =
+													interactionRequiredSessionIds?.has(session.id) ??
+													false;
+												const isActive =
+													isActivelySending && !isInteractionRequired;
+												const hasStatusDot =
+													isInteractionRequired || (!selected && hasUnread);
+												const isEditing =
+													sessionActions.editingSessionId === session.id;
+
+												return (
+													<Tooltip key={session.id}>
+														<TooltipTrigger asChild>
+															<TabsTrigger
+																value={session.id}
+																onMouseEnter={() => {
+																	onPrefetchSession?.(session.id);
+																}}
+																onFocus={() => {
+																	onPrefetchSession?.(session.id);
+																}}
+																className="group/tab relative h-full w-auto min-w-[6.5rem] max-w-[14rem] shrink-0 flex-none justify-start gap-1.5 overflow-hidden pr-5 text-ui text-muted-foreground data-[state=active]:text-foreground"
+															>
+																{/* Content wrapper: text fades out on the right when hovered so
+														    the action icons can sit on the tab's own background. */}
+																<span className="tab-content-fade flex min-w-0 flex-1 items-center gap-1.5">
+																	<SessionProviderIcon
+																		agentType={
+																			sessionDisplayProviders?.[session.id] ??
+																			session.agentType
+																		}
+																		active={isActive}
+																	/>
+																	{isEditing ? (
+																		<Input
+																			autoFocus
+																			value={sessionActions.editingTitle}
+																			onChange={(event) =>
+																				sessionActions.setEditingTitle(
+																					event.target.value,
+																				)
+																			}
+																			onKeyDown={(event) => {
+																				if (event.key === "Enter") {
+																					event.preventDefault();
+																					void sessionActions.commitRename();
+																				} else if (event.key === "Escape") {
+																					sessionActions.cancelRename();
+																				}
+																			}}
+																			onBlur={() =>
+																				void sessionActions.commitRename()
+																			}
+																			onClick={(event) =>
+																				event.stopPropagation()
+																			}
+																			className="h-auto min-w-0 flex-1 truncate border-0 bg-transparent px-0 py-0 text-ui font-medium text-inherit shadow-none outline-none focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none"
+																		/>
+																	) : (
+																		<span
+																			className={cn(
+																				"truncate font-medium",
+																				hasStatusDot && !selected
+																					? "text-foreground"
+																					: undefined,
+																			)}
+																		>
+																			{displaySessionTitle(session)}
+																		</span>
+																	)}
+																	{hasStatusDot && !isEditing ? (
+																		<span
+																			aria-label={
+																				isInteractionRequired
+																					? "Interaction required"
+																					: "Unread session"
+																			}
+																			className={cn(
+																				"size-1.5 shrink-0 rounded-full",
+																				isInteractionRequired
+																					? "bg-yellow-500"
+																					: "bg-chart-2",
+																			)}
+																		/>
+																	) : null}
+																</span>
+																{!isEditing ? (
+																	<span className="pointer-events-none invisible absolute inset-y-0 right-0 flex items-center gap-0.5 pr-1 group-hover/tab:pointer-events-auto group-hover/tab:visible">
+																		<span
+																			role="button"
+																			aria-label="Rename session"
+																			onPointerDown={stopTabActionPointerDown}
+																			onClick={(event) =>
+																				sessionActions.startRename(
+																					session,
+																					event,
+																				)
+																			}
+																			className="flex cursor-interactive items-center justify-center rounded-sm p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+																		>
+																			<Pencil
+																				className="size-3"
+																				strokeWidth={2}
+																			/>
+																		</span>
+																		<span
+																			role="button"
+																			aria-label="Close session"
+																			onPointerDown={stopTabActionPointerDown}
+																			onClick={(event) =>
+																				sessionActions.hideSession(
+																					session.id,
+																					event,
+																				)
+																			}
+																			className="flex cursor-interactive items-center justify-center rounded-sm p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+																		>
+																			<X className="size-3" strokeWidth={2} />
+																		</span>
+																	</span>
+																) : null}
+															</TabsTrigger>
+														</TooltipTrigger>
+														{!isEditing ? (
+															<TooltipContent
+																side="bottom"
+																sideOffset={4}
+																className={SESSION_TITLE_TOOLTIP_CLASS}
+															>
+																<span
+																	className={SESSION_TITLE_TOOLTIP_TEXT_CLASS}
+																>
+																	{displayTooltipTitle(
+																		displaySessionTitle(session),
+																	)}
+																</span>
+															</TooltipContent>
+														) : null}
+													</Tooltip>
+												);
+											})}
+											{planTabs.map((plan) => (
+												<Tooltip key={plan.slug}>
+													<TooltipTrigger asChild>
+														<TabsTrigger
+															value={planTabValue(plan.slug)}
+															aria-label={`Plan: ${plan.title}`}
+															onKeyDownCapture={(event) => {
+																if (
+																	event.key.toLowerCase() !== "w" ||
+																	(!event.metaKey && !event.ctrlKey)
+																) {
+																	return;
+																}
 																event.preventDefault();
 																event.stopPropagation();
-																onClosePlanTab?.(plan.slug);
+																dispatchClosePlan();
 															}}
-															className="flex cursor-interactive items-center justify-center rounded-sm p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+															className="group/tab relative h-full w-auto min-w-[6.5rem] max-w-[14rem] shrink-0 flex-none justify-start gap-1.5 overflow-hidden pr-5 text-ui text-muted-foreground data-[state=active]:text-foreground"
 														>
-															<X className="size-3" strokeWidth={2} />
+															<span className="tab-content-fade flex min-w-0 flex-1 items-center gap-1.5">
+																<ClipboardList
+																	className="size-3.5"
+																	strokeWidth={1.8}
+																/>
+																<span className="truncate font-medium">
+																	{plan.title}
+																</span>
+															</span>
+															<span className="pointer-events-none invisible absolute inset-y-0 right-0 flex items-center pr-1 group-hover/tab:pointer-events-auto group-hover/tab:visible">
+																<span
+																	role="button"
+																	aria-label="Close plan"
+																	onPointerDown={stopTabActionPointerDown}
+																	onClick={(event) => {
+																		event.preventDefault();
+																		event.stopPropagation();
+																		onClosePlanTab?.(plan.slug);
+																	}}
+																	className="flex cursor-interactive items-center justify-center rounded-sm p-0.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+																>
+																	<X className="size-3" strokeWidth={2} />
+																</span>
+															</span>
+														</TabsTrigger>
+													</TooltipTrigger>
+													<TooltipContent
+														side="bottom"
+														sideOffset={4}
+														className={SESSION_TITLE_TOOLTIP_CLASS}
+													>
+														<span className={SESSION_TITLE_TOOLTIP_TEXT_CLASS}>
+															{displayTooltipTitle(plan.title)}
 														</span>
-													</span>
-												</TabsTrigger>
+													</TooltipContent>
+												</Tooltip>
+											))}
+										</TabsList>
+									</Tabs>
+								) : (
+									<div className="flex h-[1.85rem] items-center gap-1.5 px-2 text-small text-muted-foreground">
+										<AlertCircle className="size-3" strokeWidth={1.8} />
+										No sessions
+									</div>
+								)}
+							</div>
+						</div>
+
+						<NewSessionMenu
+							sessionActions={sessionActions}
+							newSessionShortcut={newSessionShortcut}
+							newSessionMenuShortcut={newSessionMenuShortcut}
+							disabled={!workspace}
+						/>
+
+						<DropdownMenu
+							open={hiddenHistory.showHistory}
+							onOpenChange={hiddenHistory.toggleHistory}
+						>
+							<DropdownMenuTrigger asChild>
+								<Button
+									aria-label="Session history"
+									variant="ghost"
+									size="icon-sm"
+									className={cn(
+										"ml-1 shrink-0 text-muted-foreground hover:bg-accent/60 hover:text-foreground focus-visible:border-transparent focus-visible:ring-0",
+										hiddenHistory.showHistory && "bg-accent/60 text-foreground",
+									)}
+								>
+									<History className="size-3.5" strokeWidth={1.8} />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent
+								align="end"
+								className="max-h-96 w-56 overscroll-contain"
+							>
+								{hiddenHistory.hiddenSessions.length > 0 ? (
+									hiddenHistory.hiddenSessions.map((session) => (
+										<Tooltip key={session.id}>
+											<TooltipTrigger asChild>
+												<div className="flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-small text-muted-foreground hover:bg-accent/60">
+													<div className="flex min-w-0 items-center gap-1.5">
+														<SessionProviderIcon
+															agentType={session.agentType}
+															active={false}
+														/>
+														<span className="truncate">
+															{displaySessionTitle(session)}
+														</span>
+													</div>
+													<div className="flex shrink-0 items-center gap-0.5">
+														<Button
+															aria-label="Restore session"
+															onClick={() => hiddenHistory.unhide(session.id)}
+															variant="ghost"
+															size="icon-xs"
+															className="text-muted-foreground hover:text-foreground"
+														>
+															<RotateCcw className="size-3" strokeWidth={1.8} />
+														</Button>
+														<Button
+															aria-label="Delete session permanently"
+															onClick={() =>
+																sessionActions.deleteHiddenSession(session.id)
+															}
+															variant="ghost"
+															size="icon-xs"
+															className="text-muted-foreground hover:text-destructive"
+														>
+															<Trash2 className="size-3" strokeWidth={1.8} />
+														</Button>
+													</div>
+												</div>
 											</TooltipTrigger>
 											<TooltipContent
-												side="bottom"
+												side="left"
 												sideOffset={4}
 												className={SESSION_TITLE_TOOLTIP_CLASS}
 											>
 												<span className={SESSION_TITLE_TOOLTIP_TEXT_CLASS}>
-													{displayTooltipTitle(plan.title)}
+													{displayTooltipTitle(displaySessionTitle(session))}
 												</span>
 											</TooltipContent>
 										</Tooltip>
-									))}
-								</TabsList>
-							</Tabs>
-						) : (
-							<div className="flex h-[1.85rem] items-center gap-1.5 px-2 text-small text-muted-foreground">
-								<AlertCircle className="size-3" strokeWidth={1.8} />
-								No sessions
-							</div>
-						)}
+									))
+								) : (
+									<div className="px-2.5 py-1.5 text-mini text-muted-foreground">
+										No hidden sessions
+									</div>
+								)}
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</div>
-				</div>
-
-				<NewSessionMenu
-					sessionActions={sessionActions}
-					newSessionShortcut={newSessionShortcut}
-					newSessionMenuShortcut={newSessionMenuShortcut}
-					disabled={!workspace}
-				/>
-
-				<DropdownMenu
-					open={hiddenHistory.showHistory}
-					onOpenChange={hiddenHistory.toggleHistory}
-				>
-					<DropdownMenuTrigger asChild>
-						<Button
-							aria-label="Session history"
-							variant="ghost"
-							size="icon-sm"
-							className={cn(
-								"ml-1 shrink-0 text-muted-foreground hover:bg-accent/60 hover:text-foreground focus-visible:border-transparent focus-visible:ring-0",
-								hiddenHistory.showHistory && "bg-accent/60 text-foreground",
-							)}
-						>
-							<History className="size-3.5" strokeWidth={1.8} />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent
-						align="end"
-						className="max-h-96 w-56 overscroll-contain"
-					>
-						{hiddenHistory.hiddenSessions.length > 0 ? (
-							hiddenHistory.hiddenSessions.map((session) => (
-								<Tooltip key={session.id}>
-									<TooltipTrigger asChild>
-										<div className="flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-small text-muted-foreground hover:bg-accent/60">
-											<div className="flex min-w-0 items-center gap-1.5">
-												<SessionProviderIcon
-													agentType={session.agentType}
-													active={false}
-												/>
-												<span className="truncate">
-													{displaySessionTitle(session)}
-												</span>
-											</div>
-											<div className="flex shrink-0 items-center gap-0.5">
-												<Button
-													aria-label="Restore session"
-													onClick={() => hiddenHistory.unhide(session.id)}
-													variant="ghost"
-													size="icon-xs"
-													className="text-muted-foreground hover:text-foreground"
-												>
-													<RotateCcw className="size-3" strokeWidth={1.8} />
-												</Button>
-												<Button
-													aria-label="Delete session permanently"
-													onClick={() =>
-														sessionActions.deleteHiddenSession(session.id)
-													}
-													variant="ghost"
-													size="icon-xs"
-													className="text-muted-foreground hover:text-destructive"
-												>
-													<Trash2 className="size-3" strokeWidth={1.8} />
-												</Button>
-											</div>
-										</div>
-									</TooltipTrigger>
-									<TooltipContent
-										side="left"
-										sideOffset={4}
-										className={SESSION_TITLE_TOOLTIP_CLASS}
-									>
-										<span className={SESSION_TITLE_TOOLTIP_TEXT_CLASS}>
-											{displayTooltipTitle(displaySessionTitle(session))}
-										</span>
-									</TooltipContent>
-								</Tooltip>
-							))
-						) : (
-							<div className="px-2.5 py-1.5 text-mini text-muted-foreground">
-								No hidden sessions
-							</div>
-						)}
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
+				</>
+			)}
 		</header>
 	);
 });

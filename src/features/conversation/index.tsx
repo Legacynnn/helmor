@@ -133,6 +133,8 @@ export type WorkspaceConversationContainerProps = {
 	onSessionAborted?: (sessionId: string, workspaceId: string) => void;
 	headerActions?: React.ReactNode;
 	headerLeading?: React.ReactNode;
+	/** Hide the session tab strip (embedded canvas conversation). */
+	hideTabs?: boolean;
 	contextPreviewCard?: ContextCard | null;
 	contextPreviewActive?: boolean;
 	onSelectContextPreview?: () => void;
@@ -227,6 +229,7 @@ export const WorkspaceConversationContainer = memo(
 		onSessionAborted,
 		headerActions,
 		headerLeading,
+		hideTabs,
 		contextPreviewCard = null,
 		contextPreviewActive = false,
 		onSelectContextPreview,
@@ -863,6 +866,7 @@ export const WorkspaceConversationContainer = memo(
 						onCloseContextPreview={onCloseContextPreview}
 						headerActions={headerActions}
 						headerLeading={headerLeading}
+						hideTabs={hideTabs}
 						optimisticPendingSubmit={
 							pendingCreatedWorkspaceSubmit
 								? {

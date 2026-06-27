@@ -62,6 +62,7 @@ type WorkspacePanelProps = {
 	onRequestCloseSession?: (request: SessionCloseRequest) => void;
 	headerActions?: ReactNode;
 	headerLeading?: ReactNode;
+	hideTabs?: boolean;
 	newSessionShortcut?: string | null;
 	newSessionMenuShortcut?: string | null;
 	missingScriptTypes?: WorkspaceScriptType[];
@@ -101,6 +102,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	onRequestCloseSession,
 	headerActions,
 	headerLeading,
+	hideTabs,
 	newSessionShortcut,
 	newSessionMenuShortcut,
 	missingScriptTypes = [],
@@ -191,6 +193,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 					activePlanSlug={activePlanSlug}
 					headerActions={headerActions}
 					headerLeading={headerLeading}
+					hideTabs={hideTabs}
 					onSelectSession={onSelectSession}
 					onSelectWorkspace={onSelectWorkspace}
 					onSelectPlan={onSelectPlan}
