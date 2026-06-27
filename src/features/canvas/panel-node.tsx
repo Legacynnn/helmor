@@ -20,6 +20,7 @@ import { ConversationPanelBody } from "./panels/conversation-panel";
 import { DrawingPanelBody } from "./panels/drawing-panel";
 import { EditorPanelBody } from "./panels/editor-panel";
 import { FileManagerPanelBody } from "./panels/file-manager-panel";
+import { GitPanelBody } from "./panels/git-panel-body";
 import { NotesPanelBody } from "./panels/notes-panel";
 import { TerminalPanelBody } from "./panels/terminal-panel";
 import {
@@ -155,6 +156,8 @@ function PanelBody({
 			return <FileManagerPanelBody nodeId={nodeId} />;
 		case "editor":
 			return <EditorPanelBody config={configRaw} />;
+		case "git":
+			return <GitPanelBody />;
 		default:
 			return <PlaceholderBody type={panelType} />;
 	}
