@@ -29,7 +29,7 @@ export function CanvasWorkspaceControls({
 	const rows = groups.flatMap((g) => g.rows);
 
 	return (
-		<div className="pointer-events-auto absolute top-3 left-3 z-10 flex items-center gap-1 rounded-lg border border-app-border bg-app-base/90 p-1 shadow-lg backdrop-blur">
+		<div className="pointer-events-auto absolute top-3 left-3 z-10 flex items-center gap-1 rounded-[16px] border border-white/15 bg-app-base/40 p-1 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl">
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<button

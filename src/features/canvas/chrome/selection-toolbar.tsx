@@ -45,7 +45,7 @@ export function CanvasSelectionToolbar() {
 	};
 
 	return (
-		<div className="-translate-x-1/2 pointer-events-auto absolute top-3 left-1/2 z-20 flex items-center gap-1 rounded-lg border border-app-border bg-app-base/95 px-1.5 py-1 shadow-lg backdrop-blur">
+		<div className="-translate-x-1/2 pointer-events-auto absolute top-3 left-1/2 z-20 flex items-center gap-1 rounded-[16px] border border-white/15 bg-app-base/40 px-1.5 py-1 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl">
 			<RenameField
 				key={id}
 				initial={selected.data.title}

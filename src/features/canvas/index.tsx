@@ -12,7 +12,8 @@ import {
 	type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { CanvasState } from "@/lib/api";
 import { convertFileSrc } from "@/lib/ipc";
 import {
@@ -21,14 +22,15 @@ import {
 } from "@/lib/query-client";
 import { resolveBackgroundUrl } from "./backgrounds";
 import { CanvasActionsProvider } from "./canvas-actions-context";
-import { CanvasCreateToolbar } from "./canvas-create-toolbar";
 import { useCanvasViewStore } from "./canvas-view-store";
 import {
 	type CanvasWorkspaceInfo,
 	CanvasWorkspaceProvider,
 } from "./canvas-workspace-context";
 import { CanvasCreateOverlay } from "./chrome/create-overlay";
-import { CanvasManageRail } from "./chrome/manage-rail";
+import { CustomizePopover } from "./chrome/customize-popover";
+import { CanvasLeftRail } from "./chrome/left-rail";
+import { CanvasRightRail } from "./chrome/right-rail";
 import { CanvasSelectionToolbar } from "./chrome/selection-toolbar";
 import { CanvasWorkspaceControls } from "./chrome/workspace-controls";
 import {
@@ -87,6 +89,7 @@ function CanvasInner({
 }) {
 	const { data: detail } = useQuery(workspaceDetailQueryOptions(workspaceId));
 	const wrapperRef = useRef<HTMLDivElement>(null);
+	const [customizeOpen, setCustomizeOpen] = useState(false);
 
 	const workspaceInfo = useMemo<CanvasWorkspaceInfo>(
 		() => ({
@@ -245,13 +248,27 @@ function CanvasInner({
 						<MiniMap pannable zoomable />
 					</ReactFlow>
 					<CanvasCreateOverlay />
-					<CanvasWorkspaceControls
+					<TooltipProvider delayDuration={300}>
+						<CanvasWorkspaceControls
+							workspaceId={workspaceId}
+							onSelectWorkspace={onSelectWorkspace}
+						/>
+						<CanvasLeftRail
+							workspaceId={workspaceId}
+							customizeOpen={customizeOpen}
+							onCustomize={() => setCustomizeOpen((v) => !v)}
+						/>
+						<CanvasRightRail />
+						<CanvasSelectionToolbar />
+					</TooltipProvider>
+					<CustomizePopover
 						workspaceId={workspaceId}
-						onSelectWorkspace={onSelectWorkspace}
+						open={customizeOpen}
+						onOpenChange={setCustomizeOpen}
+						anchor={
+							<span className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-14" />
+						}
 					/>
-					<CanvasManageRail />
-					<CanvasSelectionToolbar />
-					<CanvasCreateToolbar />
 				</div>
 			</CanvasActionsProvider>
 		</CanvasWorkspaceProvider>
