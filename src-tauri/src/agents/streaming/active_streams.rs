@@ -19,6 +19,8 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use uuid::Uuid;
 
+use crate::platform::power::SleepGuard;
+
 #[derive(Debug, Clone)]
 pub(crate) struct ActiveStreamHandle {
     pub request_id: String,
@@ -46,14 +48,33 @@ pub struct ActiveStreamSummary {
     pub provider: String,
 }
 
-#[derive(Default)]
 pub struct ActiveStreams {
     inner: Arc<Mutex<HashMap<String, ActiveStreamHandle>>>,
+    sleep_guard: SleepGuard,
+}
+
+impl Default for ActiveStreams {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+            sleep_guard: SleepGuard::default(),
+        }
+    }
 }
 
 impl ActiveStreams {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Test constructor that injects a specific sleep backend so the
+    /// ref-count wiring can be verified without touching real IOKit.
+    #[cfg(test)]
+    pub(crate) fn with_sleep_backend(sleep_guard: SleepGuard) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+            sleep_guard,
+        }
     }
 
     /// Register `handle` iff no existing entry targets the same
@@ -71,13 +92,19 @@ impl ActiveStreams {
                 return false;
             }
         }
+        let before = map.len();
         map.insert(handle.request_id.clone(), handle);
+        let after = map.len();
+        self.sleep_guard.on_count_change(before, after);
         true
     }
 
     pub(super) fn unregister(&self, request_id: &str) {
         if let Ok(mut map) = self.inner.lock() {
+            let before = map.len();
             map.remove(request_id);
+            let after = map.len();
+            self.sleep_guard.on_count_change(before, after);
         }
     }
 
@@ -298,5 +325,71 @@ mod tests {
 
         streams.unregister("r1");
         assert!(!streams.has_active_for_workspace("ws-s1"));
+    }
+
+    #[derive(Default)]
+    struct CountingBackend {
+        acquires: std::sync::atomic::AtomicUsize,
+        releases: std::sync::atomic::AtomicUsize,
+    }
+
+    impl crate::platform::power::SleepAssertionBackend for std::sync::Arc<CountingBackend> {
+        fn acquire(&self) -> Option<u32> {
+            self.acquires
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Some(1)
+        }
+        fn release(&self, _id: u32) {
+            self.releases
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    fn streams_with_counting_backend() -> (ActiveStreams, std::sync::Arc<CountingBackend>) {
+        let backend = std::sync::Arc::new(CountingBackend::default());
+        let guard = crate::platform::power::SleepGuard::new(Box::new(backend.clone()));
+        (ActiveStreams::with_sleep_backend(guard), backend)
+    }
+
+    #[test]
+    fn acquires_once_for_concurrent_streams_releases_on_last() {
+        use std::sync::atomic::Ordering::SeqCst;
+        let (streams, backend) = streams_with_counting_backend();
+
+        assert!(streams.try_register_for_session(handle("r1", Some("s1"))));
+        assert!(streams.try_register_for_session(handle("r2", Some("s2"))));
+        assert_eq!(backend.acquires.load(SeqCst), 1);
+        assert_eq!(backend.releases.load(SeqCst), 0);
+
+        streams.unregister("r1");
+        assert_eq!(backend.releases.load(SeqCst), 0); // still one active
+
+        streams.unregister("r2");
+        assert_eq!(backend.releases.load(SeqCst), 1); // last one out
+        assert_eq!(backend.acquires.load(SeqCst), 1); // never re-acquired
+    }
+
+    #[test]
+    fn rejected_duplicate_registration_does_not_acquire_again() {
+        use std::sync::atomic::Ordering::SeqCst;
+        let (streams, backend) = streams_with_counting_backend();
+
+        assert!(streams.try_register_for_session(handle("r1", Some("s1"))));
+        // Duplicate session id is rejected — must not change the count.
+        assert!(!streams.try_register_for_session(handle("r2", Some("s1"))));
+        assert_eq!(backend.acquires.load(SeqCst), 1);
+        assert_eq!(backend.releases.load(SeqCst), 0);
+    }
+
+    #[test]
+    fn terminal_session_participates_in_refcount() {
+        use std::sync::atomic::Ordering::SeqCst;
+        let (streams, backend) = streams_with_counting_backend();
+
+        assert!(streams.set_session_active("s1", Some("ws-s1".into()), "terminal", true));
+        assert_eq!(backend.acquires.load(SeqCst), 1);
+
+        assert!(streams.set_session_active("s1", Some("ws-s1".into()), "terminal", false));
+        assert_eq!(backend.releases.load(SeqCst), 1);
     }
 }
