@@ -22,6 +22,12 @@ function CanvasNodeFallback({ children }: { children?: ReactNode }) {
 	return <>{children}</>;
 }
 
+/** CanvasFlow / CanvasGroup are structural-only: they carry no body and are read
+ * from the PlanCanvas's child blocks. Authored standalone they render nothing. */
+function CanvasStructuralFallback() {
+	return null;
+}
+
 /** Sub-components (Option, Before, After, Phase) are consumed by their parent
  * (Decision / BeforeAfter / Timeline). Authored standalone, they just render
  * their body blocks so content is never lost. */
@@ -62,6 +68,8 @@ export const PLAN_COMPONENTS: Record<string, PlanComponentDef> = {
 	Diagram: { render: Diagram, childMode: "raw" },
 	PlanCanvas: { render: PlanCanvas, childMode: "structured" },
 	CanvasNode: { render: CanvasNodeFallback, childMode: "blocks" },
+	CanvasFlow: { render: CanvasStructuralFallback, childMode: "blocks" },
+	CanvasGroup: { render: CanvasStructuralFallback, childMode: "blocks" },
 	Decision: { render: Decision, childMode: "structured" },
 	Option: { render: SubComponentFallback, childMode: "blocks" },
 	BeforeAfter: { render: BeforeAfter, childMode: "structured" },

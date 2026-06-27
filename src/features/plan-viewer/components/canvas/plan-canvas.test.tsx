@@ -7,7 +7,7 @@ vi.mock("@xyflow/react", () => ({
 	ReactFlow: ({
 		nodes,
 	}: {
-		nodes: Array<{ id: string; data: { title: string } }>;
+		nodes: Array<{ id: string; data: { title?: string } }>;
 	}) => (
 		<div data-testid="rf">
 			{nodes.map((n) => (
@@ -17,11 +17,19 @@ vi.mock("@xyflow/react", () => ({
 	),
 	Background: () => null,
 	Controls: () => null,
+	MiniMap: () => null,
+	Panel: () => null,
+	BaseEdge: () => null,
+	EdgeLabelRenderer: () => null,
+	getBezierPath: () => ["", 0, 0],
 	BackgroundVariant: { Dots: "dots" },
+	MarkerType: { ArrowClosed: "arrowclosed" },
 	Handle: () => null,
-	Position: { Top: "top", Bottom: "bottom" },
+	Position: { Top: "top", Bottom: "bottom", Left: "left", Right: "right" },
 	useNodesState: (init: unknown) => [init, vi.fn(), vi.fn()],
 	useEdgesState: (init: unknown) => [init, vi.fn(), vi.fn()],
+	useReactFlow: () => ({ fitView: vi.fn() }),
+	useViewport: () => ({ x: 0, y: 0, zoom: 1 }),
 }));
 
 import PlanCanvasSurface from "./plan-canvas-surface";

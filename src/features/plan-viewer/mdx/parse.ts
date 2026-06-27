@@ -4,6 +4,7 @@ import { unified } from "unified";
 import { isolateMalformedComponents } from "./isolate";
 import { maskRawComponentBodies } from "./mask-raw";
 import { planChildMode } from "./registry";
+import { stripLeakedToolTags } from "./strip-leaked-tags";
 
 export type PlanBlock =
 	| { kind: "prose"; id: string; markdown: string }
@@ -230,10 +231,17 @@ export function parsePlanMdx(src: string): ParsedPlan {
 	const { yaml, body: rawBody } = splitFrontmatter(src);
 	const frontmatter = parseFrontmatter(yaml);
 
+	// Drop any leaked agent tool-call wrapper tags (e.g. a Write call's trailing
+	// `</content></invoke>`) BEFORE parsing. A single stray closing tag otherwise
+	// throws in remark-mdx and the recovery tiers can't isolate it (not a
+	// capitalised component), dropping the whole plan to plain Markdown. Returns
+	// `null` (→ keep the original body) for the clean common case.
+	const body0 = stripLeakedToolTags(rawBody) ?? rawBody;
+
 	// Lift raw-content component bodies (Preview JS, diffs, generics, …) out of
 	// the source BEFORE MDX parsing — they are not valid MDX and would otherwise
 	// crash the parse. They are reattached verbatim from `stash` during the walk.
-	const { body: maskedBody, stash } = maskRawComponentBodies(rawBody);
+	const { body: maskedBody, stash } = maskRawComponentBodies(body0);
 	const { tree, body } = parseBody(maskedBody);
 
 	// A single counter keeps ids unique and stable in document order, including

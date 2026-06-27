@@ -1,35 +1,76 @@
 import type { PlanBlock } from "../../mdx/parse";
-import { type CanvasNodeKind, normalizeKind } from "./node-kinds";
+import type { PlanAccent } from "../shell/accent";
+import {
+	DEFAULT_FRAME_SIZE,
+	type FrameDevice,
+	type FrameKind,
+	normalizeDevice,
+	parseCoord,
+	parseDimension,
+	resolveFrameKind,
+} from "./frame-kinds";
+import { type CanvasTheme, normalizeAccent } from "./theme-modes";
 
-/** Data carried on each React Flow node (rendered by canvas-node.tsx). */
-export type CanvasNodeData = {
+/** Direction of a user-flow arrow, set via `<CanvasFlow kind="...">`. */
+export type FlowKind = "primary" | "secondary" | "back";
+
+const FLOW_KINDS = new Set<FlowKind>(["primary", "secondary", "back"]);
+
+function normalizeFlowKind(value: string | undefined): FlowKind {
+	return value && FLOW_KINDS.has(value as FlowKind)
+		? (value as FlowKind)
+		: "primary";
+}
+
+/** Data carried on each frame React Flow node (rendered by the frame nodes). */
+export type FrameData = {
 	title: string;
+	frameKind: FrameKind;
+	device: FrameDevice;
+	theme: CanvasTheme;
+	accent: PlanAccent;
+	/** Raw React snippet for a preview frame (empty otherwise). */
+	previewCode: string;
+	/** Raw wireframe-DSL source for a wireframe frame (empty otherwise). */
+	wireframeSource: string;
+	/** Markdown body blocks for a note frame (empty otherwise). */
 	bodyBlocks: PlanBlock[];
-	/** Optional only because nodes may be constructed outside `buildCanvasGraph`
-	 * (e.g. test fixtures); `buildCanvasGraph` always resolves it via
-	 * `normalizeKind`. Consumers should default a missing value to "note". */
-	kind?: CanvasNodeKind;
 };
 
-export type CanvasGraphNode = {
+export type FrameNode = {
 	id: string;
-	type: "canvasNode";
-	data: CanvasNodeData;
-	position: { x: number; y: number };
+	frameKind: FrameKind;
+	data: FrameData;
+	/** Authored top-left position, or `undefined` → auto-layout assigns one. */
+	position?: { x: number; y: number };
+	width: number;
+	height: number;
 };
 
-export type CanvasGraphEdge = {
+export type FlowEdge = {
 	id: string;
 	source: string;
 	target: string;
+	label: string;
+	kind: FlowKind;
+};
+
+export type GroupSpec = {
+	id: string;
+	title: string;
+	contains: string[];
+	accent: PlanAccent;
 };
 
 export type CanvasGraph = {
-	nodes: CanvasGraphNode[];
-	edges: CanvasGraphEdge[];
+	frames: FrameNode[];
+	edges: FlowEdge[];
+	groups: GroupSpec[];
+	/** True when at least one frame carries an explicit position. */
+	hasCoords: boolean;
 };
 
-function splitConnects(value: string | undefined): string[] {
+function splitIds(value: string | undefined): string[] {
 	if (!value) return [];
 	return value
 		.split(",")
@@ -37,82 +78,145 @@ function splitConnects(value: string | undefined): string[] {
 		.filter((s) => s.length > 0);
 }
 
+/** Find the first nested component block with the given name (e.g. Preview). */
+function findChildComponent(
+	block: Extract<PlanBlock, { kind: "component" }>,
+	name: string,
+): Extract<PlanBlock, { kind: "component" }> | undefined {
+	for (const child of block.childBlocks) {
+		if (child.kind === "component" && child.name === name) {
+			return child;
+		}
+	}
+	return undefined;
+}
+
 /**
- * Convert a PlanCanvas component's child blocks into a React Flow graph.
- * Only `CanvasNode` component blocks become nodes; everything else is ignored.
- * Positions are all `{0,0}` here — `layout.ts` assigns real coordinates.
+ * Convert a `<PlanCanvas>`'s child blocks into a freeform frame graph:
+ * - each `<CanvasNode>` → a positioned frame (preview / wireframe / note),
+ * - each `<CanvasFlow>` (plus back-compat `connects=`) → a labeled flow edge,
+ * - each `<CanvasGroup>` → a section spec (bbox computed after layout).
+ * Positions are honored verbatim when authored; `auto-layout.ts` fills the rest.
  */
-export function buildCanvasGraph(childBlocks: PlanBlock[]): CanvasGraph {
-	const nodes: CanvasGraphNode[] = [];
+export function buildCanvasGraph(
+	childBlocks: PlanBlock[],
+	theme: CanvasTheme,
+): CanvasGraph {
+	const frames: FrameNode[] = [];
 	const ids = new Set<string>();
+	let hasCoords = false;
 
 	for (const block of childBlocks) {
-		if (block.kind !== "component" || block.name !== "CanvasNode") {
-			continue;
-		}
+		if (block.kind !== "component" || block.name !== "CanvasNode") continue;
 		const id = block.props.id?.trim() || block.id;
 		if (ids.has(id)) continue;
 		ids.add(id);
-		nodes.push({
+
+		const previewBlock = findChildComponent(block, "Preview");
+		const wireframeBlock = findChildComponent(block, "Wireframe");
+		const frameKind = resolveFrameKind(block.props.kind, {
+			hasPreview: previewBlock != null,
+			hasWireframe: wireframeBlock != null,
+		});
+		const device = normalizeDevice(
+			block.props.device ?? wireframeBlock?.props.surface,
+		);
+		const accent = normalizeAccent(block.props.accent);
+		const defaults = DEFAULT_FRAME_SIZE[frameKind];
+		const width = parseDimension(block.props.w, defaults.width);
+		const height = parseDimension(block.props.h, defaults.height);
+
+		const x = parseCoord(block.props.x);
+		const y = parseCoord(block.props.y);
+		const position = x != null && y != null ? { x, y } : undefined;
+		if (position) hasCoords = true;
+
+		frames.push({
 			id,
-			type: "canvasNode",
+			frameKind,
 			data: {
 				title: block.props.title?.trim() || id,
+				frameKind,
+				device,
+				theme,
+				accent,
+				previewCode: previewBlock?.rawText ?? "",
+				wireframeSource: wireframeBlock?.rawText ?? "",
 				bodyBlocks: block.childBlocks,
-				kind: normalizeKind(block.props.kind),
 			},
-			position: { x: 0, y: 0 },
+			position,
+			width,
+			height,
 		});
 	}
 
-	const edges: CanvasGraphEdge[] = [];
-	const seenEdgeIds = new Set<string>();
-	// Adjacency of edges accepted so far, used to keep the graph acyclic.
-	const adjacency = new Map<string, Set<string>>();
-	for (const block of childBlocks) {
-		if (block.kind !== "component" || block.name !== "CanvasNode") {
-			continue;
-		}
-		const source = block.props.id?.trim() || block.id;
-		for (const target of splitConnects(block.props.connects)) {
-			if (!ids.has(target)) continue; // drop dangling edges
-			if (target === source) continue; // drop self-loops (degenerate layout)
-			const id = `${source}->${target}`;
-			if (seenEdgeIds.has(id)) continue; // dedupe repeated targets (e.g. "b,b")
-			// Drop any edge that would close a loop (e.g. the agent wiring the last
-			// node back to the first). Cycles force dagre into a long edge sweeping
-			// across the whole graph, which reads as clutter — keep it a clean DAG.
-			if (canReach(adjacency, target, source)) continue;
-			seenEdgeIds.add(id);
-			const out = adjacency.get(source) ?? new Set<string>();
-			out.add(target);
-			adjacency.set(source, out);
-			edges.push({ id, source, target });
-		}
-	}
-
-	return { nodes, edges };
+	const edges = buildEdges(childBlocks, ids);
+	const groups = buildGroups(childBlocks, ids);
+	return { frames, edges, groups, hasCoords };
 }
 
-/** True when `to` is already reachable from `from` via accepted edges — i.e.
- * adding `from → to` would create a cycle. Iterative DFS over the adjacency. */
-function canReach(
-	adjacency: Map<string, Set<string>>,
-	from: string,
-	to: string,
-): boolean {
-	const stack = [from];
+/** Flow edges from explicit `<CanvasFlow>` blocks AND back-compat `connects=`.
+ * Cycles are kept (user journeys legitimately loop); only self-loops, dangling
+ * ids, and duplicate ids are dropped. */
+function buildEdges(childBlocks: PlanBlock[], ids: Set<string>): FlowEdge[] {
+	const edges: FlowEdge[] = [];
 	const seen = new Set<string>();
-	while (stack.length > 0) {
-		const current = stack.pop();
-		if (current === undefined) continue;
-		if (current === to) return true;
-		if (seen.has(current)) continue;
-		seen.add(current);
-		const next = adjacency.get(current);
-		if (next) {
-			for (const node of next) stack.push(node);
+	const push = (
+		source: string,
+		target: string,
+		label: string,
+		kind: FlowKind,
+		id: string,
+	) => {
+		if (!ids.has(source) || !ids.has(target)) return;
+		if (source === target) return;
+		if (seen.has(id)) return;
+		seen.add(id);
+		edges.push({ id, source, target, label, kind });
+	};
+
+	let flowIndex = 0;
+	for (const block of childBlocks) {
+		if (block.kind !== "component") continue;
+		if (block.name === "CanvasFlow") {
+			const source = block.props.from?.trim() ?? "";
+			const target = block.props.to?.trim() ?? "";
+			push(
+				source,
+				target,
+				block.props.label?.trim() ?? "",
+				normalizeFlowKind(block.props.kind),
+				`flow-${flowIndex++}-${source}->${target}`,
+			);
+			continue;
+		}
+		if (block.name === "CanvasNode") {
+			const source = block.props.id?.trim() || block.id;
+			for (const target of splitIds(block.props.connects)) {
+				push(source, target, "", "secondary", `connect-${source}->${target}`);
+			}
 		}
 	}
-	return false;
+	return edges;
+}
+
+/** Section specs from `<CanvasGroup contains="a,b">` blocks (known ids only). */
+function buildGroups(childBlocks: PlanBlock[], ids: Set<string>): GroupSpec[] {
+	const groups: GroupSpec[] = [];
+	const seen = new Set<string>();
+	for (const block of childBlocks) {
+		if (block.kind !== "component" || block.name !== "CanvasGroup") continue;
+		const id = block.props.id?.trim() || block.id;
+		if (seen.has(id)) continue;
+		seen.add(id);
+		const contains = splitIds(block.props.contains).filter((m) => ids.has(m));
+		if (contains.length === 0) continue; // an empty section frames nothing
+		groups.push({
+			id,
+			title: block.props.title?.trim() || "",
+			contains,
+			accent: normalizeAccent(block.props.accent),
+		});
+	}
+	return groups;
 }
