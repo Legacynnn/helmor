@@ -14,10 +14,12 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { CanvasState } from "@/lib/api";
+import { convertFileSrc } from "@/lib/ipc";
 import {
 	canvasStateQueryOptions,
 	workspaceDetailQueryOptions,
 } from "@/lib/query-client";
+import { resolveBackgroundUrl } from "./backgrounds";
 import { CanvasActionsProvider } from "./canvas-actions-context";
 import { CanvasCreateToolbar } from "./canvas-create-toolbar";
 import { useCanvasViewStore } from "./canvas-view-store";
@@ -174,6 +176,11 @@ function CanvasInner({
 	const theme = useCanvasViewStore((s) => s.backgroundTheme);
 	const snapToGrid = useCanvasViewStore((s) => s.snapToGrid);
 	const setCamera = useCanvasViewStore((s) => s.setCamera);
+	const backgroundImage = useCanvasViewStore((s) => s.backgroundImage);
+	const backgroundUrl = useMemo(
+		() => resolveBackgroundUrl(backgroundImage, convertFileSrc),
+		[backgroundImage],
+	);
 
 	const onMoveEnd = useCallback(
 		(_e: unknown, vp: Viewport) => setCamera(vp.x, vp.y, vp.zoom),
@@ -195,6 +202,14 @@ function CanvasInner({
 						{ "--canvas-panel-opacity": translucency } as React.CSSProperties
 					}
 				>
+					{backgroundUrl ? (
+						<div
+							className="pointer-events-none absolute inset-0 z-0 bg-center bg-cover"
+							style={{ backgroundImage: `url("${backgroundUrl}")` }}
+						>
+							<div className="absolute inset-0 bg-app-base/40" />
+						</div>
+					) : null}
 					<ReactFlow<PanelNodeType>
 						nodes={nodes}
 						edges={edges}
