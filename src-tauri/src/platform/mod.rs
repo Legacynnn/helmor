@@ -9,6 +9,7 @@ pub mod executable;
 pub mod fs;
 pub mod ipc;
 pub mod paths;
+pub mod power;
 pub mod process;
 pub mod pty;
 pub mod shell;
