@@ -38,6 +38,10 @@ expression: "table_columns(&connection, \"canvas_view_state\")"
   - INTEGER
   - 1
   - "0"
+- - background_image
+  - TEXT
+  - 0
+  - ~
 - - updated_at
   - TEXT
   - 1
