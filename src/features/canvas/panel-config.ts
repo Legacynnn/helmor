@@ -6,6 +6,7 @@
 //   - drawing:      { drawing }      — serialized tldraw document snapshot
 //   - editor:       { filePath }     — workspace-relative file under edit
 //   - file-manager: { rootSubpath }  — optional sub-directory to scope to
+//   - git:          {}               — workspace-scoped; no per-panel binding
 // Unknown / malformed config degrades to an empty object.
 
 export type ConversationPanelConfig = {
@@ -35,6 +36,11 @@ export type FileManagerPanelConfig = {
 	rootSubpath?: string;
 };
 
+/** Git panels are workspace-scoped (show the workspace's changes); no per-panel
+ * binding is stored. Intentionally empty — listed for an explicit type set. */
+// biome-ignore lint/complexity/noBannedTypes: empty config is the intended shape
+export type GitPanelConfig = {};
+
 export type CommonPanelConfig = {
 	/** Per-panel translucency override (0..1). When unset the panel inherits
 	 * the canvas-wide translucency. */
@@ -47,6 +53,7 @@ export type PanelConfig = ConversationPanelConfig &
 	DrawingPanelConfig &
 	EditorPanelConfig &
 	FileManagerPanelConfig &
+	GitPanelConfig &
 	CommonPanelConfig;
 
 export function parsePanelConfig(raw: string | null | undefined): PanelConfig {
