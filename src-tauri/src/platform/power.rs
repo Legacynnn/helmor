@@ -12,12 +12,6 @@
 //! (clamshell) sleep is enforced by the SMC and a normal assertion does
 //! not override it; that would need a privileged helper and is out of
 //! scope here.
-//!
-//! The whole module is wired into `ActiveStreams` in a later task; until
-//! then every item here is intentionally unconsumed, so we silence
-//! `dead_code` at the module boundary rather than scattering per-item
-//! attributes that would have to be unwound once the consumer lands.
-#![allow(dead_code)]
 
 use std::sync::Mutex;
 
@@ -34,7 +28,11 @@ pub trait SleepAssertionBackend: Send + Sync {
 }
 
 /// Does nothing. Used on non-macOS platforms and as a default in
-/// environments where power management is irrelevant.
+/// environments where power management is irrelevant. On macOS the
+/// real backend is always `IoKitBackend`, so this is never constructed
+/// there — silence the resulting dead-code lint without dropping the
+/// type from the platform-agnostic API.
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 pub struct NoopBackend;
 
 impl SleepAssertionBackend for NoopBackend {
