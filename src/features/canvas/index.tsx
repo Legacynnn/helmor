@@ -266,7 +266,7 @@ function CanvasInner({
 						open={customizeOpen}
 						onOpenChange={setCustomizeOpen}
 						anchor={
-							<span className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-14" />
+							<span className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-14 block h-0 w-0" />
 						}
 					/>
 				</div>

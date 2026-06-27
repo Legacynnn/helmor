@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { createContext, useContext } from "react";
 import {
 	Tooltip,
 	TooltipContent,
@@ -7,6 +8,10 @@ import {
 import { cn } from "@/lib/utils";
 
 const SELECTED_COLOR = "var(--color-selected, #3b82f6)";
+
+/** Which screen edge the enclosing rail is pinned to. Tooltips open toward the
+ * canvas interior (away from the edge), so a right-edge rail tooltips left. */
+const RailSideContext = createContext<"left" | "right">("left");
 
 /** Vertically-centered Apple liquid-glass rail pinned to a screen edge. */
 export function GlassRail({
@@ -17,15 +22,17 @@ export function GlassRail({
 	children: ReactNode;
 }) {
 	return (
-		<div
-			className={cn(
-				"-translate-y-1/2 pointer-events-auto absolute top-1/2 z-10 flex flex-col gap-1 rounded-[20px] p-1.5",
-				"border border-white/15 bg-app-base/40 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl",
-				side === "left" ? "left-3" : "right-3",
-			)}
-		>
-			{children}
-		</div>
+		<RailSideContext.Provider value={side}>
+			<div
+				className={cn(
+					"-translate-y-1/2 pointer-events-auto absolute top-1/2 z-10 flex flex-col gap-1 rounded-[20px] p-1.5",
+					"border border-white/15 bg-app-base/40 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl",
+					side === "left" ? "left-3" : "right-3",
+				)}
+			>
+				{children}
+			</div>
+		</RailSideContext.Provider>
 	);
 }
 
@@ -43,6 +50,8 @@ export function RailButton({
 	disabled?: boolean;
 	onClick?: () => void;
 }) {
+	const railSide = useContext(RailSideContext);
+	const tooltipSide = railSide === "right" ? "left" : "right";
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
@@ -68,7 +77,7 @@ export function RailButton({
 					<Icon className="size-4.5" />
 				</button>
 			</TooltipTrigger>
-			<TooltipContent side="right">{label}</TooltipContent>
+			<TooltipContent side={tooltipSide}>{label}</TooltipContent>
 		</Tooltip>
 	);
 }
