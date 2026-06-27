@@ -10,6 +10,7 @@ vi.mock("@/lib/api", () => ({
 	saveCanvasPanel: vi.fn(async () => {}),
 	deleteCanvasPanel: vi.fn(async () => {}),
 	createSession: vi.fn(async () => ({ sessionId: "session-1" })),
+	hideSession: vi.fn(async () => {}),
 }));
 
 vi.mock("@/features/terminal/terminal-session-store", () => ({

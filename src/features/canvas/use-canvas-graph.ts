@@ -7,6 +7,7 @@ import {
 	type CanvasState,
 	createSession,
 	deleteCanvasPanel,
+	hideSession,
 	saveCanvasPanel,
 } from "@/lib/api";
 import type { CanvasActions } from "./canvas-actions-context";
@@ -72,10 +73,15 @@ async function buildConfig(
 ): Promise<{ config: string }> {
 	let base: PanelConfig = {};
 	if (type === "conversation") {
-		// Reuse an existing session when one is supplied (e.g. importing the
-		// workspace's open sessions); otherwise spawn a fresh one.
-		const sessionId =
-			override?.sessionId ?? (await createSession(workspaceId)).sessionId;
+		let sessionId = override?.sessionId;
+		if (!sessionId) {
+			sessionId = (await createSession(workspaceId)).sessionId;
+			// Canvas conversations are a separate world from the normal tab strip.
+			// Hide the session so it's excluded from `list_workspace_sessions`
+			// (and therefore the conversation tabs); the panel renders it directly
+			// by id, so it stays fully functional.
+			await hideSession(sessionId).catch(() => {});
+		}
 		base = { sessionId };
 	} else if (type === "terminal") {
 		base = { instanceId: override?.instanceId ?? crypto.randomUUID() };

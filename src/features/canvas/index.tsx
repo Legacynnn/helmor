@@ -43,7 +43,6 @@ import {
 import { PanelNode } from "./panel-node";
 import type { PanelNode as PanelNodeType } from "./types";
 import { useCanvasGraph } from "./use-canvas-graph";
-import { useSessionImport } from "./use-session-import";
 
 const NODE_TYPES = { panel: PanelNode };
 
@@ -129,14 +128,11 @@ function CanvasInner({
 		wrapperRef,
 	);
 
-	// First entry to an empty canvas seeds the workspace's existing sessions as
-	// conversation panels.
-	useSessionImport(
-		workspaceId,
-		initial.panels.length > 0,
-		nodes,
-		actions.addPanel,
-	);
+	// The canvas is its own surface: it never imports the workspace's existing
+	// (normal-tab) conversations. A canvas only ever shows panels the user
+	// created on it (persisted in `initial.panels`); a fresh canvas opens empty.
+	// Conversations created on the canvas are hidden sessions, so they never
+	// leak into the normal conversation tab strip either (see buildConfig).
 
 	// Reconcile external (CLI) mutations when the query refetches.
 	const { data: fresh } = useQuery(canvasStateQueryOptions(workspaceId));
