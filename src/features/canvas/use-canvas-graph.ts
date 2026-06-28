@@ -10,6 +10,7 @@ import {
 	hideSession,
 	saveCanvasPanel,
 } from "@/lib/api";
+import { useCableStore } from "./cable/cable-store";
 import type { CanvasActions } from "./canvas-actions-context";
 import { useConnectionsStore } from "./connections/connections-store";
 import {
@@ -189,6 +190,11 @@ export function useCanvasGraph(
 				if (instanceId) closeTerminal(instanceId);
 			}
 			useConnectionsStore.getState().pruneForPanel(id);
+			// Drop the transient connect cable too if it was anchored on this pane,
+			// otherwise its rAF loop runs forever with no cancel affordance.
+			if (useCableStore.getState().active?.sourcePaneId === id) {
+				useCableStore.getState().cancel();
+			}
 			// Chain the delete AFTER any save already queued/in-flight for this id,
 			// so an upsert can never land after the delete and re-insert the row.
 			enqueueWrite(id, () => deleteCanvasPanel(workspaceId, id));
