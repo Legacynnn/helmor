@@ -168,7 +168,7 @@ function ToolbarButton({
 			title={label}
 			onClick={onClick}
 			className={cn(
-				"flex size-7 cursor-pointer items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground",
+				"flex size-7 cursor-pointer items-center justify-center rounded text-foreground hover:bg-muted",
 				danger && "hover:bg-destructive/15 hover:text-destructive",
 			)}
 			style={
