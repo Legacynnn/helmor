@@ -786,6 +786,15 @@ fn run_migrations(connection: &Connection) -> Result<()> {
             .context("Failed to add workspaces.mode column")?;
     }
 
+    // Canvas-as-a-space: workspaces are strictly Normal or Canvas, chosen at
+    // creation. DEFAULT 'normal' backfills all existing rows. Distinct from
+    // the `mode` column (filesystem provisioning).
+    if has_table(connection, "workspaces") && !has_column(connection, "workspaces", "space") {
+        connection
+            .execute_batch("ALTER TABLE workspaces ADD COLUMN space TEXT NOT NULL DEFAULT 'normal'")
+            .context("Failed to add workspaces.space column")?;
+    }
+
     // Tracks the last successful run of the repo's setup script for this
     // workspace. NULL means "never ran" (or the workspace was created
     // before this column existed) — distinct from "ran but output got
@@ -1241,6 +1250,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
     archive_commit TEXT,
     linked_directory_paths TEXT,
     mode TEXT DEFAULT 'worktree',
+    space TEXT NOT NULL DEFAULT 'normal',
     setup_completed_at TEXT,
     display_order INTEGER NOT NULL DEFAULT 0,
     port_base INTEGER,
@@ -2474,5 +2484,22 @@ mod tests {
         assert!(read_setting(&conn, "app.review_model_id").is_none());
         assert!(read_setting(&conn, "app.pr_model_id").is_none());
         assert!(read_setting(&conn, "app.review_effort").is_none());
+    }
+
+    #[test]
+    fn workspaces_has_space_column_defaulting_normal() {
+        let conn = Connection::open_in_memory().unwrap();
+        ensure_schema(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO workspaces (id, repository_id, directory_name) VALUES ('w1','r1','dir')",
+            [],
+        )
+        .unwrap();
+        let space: String = conn
+            .query_row("SELECT space FROM workspaces WHERE id = 'w1'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(space, "normal");
     }
 }
