@@ -8,9 +8,11 @@ import {
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { useCableStore } from "../cable/cable-store";
 import { useCanvasActions } from "../canvas-actions-context";
 import { parsePanelConfig } from "../panel-config";
 import type { PanelNode } from "../types";
+import { PANEL_DEFAULT_HEIGHT, PANEL_DEFAULT_WIDTH } from "../types";
 
 /** Accent hue shared with selected panels + connection handles. */
 const SELECTED_COLOR = "var(--color-selected, #3b82f6)";
@@ -18,14 +20,11 @@ const SELECTED_COLOR = "var(--color-selected, #3b82f6)";
 /** Floating contextual toolbar shown when exactly one panel is selected. */
 export function CanvasSelectionToolbar() {
 	const actions = useCanvasActions();
+	const cableActive = useCableStore((s) => s.active?.sourcePaneId);
 	const [selected, setSelected] = useState<PanelNode | null>(null);
-	// Visual-only "connect mode" affordance. The real wire-routing between
-	// panels (with collision avoidance) is wired up in a later pass.
-	const [connecting, setConnecting] = useState(false);
 
 	const onChange = useCallback(({ nodes }: { nodes: PanelNode[] }) => {
 		setSelected(nodes.length === 1 ? nodes[0] : null);
-		setConnecting(false);
 	}, []);
 	useOnSelectionChange({ onChange });
 
@@ -80,9 +79,24 @@ export function CanvasSelectionToolbar() {
 				</PopoverContent>
 			</Popover>
 			<ToolbarButton
-				label={connecting ? "Cancel connection" : "Connect to panel"}
-				onClick={() => setConnecting((c) => !c)}
-				active={connecting}
+				label={cableActive === id ? "Cancel connection" : "Connect to panel"}
+				onClick={() => {
+					const store = useCableStore.getState();
+					if (store.active?.sourcePaneId === id) {
+						store.cancel();
+						return;
+					}
+					const w =
+						(selected.measured?.width ?? selected.width) || PANEL_DEFAULT_WIDTH;
+					const h =
+						(selected.measured?.height ?? selected.height) ||
+						PANEL_DEFAULT_HEIGHT;
+					store.spawn(id, {
+						x: selected.position.x + w,
+						y: selected.position.y + h / 2,
+					});
+				}}
+				active={cableActive === id}
 			>
 				<Cable className="size-4" />
 			</ToolbarButton>

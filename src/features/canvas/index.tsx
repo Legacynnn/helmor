@@ -22,6 +22,7 @@ import {
 	workspaceDetailQueryOptions,
 } from "@/lib/query-client";
 import { resolveBackgroundUrl } from "./backgrounds";
+import { CableOverlay } from "./cable/cable-overlay";
 import { CanvasActionsProvider } from "./canvas-actions-context";
 import { useCanvasCreateStore } from "./canvas-create-store";
 import { useCanvasInteractionStore } from "./canvas-interaction-store";
@@ -341,6 +342,7 @@ function CanvasInner({
 						/>
 						<CanvasRightRail />
 						<CanvasSelectionToolbar />
+						<CableOverlay />
 					</TooltipProvider>
 					<CustomizePopover
 						workspaceId={workspaceId}
