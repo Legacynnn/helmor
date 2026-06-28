@@ -10,9 +10,10 @@ Give every canvas panel a ⌘+digit keyboard binding so the user can jump to it,
 add a frosted-glass popover that lists all panels with their bindings and lets the
 user assign a custom digit.
 
-- Auto bindings follow **creation order**: 1st panel → ⌘1, 2nd → ⌘2, … 10th → ⌘0.
+- Auto bindings follow **creation order**: 1st panel → ⌘1, 2nd → ⌘2, … 9th → ⌘9
+  (max 9 bound panels — see "Why ⌘1–⌘9 only" below).
 - Pressing a binding **selects the panel and pans/zooms the viewport to center it**.
-- A user can set a **custom** digit per panel (⌘1–9, ⌘0) as long as it doesn't
+- A user can set a **custom** digit per panel (⌘1–⌘9) as long as it doesn't
   conflict with another panel's custom digit. Customs are managed in the popover.
 - The popover opens from a button in the top-left workspace-controls cluster **and**
   via the `⌘/` shortcut.
@@ -26,10 +27,19 @@ No Rust/schema changes: the per-panel custom digit lives in the existing free-fo
 Add an optional field to `PanelConfig` (`src/features/canvas/panel-config.ts`):
 
 ```ts
-/** Custom ⌘+digit binding for this panel (0–9; 0 = ⌘0, the 10th slot).
+/** Custom ⌘+digit binding for this panel (1–9).
  * Absent = the panel uses an auto-assigned binding based on creation order. */
 binding?: number;
 ```
+
+### Why ⌘1–⌘9 only (not ⌘0)
+
+The app's conflict engine (`getShortcutConflicts`) disables BOTH shortcuts that
+share a hotkey when their scopes overlap, and the global `zoom.reset` already owns
+`Mod+0` in the `app` scope (which overlaps every scope). A `canvas`-scope `Mod+0`
+would mutually disable with `zoom.reset`. `Mod+1`–`Mod+9` are only taken by
+`session.select1..9` in the `chat` scope, which does NOT overlap `canvas`, so those
+are safe. Therefore bindings cap at 9 panels; the 10th+ show `—`.
 
 Persists automatically via `stringifyPanelConfig` → `saveCanvasPanel` → `config` column.
 
@@ -37,8 +47,8 @@ Persists automatically via `stringifyPanelConfig` → `saveCanvasPanel` → `con
 `src/features/canvas/bindings/panel-bindings.ts` exports:
 
 ```ts
-/** Digit sequence: ⌘1..⌘9 then ⌘0 (the 10th). */
-export const BINDING_DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0] as const;
+/** Digit sequence: ⌘1..⌘9 (max 9 bound panels). */
+export const BINDING_DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 
 export type PanelBindingInput = { id: string; binding?: number };
 
@@ -101,37 +111,45 @@ Reuse the existing app shortcut system (`src/features/shortcuts/`), adding a new
 `canvas` scope so canvas bindings are focus-scoped and never collide with chat's
 existing `Mod+1..9` (scope `chat`).
 
-Registry additions (`src/features/shortcuts/registry.ts`) — 10 panel jumps + the
-popover toggle, all scope `["canvas"]`:
+Registry additions (`src/features/shortcuts/registry.ts`) — 9 panel jumps + the
+popover toggle, all scope `["canvas"]`, group `"Navigation"`:
 
 | id | defaultHotkey | title |
 | --- | --- | --- |
 | `canvas.panel1` … `canvas.panel9` | `Mod+1` … `Mod+9` | Jump to canvas panel N |
-| `canvas.panel10` | `Mod+0` | Jump to canvas panel 10 |
 | `canvas.panelList` | `Mod+/` | Toggle the canvas panels list |
 
-Add these 11 ids to the `ShortcutId` union and `canvas` to the scope type in
-`src/features/shortcuts/types.ts`. Mark `editable: false` (the hotkeys are fixed;
-the customization is *which panel* a digit maps to, owned by the canvas — not a
-hotkey rebind).
+Add these 10 ids to the `ShortcutId` union, and add `"canvas"` to the
+`ShortcutScope` type, in `src/features/shortcuts/types.ts`; also add `"canvas"` to
+`KNOWN_SCOPES` in `src/features/shortcuts/focus-scope.ts`. Mark `editable: false`
+(the hotkeys are fixed; the customization is *which panel* a digit maps to, owned by
+the canvas — not a hotkey rebind).
 
 `src/features/canvas/bindings/use-panel-binding-shortcuts.ts` builds the
-`ShortcutHandler[]` for these ids: `canvas.panelN` resolves the current digit→panel
-map (from live `rf.getNodes()` + each node's parsed `binding`) and calls
-`focusPanel` for the panel holding digit N (digit 0 for `canvas.panel10`); a handler
-is `enabled` only when such a panel exists. `canvas.panelList` toggles the popover
-open-state store. These handlers are registered through the same path
-`useGlobalShortcutHandlers` uses (so normalization, input-field guarding, and
-focus-scope gating are reused).
+`ShortcutHandler[]` for these ids and registers them with its **own**
+`useAppShortcuts({ overrides: settings.shortcuts, handlers })` call — exactly the
+pattern used by `inspector/panel/use-panel-shortcuts.ts`, `editor`, and
+`workspace-start`. This hook lives inside the canvas tree (so it has `useReactFlow`).
+`canvas.panelN` resolves the current digit→panel map (from live `rf.getNodes()` +
+each node's parsed `binding`) and calls `focusPanel` for the panel holding digit N;
+the handler is `enabled` only when such a panel exists. `canvas.panelList` toggles
+the popover open-state store.
 
-**Focus scope:** the canvas surface must declare the `canvas` focus scope so these
-shortcuts fire only when the canvas is active. Implementation step: confirm how the
-app marks focus scopes (`data-focus-scope` per the shortcut system) and apply
-`canvas` to the canvas wrapper in `index.tsx`. If the existing mechanism cannot gate
-cleanly (e.g. the canvas isn't focusable), fall back to gating the canvas handlers'
-`enabled` on a "canvas is the active surface" predicate. Either way the requirement
-is: ⌘<digit> on the canvas focuses the mapped panel and does NOT also trigger chat
-session-select.
+**No double-fire:** `useAppShortcuts` gates each registration on active scopes
+(`registration.scopes.includes("app") || activeScopes.includes(scope)`). When the
+canvas is engaged, `getActiveScopes()` returns `["canvas"]`, so the shell's
+`session.select1..9` (scope `chat`) do NOT match while `canvas.panelN` does; when
+chat is engaged, the reverse holds. Two `useAppShortcuts` window listeners coexist
+fine — each only acts on its own matched, scope-active registration. (`stopPropagation`
+between two capture-phase listeners on `window` doesn't suppress the other, but since
+no `app`/`canvas` handler shares `Mod+1..9`/`Mod+/`, nothing else fires anyway.)
+
+**Focus scope:** add `"canvas"` to `KNOWN_SCOPES` (focus-scope.ts) and tag the canvas
+wrapper div in `index.tsx` with `data-focus-scope="canvas"`. Then a pointerdown/focus
+anywhere on the canvas sets the engaged scope to `canvas` (the focus-scope module's
+global `pointerdown` listener calls `rememberEngagement`), so `getActiveScopes()`
+yields `["canvas"]`. Requirement: ⌘<digit> on the canvas focuses the mapped panel and
+does NOT also trigger chat session-select.
 
 ## "All panels" popover
 
@@ -146,11 +164,11 @@ Trigger: a new icon button (lucide `List`/`PanelsTopLeft`) added to the existing
 
 Content: a scrollable list of panels in creation order. Each row:
 - Binding badge: the effective `formatBinding(digit)` (e.g. `⌘1`), or `—` if unbound
-  (>10 panels).
+  (10th+ panel).
 - Label: the panel `title`, or `"<Type> #<n>"` when untitled (Type from
   `PANEL_META[panelType].label`, `n` = 1-based creation index).
 - A digit picker (small `DropdownMenu` or segmented control) listing `Auto` + digits
-  1–9,0; digits already held as another panel's **custom** binding are disabled;
+  1–9; digits already held as another panel's **custom** binding are disabled;
   choosing a digit writes `config.binding` via `actions.patchNodeData`, choosing
   `Auto` clears it. Conflicts are prevented by disabling taken digits
   (`customBindingConflicts`).
@@ -179,11 +197,11 @@ Edited:
 ## Testing
 
 - **vitest (pure):** `panel-bindings.test.ts` —
-  - auto assigns 1,2,3… in order; 10th gets 0; 11th gets nothing.
+  - auto assigns 1,2,3… in order; 9th gets 9; 10th gets nothing.
   - a custom binding claims its digit and autos flex around it (no gap, no dup).
   - compaction: removing a middle panel renumbers autos 1..N.
   - `customBindingConflicts` true only against another panel's custom (not autos).
-  - `formatBinding` maps 1→"⌘1", 0→"⌘0".
+  - `formatBinding` maps 1→"⌘1", 9→"⌘9".
 - **vitest (component, light):** `panels-list-popover.test.tsx` — renders rows with
   the right badges and "<Type> #n" fallback labels for a small panel set; selecting a
   digit calls `patchNodeData` with `{ config }` containing the new `binding`.
@@ -194,5 +212,5 @@ Edited:
 - Persisting the popover open-state (transient, per-session).
 - Surfacing canvas bindings in the global app shortcut-settings UI (the hotkeys are
   fixed; panel↔digit assignment is the only customization, done in the popover).
-- Bindings for >10 panels, chords, or non-⌘ modifiers.
+- Bindings for the 10th+ panel, chords, or non-⌘ modifiers.
 - Reordering panels' creation order from the popover (drag-to-reorder).
