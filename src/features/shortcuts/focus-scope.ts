@@ -16,6 +16,7 @@ const KNOWN_SCOPES: ReadonlySet<ShortcutScope> = new Set([
 	"inspector",
 	"start-composer",
 	"workspace-composer",
+	"canvas",
 ]);
 
 // Scope inheritance: when a leaf scope is active, every parent scope is also

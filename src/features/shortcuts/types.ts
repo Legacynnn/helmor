@@ -62,7 +62,17 @@ export type ShortcutId =
 	| "panel.showFiles"
 	| "panel.showGit"
 	| "panel.showSearch"
-	| "panel.showActions";
+	| "panel.showActions"
+	| "canvas.panel1"
+	| "canvas.panel2"
+	| "canvas.panel3"
+	| "canvas.panel4"
+	| "canvas.panel5"
+	| "canvas.panel6"
+	| "canvas.panel7"
+	| "canvas.panel8"
+	| "canvas.panel9"
+	| "canvas.panelList";
 
 export type ShortcutGroup =
 	| "Navigation"
@@ -94,7 +104,8 @@ export type ShortcutScope =
 	| "editor"
 	| "inspector"
 	| "start-composer"
-	| "workspace-composer";
+	| "workspace-composer"
+	| "canvas";
 
 export type ShortcutDefinition = {
 	id: ShortcutId;
