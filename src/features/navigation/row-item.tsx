@@ -181,9 +181,6 @@ export const WorkspaceRowItem = memo(
 		// Infinite Canvas (epic #61) per-workspace toggle, surfaced in this row's
 		// context menu when the experimental opt-in is on.
 		const canvasModeEnabled = useSettings().settings.canvasModeEnabled;
-		const isCanvasActive = useCanvasModeStore((s) =>
-			Boolean(s.byWorkspace[row.id]),
-		);
 
 		// Hover-intent debounce: skip prefetch when the mouse just sweeps over
 		// the row. ~120ms is short enough that the data is still warm by the
@@ -530,17 +527,11 @@ export const WorkspaceRowItem = memo(
 							<Tooltip>
 								<TooltipTrigger asChild>
 									<Button
-										aria-label={
-											isCanvasActive ? "Exit canvas" : "Open in canvas"
-										}
+										aria-label="Open in canvas"
 										onClick={(event) => {
 											event.stopPropagation();
-											if (isCanvasActive) {
-												useCanvasModeStore.getState().setMode(row.id, false);
-											} else {
-												onSelect?.(row.id);
-												useCanvasModeStore.getState().setMode(row.id, true);
-											}
+											onSelect?.(row.id);
+											useCanvasModeStore.getState().setMode(row.id, true);
 										}}
 										variant="ghost"
 										size="icon-xs"
@@ -554,9 +545,7 @@ export const WorkspaceRowItem = memo(
 									sideOffset={4}
 									className="flex h-[22px] items-center rounded-md px-1.5 text-mini leading-none"
 								>
-									<span>
-										{isCanvasActive ? "Exit canvas" : "Open in canvas"}
-									</span>
+									<span>Open in canvas</span>
 								</TooltipContent>
 							</Tooltip>
 						) : null}
@@ -675,16 +664,12 @@ export const WorkspaceRowItem = memo(
 						{canvasModeEnabled && !isRestoreAction ? (
 							<ContextMenuItem
 								onClick={() => {
-									if (isCanvasActive) {
-										useCanvasModeStore.getState().setMode(row.id, false);
-									} else {
-										onSelect?.(row.id);
-										useCanvasModeStore.getState().setMode(row.id, true);
-									}
+									onSelect?.(row.id);
+									useCanvasModeStore.getState().setMode(row.id, true);
 								}}
 							>
 								<LayoutGrid className="size-4 shrink-0" strokeWidth={1.6} />
-								<span>{isCanvasActive ? "Exit canvas" : "Open in canvas"}</span>
+								<span>Open in canvas</span>
 							</ContextMenuItem>
 						) : null}
 

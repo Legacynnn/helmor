@@ -32,7 +32,7 @@ import {
 	READABLE_PANEL_MIN_ALPHA,
 } from "./types";
 
-const PANEL_META: Record<
+export const PANEL_META: Record<
 	CanvasPanelType,
 	{ label: string; icon: ComponentType<{ className?: string }> }
 > = {
@@ -110,11 +110,33 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 
 	return (
 		<div
-			className="flex size-full flex-col overflow-hidden rounded-[10px] border border-app-border text-app-foreground shadow-lg"
+			className="flex size-full flex-col overflow-hidden rounded-[10px] border text-app-foreground shadow-lg"
 			style={{
 				backgroundColor: surface("--canvas-pane-bg", bodyAlpha),
 				backdropFilter: blur,
 				WebkitBackdropFilter: blur,
+				// Border derived from the pane's own colour, nudged 30% toward the
+				// text colour. This is theme-adaptive (darker than the cream surface
+				// in light mode, lighter than the near-black in dark mode) and always
+				// resolves — the generic --border token is a near-white that vanished
+				// over the cream. Inline so it can't lose to a base utility.
+				borderColor:
+					"color-mix(in srgb, var(--canvas-pane-bg, #fff) 70%, currentColor 30%)",
+				// Selection indicator: a thick dashed border in a SATURATED amber.
+				// The theme's `--primary` is a pale, low-chroma amber (≈ oklch 85% .08)
+				// that reads as near-white — especially as a thin line on a dark
+				// (Vesper) panel — and mixing it toward the text colour only made it
+				// whiter. So pin an explicit vivid amber: lightness 0.7 keeps it
+				// visible on both the dark panels and the light/cream ones, and the
+				// strong chroma makes it unmistakably coloured, never white.
+				...(selected
+					? {
+							borderColor: "oklch(0.7 0.17 65)",
+							borderStyle: "dashed",
+							borderWidth: "3px",
+							boxShadow: "0 12px 24px -8px rgba(0,0,0,0.45)",
+						}
+					: null),
 			}}
 			onPointerEnter={() => setHovered(true)}
 			onPointerLeave={() => setHovered(false)}
@@ -123,8 +145,12 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 				isVisible={(selected || hovered) && !data.locked}
 				minWidth={PANEL_MIN_WIDTH}
 				minHeight={PANEL_MIN_HEIGHT}
-				lineClassName="!border-[var(--color-selected,#3b82f6)] !border-dashed"
-				handleClassName="!size-2 !rounded-[2px] !border-[var(--color-selected,#3b82f6)] !bg-app-base"
+				// Selection is shown purely by the panel container's dashed primary
+				// border (above). Keep the resizer's own line AND corner handles
+				// visually invisible — no squares — while preserving their hit areas
+				// so the panel stays resizable from the edges and corners.
+				lineClassName="!border-transparent"
+				handleClassName="!size-2 !border-transparent !bg-transparent"
 			/>
 			{/* Edge endpoints — drag from the right (source) to another panel's
 			 *  left (target). Each panel is both, so chains compose. */}
@@ -145,10 +171,12 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 			<div
 				className={cn(
 					PANEL_DRAG_HANDLE_CLASS,
-					"flex h-9 shrink-0 cursor-grab items-center gap-2 border-app-border border-b px-2.5 active:cursor-grabbing",
+					"flex h-9 shrink-0 cursor-grab items-center gap-2 border-b px-2.5 active:cursor-grabbing",
 				)}
 				style={{
 					backgroundColor: surface("--canvas-pane-header-bg", headerAlpha),
+					borderBottomColor:
+						"color-mix(in srgb, var(--canvas-pane-header-bg, #fff) 70%, currentColor 30%)",
 				}}
 			>
 				<Icon className="size-3.5 shrink-0 opacity-70" />

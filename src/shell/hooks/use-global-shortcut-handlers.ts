@@ -68,6 +68,7 @@ export function useGlobalShortcutHandlers({
 	workspacePreviewActive,
 	workspacePreviewCard,
 	workspaceViewMode,
+	canvasActive,
 }: {
 	appSettings: AppSettings;
 	updateSettings: (patch: Partial<AppSettings>) => void | Promise<void>;
@@ -111,6 +112,10 @@ export function useGlobalShortcutHandlers({
 	workspacePreviewActive: boolean;
 	workspacePreviewCard: unknown;
 	workspaceViewMode: string;
+	/** True when the full-bleed canvas surface owns the workspace. The canvas
+	 * has its own ⌘1–⌘9 (focus panel N) bindings, so the chat's session-ordinal
+	 * shortcuts must stand down to avoid both firing on the same key. */
+	canvasActive: boolean;
 }): void {
 	const globalShortcutHandlers = useMemo<ShortcutHandler[]>(
 		() => [
@@ -182,7 +187,8 @@ export function useGlobalShortcutHandlers({
 			...SESSION_ORDINAL_SHORTCUTS.map(({ id, ordinal }) => ({
 				id,
 				callback: () => handleSelectSessionByOrdinal(ordinal),
-				enabled: workspaceViewMode === "conversation",
+				// Stand down under the canvas: ⌘1–⌘9 belong to canvas.panelN there.
+				enabled: workspaceViewMode === "conversation" && !canvasActive,
 			})),
 			{
 				id: "session.close" as const,
@@ -360,6 +366,7 @@ export function useGlobalShortcutHandlers({
 			workspacePreviewActive,
 			workspacePreviewCard,
 			workspaceViewMode,
+			canvasActive,
 			canEditEditorSession,
 			planSurfaceActive,
 			onClosePlan,

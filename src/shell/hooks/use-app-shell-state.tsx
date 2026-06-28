@@ -13,6 +13,7 @@
 // and `getSnapshot()` readbacks are preserved exactly.
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
+import { useIsCanvasMode } from "@/features/canvas/use-canvas-mode";
 import type { ComposerCreateContext } from "@/features/conversation";
 import { useDockUnreadBadge } from "@/features/dock-badge";
 import type { SettingsSection } from "@/features/settings";
@@ -207,6 +208,11 @@ export function useAppShellState({
 	const [planSurfaceActive, setPlanSurfaceActive] = useState(false);
 	useShellEvent("plan-surface-changed", (e) => setPlanSurfaceActive(e.active));
 
+	// Canvas owns ⌘1–⌘9 when it's the active surface; mirror the app-shell gate
+	// so the chat's session-ordinal shortcuts stand down (no double-fire).
+	const canvasActive =
+		useIsCanvasMode(selectedWorkspaceId) && appSettings.canvasModeEnabled;
+
 	useGlobalShortcutHandlers({
 		appSettings,
 		updateSettings,
@@ -243,6 +249,7 @@ export function useAppShellState({
 		workspacePreviewActive,
 		workspacePreviewCard,
 		workspaceViewMode,
+		canvasActive,
 	});
 
 	const handleWorkspaceReveal = useCallback(

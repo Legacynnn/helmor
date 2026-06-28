@@ -301,8 +301,12 @@
 	   window's translucency would bleed into panels the user never asked to
 	   fade. These are NOT the bg-app-* window tokens on purpose: those carry
 	   alpha in glass themes. */
-	--canvas-pane-bg: var(--bg-base);
-	--canvas-pane-header-bg: var(--bg-elevated);
+	/* Warm cream surfaces in light theme — softer than plain white, and a
+	   touch warmer in the header so the chrome reads as a distinct layer. The
+	   pane border is derived from these in panel-node (color-mix toward the
+	   text colour) so it stays visible over the cream in every theme. */
+	--canvas-pane-bg: oklch(0.975 0.013 83);
+	--canvas-pane-header-bg: oklch(0.95 0.017 83);
 	--canvas-pane-terminal-bg: var(--terminal-chrome-bg);
 
 	/* Terminal ANSI palette (LOCKED) */

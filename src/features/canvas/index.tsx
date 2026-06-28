@@ -13,7 +13,14 @@ import {
 	type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type CSSProperties,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { CanvasState } from "@/lib/api";
 import { convertFileSrc } from "@/lib/ipc";
@@ -22,6 +29,7 @@ import {
 	workspaceDetailQueryOptions,
 } from "@/lib/query-client";
 import { resolveBackgroundUrl } from "./backgrounds";
+import { usePanelBindingShortcuts } from "./bindings/use-panel-binding-shortcuts";
 import { CableOverlay } from "./cable/cable-overlay";
 import { CanvasActionsProvider } from "./canvas-actions-context";
 import { useCanvasCreateStore } from "./canvas-create-store";
@@ -34,6 +42,7 @@ import {
 import { CanvasCreateOverlay } from "./chrome/create-overlay";
 import { CustomizePopover } from "./chrome/customize-popover";
 import { CanvasLeftRail } from "./chrome/left-rail";
+import { PanelsListPopover } from "./chrome/panels-list-popover";
 import { CanvasRightRail } from "./chrome/right-rail";
 import { CanvasSelectionToolbar } from "./chrome/selection-toolbar";
 import { CanvasWorkspaceControls } from "./chrome/workspace-controls";
@@ -132,6 +141,10 @@ function CanvasInner({
 		initial,
 		wrapperRef,
 	);
+
+	// ⌘1–⌘9 focus a panel by its binding; ⌘/ toggles the panels list. Scoped to
+	// the canvas via `data-focus-scope="canvas"` on the wrapper below.
+	usePanelBindingShortcuts(nodes);
 
 	// The canvas is its own surface: it never imports the workspace's existing
 	// (normal-tab) conversations. A canvas only ever shows panels the user
@@ -269,7 +282,22 @@ function CanvasInner({
 			<CanvasActionsProvider value={actions}>
 				<div
 					ref={wrapperRef}
+					// Activates the `canvas` shortcut scope (⌘1–⌘9, ⌘/) while focus is
+					// inside the surface, so they don't double-fire with chat shortcuts.
+					data-focus-scope="canvas"
 					className="relative size-full overflow-hidden bg-app-base"
+					// The canvas accent (selected-panel border, resize handles,
+					// connection cables, selection toolbar) reads `--color-selected`,
+					// which is otherwise undefined and falls back to a hardcoded blue.
+					// Bind it — and React Flow's own `--xy-resize-background-color` (the
+					// resize-handle fill) — to the app's primary token so nothing in the
+					// canvas renders that off-brand blue.
+					style={
+						{
+							"--color-selected": "var(--primary)",
+							"--xy-resize-background-color": "var(--primary)",
+						} as CSSProperties
+					}
 				>
 					{backgroundUrl ? (
 						<>
@@ -343,6 +371,7 @@ function CanvasInner({
 						<CanvasRightRail />
 						<CanvasSelectionToolbar />
 						<CableOverlay />
+						<PanelsListPopover nodes={nodes} />
 					</TooltipProvider>
 					<CustomizePopover
 						workspaceId={workspaceId}

@@ -11,10 +11,12 @@ import {
 	workspaceDetailQueryOptions,
 	workspaceGroupsQueryOptions,
 } from "@/lib/query-client";
+import { usePanelsListStore } from "../bindings/panels-list-store";
 import { useCanvasModeStore } from "../use-canvas-mode";
 
 /** Top-left workspace control region: identity + open-workspaces dropdown
- * (jump between canvases) + switch-back-to-normal-mode toggle. */
+ * (jump between canvases). Exiting the canvas is handled by the left rail's
+ * "Back to workspace" button. */
 export function CanvasWorkspaceControls({
 	workspaceId,
 	onSelectWorkspace,
@@ -75,13 +77,11 @@ export function CanvasWorkspaceControls({
 			<button
 				type="button"
 				className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-xs hover:bg-app-muted"
-				onClick={() =>
-					useCanvasModeStore.getState().setMode(workspaceId, false)
-				}
-				title="Switch back to normal mode"
+				onClick={() => usePanelsListStore.getState().toggle()}
+				title="Panels (⌘/)"
 			>
 				<PanelsTopLeft className="size-3.5 opacity-70" />
-				<span>Exit</span>
+				<span>Panels</span>
 			</button>
 		</div>
 	);
