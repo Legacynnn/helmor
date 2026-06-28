@@ -43,8 +43,12 @@ import {
 import { PanelNode } from "./panel-node";
 import type { PanelNode as PanelNodeType } from "./types";
 import { useCanvasGraph } from "./use-canvas-graph";
+import { usePinchZoom } from "./use-pinch-zoom";
 
 const NODE_TYPES = { panel: PanelNode };
+
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 2;
 
 const SELECTED_COLOR = "var(--color-selected, #3b82f6)";
 const EDGE_COLOR = "var(--xy-edge-stroke, #9ca3af)";
@@ -183,8 +187,8 @@ function CanvasInner({
 		[nodes],
 	);
 
-	// Appearance from the view store.
-	const translucency = useCanvasViewStore((s) => s.translucency);
+	// Appearance from the view store. (Translucency is consumed per-panel in
+	// PanelNode, where it fades only the panel surfaces — not their content.)
 	const pattern = useCanvasViewStore((s) => s.backgroundPattern);
 	const theme = useCanvasViewStore((s) => s.backgroundTheme);
 	const snapToGrid = useCanvasViewStore((s) => s.snapToGrid);
@@ -211,6 +215,49 @@ function CanvasInner({
 		[setCamera],
 	);
 
+	// Parallax background. The custom image lives in an oversized layer that
+	// drifts at a fraction of the canvas pan and scales gently with zoom, so it
+	// reads as a deep backdrop the panels float above — reinforcing that the
+	// canvas continues past the viewport edges. Driven imperatively from
+	// `onMove` (fires every frame while panning/zooming) to avoid re-renders.
+	const bgRef = useRef<HTMLDivElement>(null);
+	const applyParallax = useCallback((vp: Viewport) => {
+		const el = bgRef.current;
+		if (!el) return;
+		const FACTOR = 0.18; // background travels at 18% of the pan
+		const MAX = 120; // clamp the drift well inside the -inset-40 (160px) overhang
+		const tx = Math.max(-MAX, Math.min(MAX, vp.x * FACTOR));
+		const ty = Math.max(-MAX, Math.min(MAX, vp.y * FACTOR));
+		// Never scale below 1, or the layer would shrink under the viewport and
+		// expose an edge when the user pans far toward a corner.
+		const scale = Math.max(1, Math.min(1.5, 1 + (vp.zoom - 1) * 0.14));
+		el.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`;
+	}, []);
+	const onMove = useCallback(
+		(_e: unknown, vp: Viewport) => applyParallax(vp),
+		[applyParallax],
+	);
+	// Seed the transform from the persisted viewport before the first pan.
+	useEffect(() => {
+		applyParallax({
+			x: initial.viewState.panX,
+			y: initial.viewState.panY,
+			zoom: initial.viewState.zoom || 1,
+		});
+	}, [applyParallax, backgroundUrl, initial.viewState]);
+
+	// WebKit (Tauri webview) delivers trackpad pinch as `gesture*` events, which
+	// React Flow ignores. Drive zoom from them ourselves and persist on release.
+	const onPinchCommit = useCallback(
+		(vp: Viewport) => setCamera(vp.x, vp.y, vp.zoom),
+		[setCamera],
+	);
+	usePinchZoom(wrapperRef, {
+		minZoom: MIN_ZOOM,
+		maxZoom: MAX_ZOOM,
+		onCommit: onPinchCommit,
+	});
+
 	const onEdgesDelete = useCallback((deleted: Edge[]) => {
 		const store = useConnectionsStore.getState();
 		for (const e of deleted) store.disconnect(e.id);
@@ -222,17 +269,20 @@ function CanvasInner({
 				<div
 					ref={wrapperRef}
 					className="relative size-full overflow-hidden bg-app-base"
-					style={
-						{ "--canvas-panel-opacity": translucency } as React.CSSProperties
-					}
 				>
 					{backgroundUrl ? (
-						<div
-							className="pointer-events-none absolute inset-0 z-0 bg-center bg-cover"
-							style={{ backgroundImage: `url("${backgroundUrl}")` }}
-						>
-							<div className="absolute inset-0 bg-app-base/40" />
-						</div>
+						<>
+							{/* Oversized parallax layer: drifts at a fraction of the pan and
+							    scales with zoom (driven imperatively via `onMove`). The
+							    -inset margin gives the transform room before an edge shows. */}
+							<div
+								ref={bgRef}
+								className="pointer-events-none absolute -inset-40 z-0 origin-center bg-center bg-cover will-change-transform"
+								style={{ backgroundImage: `url("${backgroundUrl}")` }}
+							>
+								<div className="absolute inset-0 bg-black/25" />
+							</div>
+						</>
 					) : null}
 					<ReactFlow<PanelNodeType>
 						nodes={rfNodes}
@@ -243,6 +293,7 @@ function CanvasInner({
 						onNodesChange={onNodesChange}
 						onConnect={onConnect}
 						onEdgesDelete={onEdgesDelete}
+						onMove={onMove}
 						onMoveEnd={onMoveEnd}
 						nodeTypes={NODE_TYPES}
 						colorMode={theme as ColorMode}
@@ -253,10 +304,12 @@ function CanvasInner({
 							y: initial.viewState.panY,
 							zoom: initial.viewState.zoom || 1,
 						}}
-						minZoom={0.1}
-						maxZoom={2}
+						minZoom={MIN_ZOOM}
+						maxZoom={MAX_ZOOM}
 						proOptions={{ hideAttribution: true }}
 						deleteKeyCode={["Backspace", "Delete"]}
+						panOnScroll
+						zoomOnScroll={false}
 						panOnDrag={selectMode ? [1, 2] : true}
 						selectionOnDrag={selectMode}
 						selectNodesOnDrag={false}

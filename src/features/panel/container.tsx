@@ -76,6 +76,12 @@ type WorkspacePanelContainerProps = {
 	headerActions?: React.ReactNode;
 	headerLeading?: React.ReactNode;
 	hideTabs?: boolean;
+	/** Pin the thread to exactly `displayedSessionId`, bypassing the
+	 *  "is it in the visible session list?" fallback. Canvas conversation panels
+	 *  bind a HIDDEN session (excluded from `list_workspace_sessions`), so without
+	 *  this every panel would fail the membership check and fall back to the
+	 *  workspace's active session — making all panels show the same thread. */
+	pinDisplayedSession?: boolean;
 	/** Optimistic user bubble for a workspace that's mid-finalize — rendered
 	 *  before the real send actually fires, swapped out as soon as the real
 	 *  user message lands in DB. */
@@ -105,6 +111,7 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	headerActions,
 	headerLeading,
 	hideTabs,
+	pinDisplayedSession = false,
 	optimisticPendingSubmit = null,
 }: WorkspacePanelContainerProps) {
 	const queryClient = useQueryClient();
@@ -277,6 +284,14 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 			return null;
 		}
 
+		// Pinned (canvas) panels bind an exact, often HIDDEN session — trust it
+		// directly instead of requiring membership in the visible session list,
+		// which would otherwise drop every panel onto the workspace's active
+		// session and make them all mirror the same thread.
+		if (pinDisplayedSession) {
+			return displayedSessionId;
+		}
+
 		if (
 			displayedSessionId &&
 			sessions.some((session) => session.id === displayedSessionId)
@@ -294,6 +309,7 @@ export const WorkspacePanelContainer = memo(function WorkspacePanelContainer({
 	}, [
 		displayedSessionId,
 		displayedWorkspaceId,
+		pinDisplayedSession,
 		rememberedSessionId,
 		sessions,
 		workspace?.activeSessionId,

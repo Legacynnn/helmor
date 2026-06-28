@@ -1,13 +1,5 @@
 import { useOnSelectionChange } from "@xyflow/react";
-import {
-	ArrowDownToLine,
-	ArrowUpToLine,
-	Copy,
-	Droplets,
-	Lock,
-	Trash2,
-	Unlock,
-} from "lucide-react";
+import { Cable, Copy, Droplets, Lock, Trash2, Unlock } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
 	Popover,
@@ -20,13 +12,20 @@ import { useCanvasActions } from "../canvas-actions-context";
 import { parsePanelConfig } from "../panel-config";
 import type { PanelNode } from "../types";
 
+/** Accent hue shared with selected panels + connection handles. */
+const SELECTED_COLOR = "var(--color-selected, #3b82f6)";
+
 /** Floating contextual toolbar shown when exactly one panel is selected. */
 export function CanvasSelectionToolbar() {
 	const actions = useCanvasActions();
 	const [selected, setSelected] = useState<PanelNode | null>(null);
+	// Visual-only "connect mode" affordance. The real wire-routing between
+	// panels (with collision avoidance) is wired up in a later pass.
+	const [connecting, setConnecting] = useState(false);
 
 	const onChange = useCallback(({ nodes }: { nodes: PanelNode[] }) => {
 		setSelected(nodes.length === 1 ? nodes[0] : null);
+		setConnecting(false);
 	}, []);
 	useOnSelectionChange({ onChange });
 
@@ -45,7 +44,13 @@ export function CanvasSelectionToolbar() {
 	};
 
 	return (
-		<div className="-translate-x-1/2 pointer-events-auto absolute top-3 left-1/2 z-20 flex items-center gap-1 rounded-[16px] border border-white/15 bg-app-base/40 px-1.5 py-1 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl">
+		<div
+			className="-translate-x-1/2 pointer-events-auto absolute top-3 left-1/2 z-20 flex items-center gap-1 rounded-[16px] border bg-popover/95 px-1.5 py-1 backdrop-blur-xl"
+			style={{
+				borderColor: `color-mix(in oklab, ${SELECTED_COLOR} 55%, transparent)`,
+				boxShadow: `0 12px 32px -10px rgba(0,0,0,0.6), 0 0 0 1px color-mix(in oklab, ${SELECTED_COLOR} 35%, transparent), 0 0 22px -6px color-mix(in oklab, ${SELECTED_COLOR} 45%, transparent)`,
+			}}
+		>
 			<RenameField
 				key={id}
 				initial={selected.data.title}
@@ -75,16 +80,11 @@ export function CanvasSelectionToolbar() {
 				</PopoverContent>
 			</Popover>
 			<ToolbarButton
-				label="Bring to front"
-				onClick={() => actions.bringToFront(id)}
+				label={connecting ? "Cancel connection" : "Connect to panel"}
+				onClick={() => setConnecting((c) => !c)}
+				active={connecting}
 			>
-				<ArrowUpToLine className="size-3.5" />
-			</ToolbarButton>
-			<ToolbarButton
-				label="Send to back"
-				onClick={() => actions.sendToBack(id)}
-			>
-				<ArrowDownToLine className="size-3.5" />
+				<Cable className="size-3.5" />
 			</ToolbarButton>
 			<ToolbarButton
 				label={selected.data.locked ? "Unlock" : "Lock"}
@@ -127,7 +127,7 @@ function RenameField({
 	useEffect(() => setValue(initial), [initial]);
 	return (
 		<input
-			className="h-6 w-32 rounded bg-transparent px-1.5 text-xs outline-none focus:bg-app-muted"
+			className="h-6 w-32 rounded bg-transparent px-1.5 text-xs text-foreground outline-none focus:bg-muted"
 			value={value}
 			placeholder="Untitled"
 			onChange={(e) => setValue(e.target.value)}
@@ -143,23 +143,35 @@ function ToolbarButton({
 	label,
 	onClick,
 	danger,
+	active,
 	children,
 }: {
 	label: string;
 	onClick?: () => void;
 	danger?: boolean;
+	active?: boolean;
 	children: React.ReactNode;
 }) {
 	return (
 		<button
 			type="button"
 			aria-label={label}
+			aria-pressed={active}
 			title={label}
 			onClick={onClick}
 			className={cn(
-				"flex size-6 cursor-pointer items-center justify-center rounded text-app-muted-foreground hover:bg-app-muted hover:text-app-foreground",
+				"flex size-6 cursor-pointer items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground",
 				danger && "hover:bg-destructive/15 hover:text-destructive",
 			)}
+			style={
+				active
+					? {
+							backgroundColor: `color-mix(in oklab, ${SELECTED_COLOR} 22%, transparent)`,
+							color: SELECTED_COLOR,
+							boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${SELECTED_COLOR} 50%, transparent)`,
+						}
+					: undefined
+			}
 		>
 			{children}
 		</button>
@@ -167,5 +179,5 @@ function ToolbarButton({
 }
 
 function Divider() {
-	return <div className="mx-0.5 h-4 w-px bg-app-border" />;
+	return <div className="mx-0.5 h-4 w-px bg-border" />;
 }

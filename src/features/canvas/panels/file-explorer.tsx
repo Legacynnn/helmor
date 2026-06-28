@@ -7,7 +7,6 @@ import {
 } from "@/components/ai/file-tree";
 import type { WorkspaceTreeEntry } from "@/lib/api";
 import { workspaceTreeQueryOptions } from "@/lib/query-client";
-import { useCanvasActions } from "../canvas-actions-context";
 import { useCanvasWorkspace } from "../canvas-workspace-context";
 
 type TreeNode = { entry: WorkspaceTreeEntry; children: TreeNode[] };
@@ -52,12 +51,17 @@ function renderNodes(nodes: TreeNode[]) {
 	);
 }
 
-/** File-tree browser scoped to the workspace root. Clicking a file opens it in
- * a new Editor panel. */
-export function FileManagerPanelBody({ nodeId }: { nodeId: string }) {
-	const { addPanel } = useCanvasActions();
+/** File-tree browser scoped to the workspace root. Selecting a file calls
+ * `onSelect` with its workspace-relative path; folder toggles are swallowed.
+ * Rendered inside the Editor panel as the right-hand pane. */
+export function FileExplorer({
+	selectedPath,
+	onSelect,
+}: {
+	selectedPath?: string;
+	onSelect: (filePath: string) => void;
+}) {
 	const { workspaceRootPath } = useCanvasWorkspace();
-	void nodeId;
 	const { data, isLoading } = useQuery({
 		...workspaceTreeQueryOptions(workspaceRootPath ?? ""),
 		enabled: !!workspaceRootPath,
@@ -71,9 +75,8 @@ export function FileManagerPanelBody({ nodeId }: { nodeId: string }) {
 		};
 	}, [data]);
 
-	const openFile = (filePath: string) => {
-		if (!filepaths.has(filePath)) return; // folder toggle, not a file
-		void addPanel("editor", { config: { filePath } });
+	const handleSelect = (path: string) => {
+		if (filepaths.has(path)) onSelect(path); // ignore folder toggles
 	};
 
 	if (!workspaceRootPath) {
@@ -85,13 +88,17 @@ export function FileManagerPanelBody({ nodeId }: { nodeId: string }) {
 	}
 
 	return (
-		<div className="size-full overflow-auto bg-app-base p-1">
+		<div className="size-full overflow-auto p-1">
 			{isLoading ? (
 				<div className="p-3 text-app-muted-foreground text-xs">Loading…</div>
 			) : tree.length === 0 ? (
 				<div className="p-3 text-app-muted-foreground text-xs">No files.</div>
 			) : (
-				<FileTree className="border-0 bg-transparent" onSelect={openFile}>
+				<FileTree
+					className="border-0 bg-transparent"
+					selectedPath={selectedPath}
+					onSelect={handleSelect}
+				>
 					{renderNodes(tree)}
 				</FileTree>
 			)}

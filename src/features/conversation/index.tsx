@@ -135,6 +135,9 @@ export type WorkspaceConversationContainerProps = {
 	headerLeading?: React.ReactNode;
 	/** Hide the session tab strip (embedded canvas conversation). */
 	hideTabs?: boolean;
+	/** Pin the thread to exactly `displayedSessionId` (canvas panels bind a
+	 *  hidden, per-panel session that isn't in the visible session list). */
+	pinDisplayedSession?: boolean;
 	contextPreviewCard?: ContextCard | null;
 	contextPreviewActive?: boolean;
 	onSelectContextPreview?: () => void;
@@ -230,6 +233,7 @@ export const WorkspaceConversationContainer = memo(
 		headerActions,
 		headerLeading,
 		hideTabs,
+		pinDisplayedSession = false,
 		contextPreviewCard = null,
 		contextPreviewActive = false,
 		onSelectContextPreview,
@@ -867,6 +871,7 @@ export const WorkspaceConversationContainer = memo(
 						headerActions={headerActions}
 						headerLeading={headerLeading}
 						hideTabs={hideTabs}
+						pinDisplayedSession={pinDisplayedSession}
 						optimisticPendingSubmit={
 							pendingCreatedWorkspaceSubmit
 								? {

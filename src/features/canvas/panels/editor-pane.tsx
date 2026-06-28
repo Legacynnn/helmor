@@ -1,0 +1,92 @@
+import { useEffect, useRef, useState } from "react";
+import { readEditorFile, writeEditorFile } from "@/lib/api";
+import { createFileEditor } from "@/lib/monaco-runtime";
+import { useCanvasWorkspace } from "../canvas-workspace-context";
+
+type FileEditorController = Awaited<ReturnType<typeof createFileEditor>>;
+
+const SAVE_DEBOUNCE_MS = 600;
+
+function joinPath(root: string, rel: string): string {
+	return `${root.replace(/\/$/, "")}/${rel.replace(/^\//, "")}`;
+}
+
+type Status = "empty" | "loading" | "ready" | "error";
+
+/** Monaco file editor bound to one workspace-relative file (`filePath`). Loads
+ * content from disk on mount and debounce-saves edits back. `automaticLayout`
+ * (set in createFileEditor) handles resizes — including the explorer divider
+ * drag. Re-keys on `filePath`, so selecting another file in the tree disposes
+ * the old model and opens the new one. */
+export function EditorPane({ filePath }: { filePath: string | null }) {
+	const { workspaceRootPath } = useCanvasWorkspace();
+	const containerRef = useRef<HTMLDivElement>(null);
+	const [status, setStatus] = useState<Status>("empty");
+
+	useEffect(() => {
+		if (!filePath || !workspaceRootPath || !containerRef.current) {
+			setStatus("empty");
+			return;
+		}
+		const abs = joinPath(workspaceRootPath, filePath);
+		const container = containerRef.current;
+		let disposed = false;
+		let controller: FileEditorController | null = null;
+		let saveTimer: ReturnType<typeof setTimeout> | null = null;
+		setStatus("loading");
+
+		void (async () => {
+			try {
+				const { content } = await readEditorFile(abs);
+				if (disposed) return;
+				controller = await createFileEditor({ container, path: abs, content });
+				if (disposed) {
+					controller.dispose();
+					return;
+				}
+				controller.onDidChangeModelContent((value: string) => {
+					if (saveTimer) clearTimeout(saveTimer);
+					saveTimer = setTimeout(() => {
+						void writeEditorFile(abs, value).catch(() => {});
+					}, SAVE_DEBOUNCE_MS);
+				});
+				setStatus("ready");
+			} catch {
+				if (!disposed) setStatus("error");
+			}
+		})();
+
+		return () => {
+			disposed = true;
+			if (saveTimer) clearTimeout(saveTimer);
+			controller?.dispose();
+		};
+	}, [filePath, workspaceRootPath]);
+
+	if (!filePath) {
+		return (
+			<div className="flex size-full items-center justify-center p-4 text-center text-app-muted-foreground text-xs">
+				Select a file from the tree.
+			</div>
+		);
+	}
+
+	return (
+		<div className="relative size-full">
+			<div ref={containerRef} className="size-full" />
+			{status === "loading" ? (
+				<Overlay text="Loading…" />
+			) : status === "error" ? (
+				<Overlay text="Failed to open file." />
+			) : null}
+		</div>
+	);
+}
+
+function Overlay({ text }: { text: string }) {
+	return (
+		<div className="absolute inset-0 flex items-center justify-center text-app-muted-foreground text-xs">
+			{text}
+		</div>
+	);
+}

@@ -1,92 +1,82 @@
-import { useEffect, useRef, useState } from "react";
-import { readEditorFile, writeEditorFile } from "@/lib/api";
-import { createFileEditor } from "@/lib/monaco-runtime";
-import { useCanvasWorkspace } from "../canvas-workspace-context";
+import {
+	type PointerEvent as ReactPointerEvent,
+	useRef,
+	useState,
+} from "react";
 import { parsePanelConfig } from "../panel-config";
+import { usePanelConfigWriter } from "../use-panel-config-writer";
+import { EditorPane } from "./editor-pane";
+import { FileExplorer } from "./file-explorer";
 
-type FileEditorController = Awaited<ReturnType<typeof createFileEditor>>;
+const MIN_TREE_WIDTH = 160;
+const MAX_TREE_WIDTH = 520;
+const DEFAULT_TREE_WIDTH = 240;
 
-const SAVE_DEBOUNCE_MS = 600;
-
-function joinPath(root: string, rel: string): string {
-	return `${root.replace(/\/$/, "")}/${rel.replace(/^\//, "")}`;
-}
-
-type Status = "empty" | "loading" | "ready" | "error";
-
-/** Monaco file editor bound to one workspace-relative file (`config.filePath`).
- * Loads content from disk on mount and debounce-saves edits back.
- * `automaticLayout` handles panel resizes. */
-export function EditorPanelBody({ config }: { config: string }) {
-	const { workspaceRootPath } = useCanvasWorkspace();
-	const filePath = parsePanelConfig(config).filePath ?? null;
-	const containerRef = useRef<HTMLDivElement>(null);
-	const [status, setStatus] = useState<Status>("empty");
-
-	useEffect(() => {
-		if (!filePath || !workspaceRootPath || !containerRef.current) {
-			setStatus("empty");
-			return;
-		}
-		const abs = joinPath(workspaceRootPath, filePath);
-		const container = containerRef.current;
-		let disposed = false;
-		let controller: FileEditorController | null = null;
-		let saveTimer: ReturnType<typeof setTimeout> | null = null;
-		setStatus("loading");
-
-		void (async () => {
-			try {
-				const { content } = await readEditorFile(abs);
-				if (disposed) return;
-				controller = await createFileEditor({ container, path: abs, content });
-				if (disposed) {
-					controller.dispose();
-					return;
-				}
-				controller.onDidChangeModelContent((value: string) => {
-					if (saveTimer) clearTimeout(saveTimer);
-					saveTimer = setTimeout(() => {
-						void writeEditorFile(abs, value).catch(() => {});
-					}, SAVE_DEBOUNCE_MS);
-				});
-				setStatus("ready");
-			} catch {
-				if (!disposed) setStatus("error");
-			}
-		})();
-
-		return () => {
-			disposed = true;
-			if (saveTimer) clearTimeout(saveTimer);
-			controller?.dispose();
-		};
-	}, [filePath, workspaceRootPath]);
-
-	if (!filePath) {
-		return (
-			<div className="flex size-full items-center justify-center p-4 text-center text-app-muted-foreground text-xs">
-				No file open. Open one from a File-manager panel.
-			</div>
-		);
-	}
-
-	return (
-		<div className="relative size-full bg-app-base">
-			<div ref={containerRef} className="size-full" />
-			{status === "loading" ? (
-				<Overlay text="Loading…" />
-			) : status === "error" ? (
-				<Overlay text="Failed to open file." />
-			) : null}
-		</div>
+/** Combined file browser + editor. One panel, two panes: the Monaco editor on
+ * the left (content) and the workspace file tree on the right (files), split by
+ * a draggable divider. Selecting a file in the tree loads it into the editor
+ * and persists it as `config.filePath`, so a reload (or opening a file from the
+ * Git panel) reopens the same file. */
+export function EditorPanelBody({
+	nodeId,
+	config,
+}: {
+	nodeId: string;
+	config: string;
+}) {
+	const write = usePanelConfigWriter(nodeId, config);
+	const [selected, setSelected] = useState<string | null>(
+		() => parsePanelConfig(config).filePath ?? null,
 	);
-}
+	const [treeWidth, setTreeWidth] = useState(DEFAULT_TREE_WIDTH);
+	const rootRef = useRef<HTMLDivElement>(null);
 
-function Overlay({ text }: { text: string }) {
+	const selectFile = (filePath: string) => {
+		setSelected(filePath);
+		write({ filePath });
+	};
+
+	// Resize the explorer by dragging the divider. Width is measured from the
+	// panel's right edge so the tree grows leftward as the pointer moves left.
+	const onDividerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+		e.preventDefault();
+		e.stopPropagation(); // don't let React Flow start a pan/selection
+		const root = rootRef.current;
+		if (!root) return;
+		const rightEdge = root.getBoundingClientRect().right;
+		const onMove = (ev: PointerEvent) => {
+			const next = Math.min(
+				MAX_TREE_WIDTH,
+				Math.max(MIN_TREE_WIDTH, rightEdge - ev.clientX),
+			);
+			setTreeWidth(next);
+		};
+		const onUp = () => {
+			window.removeEventListener("pointermove", onMove);
+			window.removeEventListener("pointerup", onUp);
+		};
+		window.addEventListener("pointermove", onMove);
+		window.addEventListener("pointerup", onUp);
+	};
+
 	return (
-		<div className="absolute inset-0 flex items-center justify-center bg-app-base text-app-muted-foreground text-xs">
-			{text}
+		<div ref={rootRef} className="flex size-full">
+			<div className="min-w-0 flex-1">
+				<EditorPane filePath={selected} />
+			</div>
+			<div
+				className="w-1 shrink-0 cursor-col-resize bg-app-border transition-colors hover:bg-app-accent"
+				onPointerDown={onDividerDown}
+			/>
+			<div
+				className="shrink-0 overflow-hidden border-app-border border-l"
+				style={{ width: treeWidth }}
+			>
+				<FileExplorer
+					selectedPath={selected ?? undefined}
+					onSelect={selectFile}
+				/>
+			</div>
 		</div>
 	);
 }

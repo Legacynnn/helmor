@@ -291,6 +291,20 @@
 	--workspace-branch-status-inactive: var(--workspace-sidebar-status-neutral);
 	--plan: #48968c;
 
+	/* ── Canvas panes ──────────────────────────────────────────────────────
+	   These tokens are always defined OPAQUE (a solid hue per theme). The
+	   canvas Translucency slider derives any transparency at render time in
+	   panel-node, by mixing these tokens toward `transparent` for the panel
+	   *surfaces only* (body fill + header fill) and frosting the result with a
+	   backdrop blur — content/text never fades. Keep these opaque so a glass
+	   theme such as Vesper sets canvas *hue* here, never *alpha*; otherwise the
+	   window's translucency would bleed into panels the user never asked to
+	   fade. These are NOT the bg-app-* window tokens on purpose: those carry
+	   alpha in glass themes. */
+	--canvas-pane-bg: var(--bg-base);
+	--canvas-pane-header-bg: var(--bg-elevated);
+	--canvas-pane-terminal-bg: var(--terminal-chrome-bg);
+
 	/* Terminal ANSI palette (LOCKED) */
 	--terminal-background: var(--terminal-chrome-bg);
 	--terminal-foreground: var(--sidebar-fg);
@@ -894,6 +908,14 @@
 	   touch darker than the pane glass so the terminal still reads as a distinct
 	   surface. */
 	--terminal-chrome-bg: oklch(0.2 0.005 65 / 0.42);
+
+	/* Canvas panes stay OPAQUE under Vesper — the glass belongs to the window
+	   chrome and the canvas backdrop, not to the panels. Translucency on the
+	   canvas comes only from the Translucency slider. Warm near-black hues that
+	   match the Vesper palette, alpha forced to 1. */
+	--canvas-pane-bg: oklch(0.17 0.004 65);
+	--canvas-pane-header-bg: oklch(0.205 0.005 65);
+	--canvas-pane-terminal-bg: oklch(0.155 0.004 65);
 
 	/* Fullscreen-only CSS material. Native vibrancy cannot sample the desktop in
 	   its own Space, so these provide the in-window backdrop for backdrop-filter
