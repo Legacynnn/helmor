@@ -216,12 +216,12 @@ export function CableOverlay() {
 				onPointerDown={onPlugPointerDown}
 			>
 				{/* Larger invisible hit area for easy grabbing. */}
-				<circle r={16} fill="transparent" />
+				<circle r={14} fill="transparent" />
 				<circle
-					r={7}
+					r={3.5}
 					fill={PLUG_FILL}
 					stroke="rgba(0,0,0,0.45)"
-					strokeWidth={1.5}
+					strokeWidth={1}
 				/>
 			</g>
 		</svg>
