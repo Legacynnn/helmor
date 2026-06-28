@@ -123,7 +123,7 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 				isVisible={(selected || hovered) && !data.locked}
 				minWidth={PANEL_MIN_WIDTH}
 				minHeight={PANEL_MIN_HEIGHT}
-				lineClassName="!border-[var(--color-selected,#3b82f6)]"
+				lineClassName="!border-[var(--color-selected,#3b82f6)] !border-dashed"
 				handleClassName="!size-2 !rounded-[2px] !border-[var(--color-selected,#3b82f6)] !bg-app-base"
 			/>
 			{/* Edge endpoints — drag from the right (source) to another panel's
