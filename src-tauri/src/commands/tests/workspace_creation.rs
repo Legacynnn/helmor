@@ -230,6 +230,7 @@ fn prepare_local_workspace_keeps_current_branch_when_source_is_none() {
         None,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -298,6 +299,7 @@ fn prepare_local_workspace_switches_branch_when_source_differs() {
         Some("develop"),
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -346,6 +348,7 @@ fn prepare_local_workspace_checks_out_remote_only_branch_via_dwim() {
         Some("remote-only"),
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -677,6 +680,7 @@ fn prepare_local_workspace_rejects_dirty_tracked_changes() {
         Some("develop"),
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap_err();
     let msg = format!("{err:#}");
@@ -703,6 +707,7 @@ fn prepare_local_workspace_allows_untracked_files_when_switching_branch() {
         Some("develop"),
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     assert_eq!(response.branch, "develop");
@@ -725,6 +730,7 @@ fn prepare_local_workspace_rolls_back_db_when_checkout_fails() {
         Some(nonexistent),
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap_err();
     assert!(format!("{err:#}").to_lowercase().contains("checkout"));
@@ -750,6 +756,7 @@ fn finalize_workspace_from_repo_no_ops_for_local_workspace() {
         None,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -787,6 +794,7 @@ fn finalize_workspace_short_circuits_for_orphaned_initializing_local_row() {
         None,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     // Force the row back into Initializing to mimic the orphaned state.
@@ -1151,6 +1159,7 @@ fn execute_archive_plan_short_circuits_for_local_workspace() {
         None,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     fs::write(harness.source_repo_root.join("user.txt"), "important").unwrap();
@@ -1190,6 +1199,7 @@ fn archive_local_workspace_only_updates_db() {
         None,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     fs::write(harness.source_repo_root.join("user.txt"), "important").unwrap();
@@ -1231,6 +1241,7 @@ fn restore_local_workspace_only_flips_state() {
         None,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     workspaces::archive_workspace_impl(&prepared.workspace_id).unwrap();
@@ -1296,6 +1307,7 @@ fn validate_restore_local_workspace_short_circuits_to_no_conflict() {
         None,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     workspaces::archive_workspace_impl(&prepared.workspace_id).unwrap();
@@ -1317,6 +1329,7 @@ fn move_local_workspace_to_worktree_carries_uncommitted_changes() {
         None,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -1402,6 +1415,7 @@ fn move_local_workspace_to_worktree_works_on_clean_local() {
         None,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -2048,6 +2062,7 @@ fn prepare_local_workspace_with_backlog_initial_status_lands_in_backlog() {
         None,
         WorkspaceStatus::Backlog,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 

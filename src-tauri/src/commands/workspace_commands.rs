@@ -60,6 +60,7 @@ pub async fn prepare_workspace_from_repo(
                     source_branch.as_deref(),
                     initial_status,
                     seed_session_id.as_deref(),
+                    space,
                 )
             }
             crate::workspace_state::WorkspaceMode::Chat => {

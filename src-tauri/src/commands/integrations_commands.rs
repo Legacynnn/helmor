@@ -600,6 +600,7 @@ pub async fn create_workspace_from_task(
                 source_branch.as_deref(),
                 WorkspaceStatus::default(),
                 None,
+                crate::workspace_state::WorkspaceSpace::default(),
             ),
             WorkspaceMode::Chat => unreachable!("chat mode rejected above"),
         })

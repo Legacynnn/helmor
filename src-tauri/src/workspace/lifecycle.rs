@@ -312,6 +312,7 @@ pub fn prepare_local_workspace_impl(
     source_branch: Option<&str>,
     initial_status: WorkspaceStatus,
     seed_session_id: Option<&str>,
+    space: WorkspaceSpace,
 ) -> Result<PrepareWorkspaceResponse> {
     let repository = repos::load_repository_by_id(repo_id)?
         .with_context(|| format!("Repository not found: {repo_id}"))?;
@@ -363,7 +364,7 @@ pub fn prepare_local_workspace_impl(
         &target_branch,
         &base_branch,
         crate::workspace_state::WorkspaceMode::Local,
-        crate::workspace_state::WorkspaceSpace::default(),
+        space,
         WorkspaceBranchIntent::UseBranch,
         initial_status,
         &timestamp,
