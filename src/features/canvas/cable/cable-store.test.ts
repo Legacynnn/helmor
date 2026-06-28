@@ -9,7 +9,8 @@ describe("cable-store", () => {
 		const active = useCableStore.getState().active;
 		expect(active?.sourcePaneId).toBe("pane-a");
 		expect(active?.anchor).toEqual({ x: 10, y: 20 });
-		expect(active?.dragging).toBe(false);
+		// Spawns in following mode so the plug tracks the cursor immediately.
+		expect(active?.dragging).toBe(true);
 		expect(active?.pluggedTargetId).toBeNull();
 	});
 

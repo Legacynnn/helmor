@@ -19,7 +19,9 @@ export type ActiveCable = {
 
 type CableStore = {
 	active: ActiveCable | null;
-	/** Start a new cable from `sourcePaneId`, anchored at `anchor`. */
+	/** Start a new cable from `sourcePaneId`, anchored at `anchor`. Spawns in
+	 * "following" mode (`dragging: true`) so the plug tracks the cursor right
+	 * away until the user clicks a pane to plug in or cancels. */
 	spawn: (sourcePaneId: string, anchor: Vec) => void;
 	setDragging: (dragging: boolean) => void;
 	/** Move the plug (flow coords) and set the hovered drop target. */
@@ -39,8 +41,8 @@ export const useCableStore = create<CableStore>((set) => ({
 			active: {
 				sourcePaneId,
 				anchor,
-				plug: { x: anchor.x + 180, y: anchor.y + 60 },
-				dragging: false,
+				plug: { x: anchor.x + 80, y: anchor.y + 40 },
+				dragging: true,
 				hoveredTargetId: null,
 				pluggedTargetId: null,
 			},

@@ -10,10 +10,20 @@ import {
 	type Vec,
 } from "./verlet-rope";
 
-const SELECTED_COLOR = "var(--color-selected, #3b82f6)";
 const SEGMENTS = 24;
+// Grayish cable palette. The cable reads as a neutral wire; the only accent is
+// a subtle brighten when it's hovering a valid drop target.
+const CABLE_COLOR = "#9ca3af"; // gray-400
+const CABLE_HOVER_COLOR = "#e5e7eb"; // gray-200
+const PLUG_FILL = "#9ca3af";
+const PLUG_HOVER_FILL = "#e5e7eb";
 
-/** Renders the active connect cable as a draggable physics rope over the canvas.
+/** Renders the active connect cable as a physics rope over the canvas. Clicking
+ * Connect spawns it in "following" mode: the plug tracks the cursor (no need to
+ * grab the small head) until the user clicks a pane to plug in, or cancels with
+ * Escape / the Connect toggle. The cable attaches to whichever edge of each pane
+ * (top/right/bottom/left) faces the other end.
+ *
  * Simulates in flow coordinates and projects to screen via the live viewport so
  * the cable pans/zooms with the panes. Drawing is imperative (no per-frame React
  * re-render); only mount/unmount is driven by store state.
@@ -45,6 +55,51 @@ export function CableOverlay() {
 		ropeRef.current = createRope(active.anchor, active.plug, SEGMENTS);
 	}, [hasActive, sourceId]);
 
+	// While following the cursor, drive the plug from window-level pointer events
+	// (so the user doesn't have to grab the small plug head). A click over a pane
+	// plugs in; Escape cancels. Clicking empty space keeps following.
+	useEffect(() => {
+		if (!hasActive) return;
+
+		const onMove = (e: PointerEvent) => {
+			const store = useCableStore.getState();
+			const a = store.active;
+			if (!a?.dragging) return;
+			const flow = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+			store.updatePlug(flow, paneAt(rf, flow, a.sourcePaneId));
+		};
+
+		const onDown = (e: PointerEvent) => {
+			const store = useCableStore.getState();
+			const a = store.active;
+			if (!a?.dragging) return;
+			const flow = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+			const target = paneAt(rf, flow, a.sourcePaneId);
+			if (!target) return; // clicked empty space — keep following
+			const node = rf.getNode(target);
+			if (!node) return;
+			// Snap to the target edge facing the source pane.
+			const src = rf.getNode(a.sourcePaneId);
+			const from = src ? rectCenter(rectOf(src)) : flow;
+			store.plugInto(target, nearestEdgeMidpoint(rectOf(node), from));
+			e.preventDefault();
+			e.stopPropagation();
+		};
+
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === "Escape") useCableStore.getState().cancel();
+		};
+
+		window.addEventListener("pointermove", onMove);
+		window.addEventListener("pointerdown", onDown, true);
+		window.addEventListener("keydown", onKey);
+		return () => {
+			window.removeEventListener("pointermove", onMove);
+			window.removeEventListener("pointerdown", onDown, true);
+			window.removeEventListener("keydown", onKey);
+		};
+	}, [hasActive, rf]);
+
 	// rAF simulation + draw loop, alive only while a cable is active.
 	useEffect(() => {
 		if (!hasActive) return;
@@ -59,27 +114,22 @@ export function CableOverlay() {
 			const nodes = rf.getNodes();
 			const vp = rf.getViewport();
 
-			// Source anchor follows the source pane's right-edge midpoint.
+			const pinned = active.dragging || active.pluggedTargetId !== null;
+			const plugPoint = pinned
+				? active.plug
+				: rope.points[rope.points.length - 1];
+
+			// Source anchor attaches to whichever source edge faces the plug.
 			const src = nodes.find((n) => n.id === active.sourcePaneId);
 			const anchor: Vec = src
-				? {
-						x: src.position.x + nodeWidth(src),
-						y: src.position.y + nodeHeight(src) / 2,
-					}
+				? nearestEdgeMidpoint(rectOf(src), plugPoint)
 				: active.anchor;
 
 			// Colliders: every pane rectangle except the source.
 			const colliders: Rect[] = nodes
 				.filter((n) => n.id !== active.sourcePaneId)
-				.map((n) => ({
-					x: n.position.x,
-					y: n.position.y,
-					w: nodeWidth(n),
-					h: nodeHeight(n),
-				}));
+				.map(rectOf);
 
-			// Pin the plug only while dragging or plugged; otherwise it dangles.
-			const pinned = active.dragging || active.pluggedTargetId !== null;
 			step(rope, {
 				anchor,
 				plug: pinned ? active.plug : null,
@@ -93,8 +143,17 @@ export function CableOverlay() {
 				y: p.y * vp.zoom + vp.y,
 			});
 			const pts = rope.points.map(toScreen);
+			const hovering = active.hoveredTargetId !== null;
+			const following = active.dragging && active.pluggedTargetId === null;
+
 			if (pathRef.current) {
-				pathRef.current.setAttribute("d", smoothPath(pts));
+				const path = pathRef.current;
+				path.setAttribute("d", smoothPath(pts));
+				path.setAttribute("stroke", hovering ? CABLE_HOVER_COLOR : CABLE_COLOR);
+				// Armed/following cable is dashed + lighter to read as "in progress";
+				// a plugged or settled cable is solid.
+				path.setAttribute("stroke-dasharray", following ? "2 9" : "0");
+				path.setAttribute("opacity", following ? "0.8" : "0.95");
 			}
 			if (plugRef.current) {
 				const tip = pts[pts.length - 1];
@@ -103,9 +162,9 @@ export function CableOverlay() {
 					`translate(${tip.x}, ${tip.y})`,
 				);
 				plugRef.current.style.fill =
-					active.hoveredTargetId !== null || active.pluggedTargetId !== null
-						? SELECTED_COLOR
-						: "#cbd5e1";
+					hovering || active.pluggedTargetId !== null
+						? PLUG_HOVER_FILL
+						: PLUG_FILL;
 			}
 		};
 
@@ -115,40 +174,11 @@ export function CableOverlay() {
 
 	if (!hasActive) return null;
 
+	// Re-grab a settled/plugged cable to move its plug again (re-enters follow).
 	const onPlugPointerDown = (e: React.PointerEvent) => {
 		e.stopPropagation();
 		e.preventDefault();
-		(e.target as Element).setPointerCapture?.(e.pointerId);
 		useCableStore.getState().setDragging(true);
-	};
-
-	const onPlugPointerMove = (e: React.PointerEvent) => {
-		const store = useCableStore.getState();
-		if (!store.active?.dragging) return;
-		const flow = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-		const target = paneAt(rf, flow, store.active.sourcePaneId);
-		store.updatePlug(flow, target);
-	};
-
-	const onPlugPointerUp = (e: React.PointerEvent) => {
-		(e.target as Element).releasePointerCapture?.(e.pointerId);
-		const store = useCableStore.getState();
-		if (!store.active) return;
-		const flow = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-		const target = paneAt(rf, flow, store.active.sourcePaneId);
-		if (target) {
-			// Snap to the target pane's left-edge midpoint (decorative plug-in).
-			const node = rf.getNode(target);
-			if (node) {
-				store.plugInto(target, {
-					x: node.position.x,
-					y: node.position.y + nodeHeight(node) / 2,
-				});
-				return;
-			}
-		}
-		// Released over empty space: let the plug fall and dangle.
-		store.setDragging(false);
 	};
 
 	return (
@@ -160,7 +190,7 @@ export function CableOverlay() {
 			<path
 				ref={pathRef}
 				fill="none"
-				stroke={SELECTED_COLOR}
+				stroke={CABLE_COLOR}
 				strokeWidth={4}
 				strokeLinecap="round"
 				opacity={0.9}
@@ -169,15 +199,13 @@ export function CableOverlay() {
 				ref={plugRef}
 				className="pointer-events-auto cursor-grab"
 				onPointerDown={onPlugPointerDown}
-				onPointerMove={onPlugPointerMove}
-				onPointerUp={onPlugPointerUp}
 			>
 				{/* Larger invisible hit area for easy grabbing. */}
 				<circle r={16} fill="transparent" />
 				<circle
 					r={7}
-					fill="#cbd5e1"
-					stroke="rgba(0,0,0,0.4)"
+					fill={PLUG_FILL}
+					stroke="rgba(0,0,0,0.45)"
 					strokeWidth={1.5}
 				/>
 			</g>
@@ -199,6 +227,41 @@ function nodeHeight(n: {
 	return n.measured?.height ?? n.height ?? PANEL_DEFAULT_HEIGHT;
 }
 
+/** Flow-coordinate rectangle for a React Flow node. */
+function rectOf(n: {
+	position: { x: number; y: number };
+	measured?: { width?: number; height?: number };
+	width?: number;
+	height?: number;
+}): Rect {
+	return {
+		x: n.position.x,
+		y: n.position.y,
+		w: nodeWidth(n),
+		h: nodeHeight(n),
+	};
+}
+
+function rectCenter(r: Rect): Vec {
+	return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+}
+
+/** Midpoint of the rectangle edge (top/right/bottom/left) that faces `toward`.
+ * Compares the direction from the rect center against its half-extents so the
+ * choice respects the pane's aspect ratio. */
+function nearestEdgeMidpoint(r: Rect, toward: Vec): Vec {
+	const cx = r.x + r.w / 2;
+	const cy = r.y + r.h / 2;
+	const dx = toward.x - cx;
+	const dy = toward.y - cy;
+	const ax = Math.abs(dx) / (r.w / 2 || 1);
+	const ay = Math.abs(dy) / (r.h / 2 || 1);
+	if (ax >= ay) {
+		return dx >= 0 ? { x: r.x + r.w, y: cy } : { x: r.x, y: cy };
+	}
+	return dy >= 0 ? { x: cx, y: r.y + r.h } : { x: cx, y: r.y };
+}
+
 /** Topmost pane containing `flow`, excluding the source pane. */
 function paneAt(
 	rf: ReturnType<typeof useReactFlow>,
@@ -209,13 +272,12 @@ function paneAt(
 	for (let i = nodes.length - 1; i >= 0; i--) {
 		const n = nodes[i];
 		if (n.id === sourceId) continue;
-		const w = nodeWidth(n);
-		const h = nodeHeight(n);
+		const r = rectOf(n);
 		if (
-			flow.x >= n.position.x &&
-			flow.x <= n.position.x + w &&
-			flow.y >= n.position.y &&
-			flow.y <= n.position.y + h
+			flow.x >= r.x &&
+			flow.x <= r.x + r.w &&
+			flow.y >= r.y &&
+			flow.y <= r.y + r.h
 		) {
 			return n.id;
 		}
