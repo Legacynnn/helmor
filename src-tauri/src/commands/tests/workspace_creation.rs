@@ -1457,6 +1457,52 @@ fn move_local_workspace_to_worktree_rejects_worktree_mode_workspace() {
 }
 
 #[test]
+fn canvas_space_persists_through_create() {
+    // Regression guard for the `workspaces.space` column: the space choice
+    // passed into prepare must survive the insert and read back on the
+    // WorkspaceRecord. Mirrors the prepare/finalize tests above but threads
+    // a non-default `WorkspaceSpace` through the last param.
+    use crate::workspace_state::WorkspaceSpace;
+
+    let _guard = TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let harness = CreateTestHarness::new();
+
+    // Canvas space round-trips.
+    let canvas = workspaces::prepare_workspace_from_repo_impl(
+        &harness.repo_id,
+        None,
+        WorkspaceBranchIntent::FromBranch,
+        WorkspaceStatus::InProgress,
+        None,
+        WorkspaceSpace::Canvas,
+    )
+    .unwrap();
+    let canvas_record =
+        crate::models::workspaces::load_workspace_record_by_id(&canvas.workspace_id)
+            .unwrap()
+            .expect("canvas workspace record should exist");
+    assert_eq!(canvas_record.space, WorkspaceSpace::Canvas);
+
+    // Default (Normal) space also reads back correctly.
+    let normal = workspaces::prepare_workspace_from_repo_impl(
+        &harness.repo_id,
+        None,
+        WorkspaceBranchIntent::FromBranch,
+        WorkspaceStatus::InProgress,
+        None,
+        WorkspaceSpace::default(),
+    )
+    .unwrap();
+    let normal_record =
+        crate::models::workspaces::load_workspace_record_by_id(&normal.workspace_id)
+            .unwrap()
+            .expect("normal workspace record should exist");
+    assert_eq!(normal_record.space, WorkspaceSpace::Normal);
+}
+
+#[test]
 fn create_and_checkout_branch_creates_new_local_ref_and_switches_head() {
     let _guard = TEST_LOCK
         .lock()
