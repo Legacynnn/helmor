@@ -943,6 +943,17 @@ fn import_workspace_column_lists(conn: &Connection) -> Result<(String, String)> 
             });
             continue;
         }
+        // `space` is NOT NULL in main; older Conductor DBs (or CREATE-TABLE-AS-SELECT
+        // source tables) leave it NULL or absent, so coalesce to the default.
+        if col == "space" {
+            main_parts.push(col.clone());
+            source_parts.push(if source_set.contains("space") {
+                "COALESCE(space, 'normal') AS space".to_string()
+            } else {
+                "'normal' AS space".to_string()
+            });
+            continue;
+        }
         if col == "ai_priming_consumed" {
             main_parts.push(col.clone());
             source_parts.push(if source_set.contains("ai_priming_consumed") {
