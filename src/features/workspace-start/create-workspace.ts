@@ -80,6 +80,7 @@ export async function createWorkspaceFromStartComposer({
 					repoId,
 					sourceBranch,
 					mode,
+					null,
 					branchIntent ?? null,
 					initialStatus,
 					seedSessionId,

@@ -83,6 +83,7 @@ export type WorkspaceRow = {
 	repoInitials?: string | null;
 	state?: WorkspaceState;
 	mode?: WorkspaceMode;
+	space?: WorkspaceSpace;
 	hasUnread?: boolean;
 	workspaceUnread?: number;
 	unreadSessionCount?: number;
@@ -2135,6 +2136,11 @@ export async function moveLocalWorkspaceToWorktree(
  */
 export type WorkspaceMode = "worktree" | "local" | "chat";
 
+/** Mirror of the Rust `WorkspaceSpace` enum (`src-tauri/src/workspace/state.rs`).
+ *  Which "world" a workspace lives in: the classic chat layout (`normal`) or
+ *  the full-bleed infinite canvas (`canvas`). Distinct from `WorkspaceMode`. */
+export type WorkspaceSpace = "normal" | "canvas";
+
 /** `from_branch`: fork off the picked base. `use_branch`: attach to it. */
 export type WorkspaceBranchIntent = "from_branch" | "use_branch";
 
@@ -3807,6 +3813,7 @@ export async function prepareWorkspaceFromRepo(
 	repoId: string,
 	sourceBranch?: string | null,
 	mode?: WorkspaceMode | null,
+	space?: WorkspaceSpace | null,
 	branchIntent?: WorkspaceBranchIntent | null,
 	initialStatus?: WorkspaceStatus | null,
 	/** Pre-allocated session UUID, so pre-submit paste-cache files
@@ -3818,6 +3825,7 @@ export async function prepareWorkspaceFromRepo(
 		repoId,
 		sourceBranch: sourceBranch ?? null,
 		mode: mode ?? null,
+		space: space ?? null,
 		branchIntent: branchIntent ?? null,
 		initialStatus: initialStatus ?? null,
 		seedSessionId: seedSessionId ?? null,
@@ -3849,10 +3857,12 @@ export async function prepareChatWorkspace(
 	initialStatus?: WorkspaceStatus | null,
 	/** See `prepareWorkspaceFromRepo`'s `seedSessionId`. */
 	seedSessionId?: string | null,
+	space?: WorkspaceSpace | null,
 ): Promise<PrepareWorkspaceResponse> {
 	return invoke<PrepareWorkspaceResponse>("prepare_chat_workspace", {
 		initialStatus: initialStatus ?? null,
 		seedSessionId: seedSessionId ?? null,
+		space: space ?? null,
 	});
 }
 
