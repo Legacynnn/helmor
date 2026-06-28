@@ -45,6 +45,9 @@ export type CommonPanelConfig = {
 	/** Per-panel translucency override (0..1). When unset the panel inherits
 	 * the canvas-wide translucency. */
 	opacity?: number;
+	/** Custom ⌘+digit keyboard binding (1–9). Absent = auto-assigned by
+	 * creation order. */
+	binding?: number;
 };
 
 export type PanelConfig = ConversationPanelConfig &
