@@ -7,7 +7,7 @@ use crate::{
     repos,
     workspace::sidebar_order,
     workspace_pr_sync::PrSyncState,
-    workspace_state::{WorkspaceBranchIntent, WorkspaceMode, WorkspaceState},
+    workspace_state::{WorkspaceBranchIntent, WorkspaceMode, WorkspaceSpace, WorkspaceState},
     workspace_status::WorkspaceStatus,
 };
 
@@ -31,6 +31,7 @@ pub struct WorkspaceRecord {
     pub initialization_parent_branch: Option<String>,
     pub intended_target_branch: Option<String>,
     pub mode: WorkspaceMode,
+    pub space: WorkspaceSpace,
     /// `FromBranch`: workspace owns the branch (safe to delete on archive).
     /// `UseBranch`: branch is reused, must not be deleted.
     pub branch_intent: WorkspaceBranchIntent,
@@ -199,7 +200,8 @@ pub const WORKSPACE_RECORD_SQL: &str = r#"
       COALESCE(w.kind, 'manual') AS kind,
       COALESCE(w.ai_priming_consumed, 0) AS ai_priming_consumed,
       w.triage_source_type,
-      w.parent_workspace_id
+      w.parent_workspace_id,
+      COALESCE(w.space, 'normal') AS space
     FROM workspaces w
     JOIN repos r ON r.id = w.repository_id
     LEFT JOIN sessions s ON s.id = w.active_session_id
@@ -270,6 +272,7 @@ pub(crate) fn insert_initializing_workspace_and_session(
         branch,
         default_branch,
         WorkspaceMode::Worktree,
+        WorkspaceSpace::default(),
         branch_intent,
         status,
         timestamp,
@@ -285,6 +288,7 @@ pub(crate) fn insert_initializing_workspace_and_session_with_mode(
     branch: &str,
     default_branch: &str,
     mode: WorkspaceMode,
+    space: WorkspaceSpace,
     branch_intent: WorkspaceBranchIntent,
     status: WorkspaceStatus,
     timestamp: &str,
@@ -320,13 +324,14 @@ pub(crate) fn insert_initializing_workspace_and_session_with_mode(
               initialization_parent_branch,
               intended_target_branch,
               mode,
+              space,
               branch_intent,
               display_order,
               status,
               unread,
               created_at,
               updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 0, ?13, ?13)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 0, ?14, ?14)
             "#,
             (
                 workspace_id,
@@ -338,6 +343,7 @@ pub(crate) fn insert_initializing_workspace_and_session_with_mode(
                 default_branch,
                 default_branch,
                 mode,
+                space,
                 branch_intent,
                 next_order,
                 status,
@@ -419,13 +425,14 @@ pub(crate) fn insert_chat_workspace_and_session(
               initialization_parent_branch,
               intended_target_branch,
               mode,
+              space,
               branch_intent,
               display_order,
               status,
               unread,
               created_at,
               updated_at
-            ) VALUES (?1, ?2, ?3, ?4, NULL, ?5, NULL, NULL, ?6, ?7, ?8, ?9, 0, ?10, ?10)
+            ) VALUES (?1, ?2, ?3, ?4, NULL, ?5, NULL, NULL, ?6, ?7, ?8, ?9, ?10, 0, ?11, ?11)
             "#,
             (
                 workspace_id,
@@ -434,6 +441,7 @@ pub(crate) fn insert_chat_workspace_and_session(
                 session_id,
                 WorkspaceState::Initializing,
                 WorkspaceMode::Chat,
+                WorkspaceSpace::default(),
                 WorkspaceBranchIntent::UseBranch,
                 next_order,
                 status,
@@ -713,6 +721,7 @@ fn workspace_record_from_row(row: &Row<'_>) -> rusqlite::Result<WorkspaceRecord>
         initialization_parent_branch: row.get(13)?,
         intended_target_branch: row.get(14)?,
         mode: row.get(15)?,
+        space: row.get(45)?,
         branch_intent: row.get(16)?,
         pinned_at: row.get(17)?,
         active_session_id: row.get(18)?,

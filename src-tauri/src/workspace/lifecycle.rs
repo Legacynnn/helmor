@@ -360,6 +360,7 @@ pub fn prepare_local_workspace_impl(
         &target_branch,
         &base_branch,
         crate::workspace_state::WorkspaceMode::Local,
+        crate::workspace_state::WorkspaceSpace::default(),
         WorkspaceBranchIntent::UseBranch,
         initial_status,
         &timestamp,
