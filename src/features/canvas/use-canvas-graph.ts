@@ -190,9 +190,10 @@ export function useCanvasGraph(
 				if (instanceId) closeTerminal(instanceId);
 			}
 			useConnectionsStore.getState().pruneForPanel(id);
-			// Drop the transient connect cable too if it was anchored on this pane,
-			// otherwise its rAF loop runs forever with no cancel affordance.
-			if (useCableStore.getState().active?.sourcePaneId === id) {
+			// Drop the transient connect cable too if either of its ends was on this
+			// pane, otherwise it dangles (and its rAF loop runs) with no affordance.
+			const cable = useCableStore.getState().active;
+			if (cable?.sourcePaneId === id || cable?.pluggedTargetId === id) {
 				useCableStore.getState().cancel();
 			}
 			// Chain the delete AFTER any save already queued/in-flight for this id,

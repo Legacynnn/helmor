@@ -114,28 +114,43 @@ export function CableOverlay() {
 			const nodes = rf.getNodes();
 			const vp = rf.getViewport();
 
-			const pinned = active.dragging || active.pluggedTargetId !== null;
-			const plugPoint = pinned
-				? active.plug
-				: rope.points[rope.points.length - 1];
-
-			// Source anchor attaches to whichever source edge faces the plug.
 			const src = nodes.find((n) => n.id === active.sourcePaneId);
+			const tgt = active.pluggedTargetId
+				? nodes.find((n) => n.id === active.pluggedTargetId)
+				: undefined;
+
+			// Where the plug is pinned this frame (null = free/dangling):
+			//  - plugged: recompute from the target pane's facing edge every frame,
+			//    so the wire follows the target when it's dragged around;
+			//  - following: the live cursor position;
+			//  - otherwise: unpinned.
+			let plug: Vec | null;
+			if (active.pluggedTargetId) {
+				const srcCenter = src ? rectCenter(rectOf(src)) : active.anchor;
+				plug = tgt ? nearestEdgeMidpoint(rectOf(tgt), srcCenter) : active.plug;
+			} else if (active.dragging) {
+				plug = active.plug;
+			} else {
+				plug = null;
+			}
+
+			// Source anchor attaches to whichever source edge faces the plug — so
+			// moving the source pane also moves its end of the wire.
+			const plugPoint = plug ?? rope.points[rope.points.length - 1];
 			const anchor: Vec = src
 				? nearestEdgeMidpoint(rectOf(src), plugPoint)
 				: active.anchor;
 
-			// Colliders: every pane rectangle except the source.
+			// Colliders: every pane except the cable's own endpoint panes (source
+			// and the plugged target), so the rope doesn't fight what it's tied to.
 			const colliders: Rect[] = nodes
-				.filter((n) => n.id !== active.sourcePaneId)
+				.filter(
+					(n) =>
+						n.id !== active.sourcePaneId && n.id !== active.pluggedTargetId,
+				)
 				.map(rectOf);
 
-			step(rope, {
-				anchor,
-				plug: pinned ? active.plug : null,
-				colliders,
-				gravity: 0.6,
-			});
+			step(rope, { anchor, plug, colliders, gravity: 0.6 });
 
 			// Project flow → screen and draw.
 			const toScreen = (p: { x: number; y: number }) => ({
