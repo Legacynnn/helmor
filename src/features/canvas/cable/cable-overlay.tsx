@@ -16,7 +16,14 @@ const SEGMENTS = 24;
 /** Renders the active connect cable as a draggable physics rope over the canvas.
  * Simulates in flow coordinates and projects to screen via the live viewport so
  * the cable pans/zooms with the panes. Drawing is imperative (no per-frame React
- * re-render); only mount/unmount is driven by store state. */
+ * re-render); only mount/unmount is driven by store state.
+ *
+ * IMPORTANT: mount this as a direct child of the same element the React Flow
+ * pane fills (the canvas `wrapperRef` div), so the SVG's `inset-0` origin
+ * coincides with the pane origin. The draw path projects flow→screen relative
+ * to the pane, while pointer input uses `screenToFlowPosition` (client-rect
+ * relative); the two are exact inverses only when the SVG overlays the pane
+ * with zero offset. */
 export function CableOverlay() {
 	const rf = useReactFlow();
 	const hasActive = useCableStore((s) => s.active !== null);
@@ -167,7 +174,12 @@ export function CableOverlay() {
 			>
 				{/* Larger invisible hit area for easy grabbing. */}
 				<circle r={16} fill="transparent" />
-				<circle r={7} stroke="rgba(0,0,0,0.4)" strokeWidth={1.5} />
+				<circle
+					r={7}
+					fill="#cbd5e1"
+					stroke="rgba(0,0,0,0.4)"
+					strokeWidth={1.5}
+				/>
 			</g>
 		</svg>
 	);
