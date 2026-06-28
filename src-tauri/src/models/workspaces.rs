@@ -253,33 +253,6 @@ pub fn load_archived_workspace_records() -> Result<Vec<WorkspaceRecord>> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn insert_initializing_workspace_and_session(
-    repository: &repos::RepositoryRecord,
-    workspace_id: &str,
-    session_id: &str,
-    directory_name: &str,
-    branch: &str,
-    default_branch: &str,
-    branch_intent: WorkspaceBranchIntent,
-    status: WorkspaceStatus,
-    timestamp: &str,
-) -> Result<()> {
-    insert_initializing_workspace_and_session_with_mode(
-        repository,
-        workspace_id,
-        session_id,
-        directory_name,
-        branch,
-        default_branch,
-        WorkspaceMode::Worktree,
-        WorkspaceSpace::default(),
-        branch_intent,
-        status,
-        timestamp,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn insert_initializing_workspace_and_session_with_mode(
     repository: &repos::RepositoryRecord,
     workspace_id: &str,
@@ -385,11 +358,13 @@ pub(crate) fn insert_initializing_workspace_and_session_with_mode(
 /// `directory_name` stores the relative scratch path
 /// (`"YYYY-MM-DD/new-chat[-N]"`); `helpers::workspace_path` joins it
 /// under `chats_dir` to resolve the absolute cwd at read time.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn insert_chat_workspace_and_session(
     repository: &repos::RepositoryRecord,
     workspace_id: &str,
     session_id: &str,
     directory_name: &str,
+    space: WorkspaceSpace,
     status: WorkspaceStatus,
     timestamp: &str,
 ) -> Result<()> {
@@ -441,7 +416,7 @@ pub(crate) fn insert_chat_workspace_and_session(
                 session_id,
                 WorkspaceState::Initializing,
                 WorkspaceMode::Chat,
-                WorkspaceSpace::default(),
+                space,
                 WorkspaceBranchIntent::UseBranch,
                 next_order,
                 status,

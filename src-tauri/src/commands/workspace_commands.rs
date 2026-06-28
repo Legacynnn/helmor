@@ -25,16 +25,19 @@ fn notify_workspace_changed_in_background(app: AppHandle) {
 /// row, so pre-submit paste-cache files (`cache/paste/<seed>/`) survive
 /// submit. Backend mints one when absent.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn prepare_workspace_from_repo(
     app: AppHandle,
     repo_id: String,
     source_branch: Option<String>,
     mode: Option<crate::workspace_state::WorkspaceMode>,
+    space: Option<crate::workspace_state::WorkspaceSpace>,
     branch_intent: Option<crate::workspace_state::WorkspaceBranchIntent>,
     initial_status: Option<WorkspaceStatus>,
     seed_session_id: Option<String>,
 ) -> CmdResult<workspaces::PrepareWorkspaceResponse> {
     let mode = mode.unwrap_or_default();
+    let space = space.unwrap_or_default();
     let branch_intent = branch_intent.unwrap_or_default();
     let initial_status = initial_status.unwrap_or_default();
     let result = {
@@ -47,6 +50,7 @@ pub async fn prepare_workspace_from_repo(
                     branch_intent,
                     initial_status,
                     seed_session_id.as_deref(),
+                    space,
                 )
             }
             crate::workspace_state::WorkspaceMode::Local => {
@@ -80,14 +84,20 @@ pub async fn prepare_workspace_from_repo(
 #[tauri::command]
 pub async fn prepare_chat_workspace(
     app: AppHandle,
+    space: Option<crate::workspace_state::WorkspaceSpace>,
     initial_status: Option<WorkspaceStatus>,
     seed_session_id: Option<String>,
 ) -> CmdResult<workspaces::PrepareWorkspaceResponse> {
     let initial_status = initial_status.unwrap_or_default();
+    let space = space.unwrap_or_default();
     let result = {
         let _lock = db::WORKSPACE_FS_MUTATION_LOCK.lock().await;
         run_blocking(move || {
-            workspaces::prepare_chat_workspace_impl(initial_status, seed_session_id.as_deref())
+            workspaces::prepare_chat_workspace_impl(
+                initial_status,
+                seed_session_id.as_deref(),
+                space,
+            )
         })
         .await?
     };

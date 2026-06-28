@@ -235,8 +235,8 @@ async fn dispatch(
         }
         "prefetch_remote_refs" => to_value(crate::commands::workspace_commands::prefetch_remote_refs(arg_opt_string(&args, "workspaceId"), arg_opt_string(&args, "repoId")).await?),
         "prepare_archive_workspace" => to_value(crate::commands::workspace_commands::prepare_archive_workspace(app.clone(), arg_string(&args, "workspaceId")?).await?),
-        "prepare_chat_workspace" => to_value(crate::commands::workspace_commands::prepare_chat_workspace(app.clone(), arg_opt_json(&args, "initialStatus")?, arg_opt_string(&args, "seedSessionId")).await?),
-        "prepare_workspace_from_repo" => to_value(crate::commands::workspace_commands::prepare_workspace_from_repo(app.clone(), arg_string(&args, "repoId")?, arg_opt_string(&args, "sourceBranch"), arg_opt_json(&args, "mode")?, arg_opt_json(&args, "branchIntent")?, arg_opt_json(&args, "initialStatus")?, arg_opt_string(&args, "seedSessionId")).await?),
+        "prepare_chat_workspace" => to_value(crate::commands::workspace_commands::prepare_chat_workspace(app.clone(), arg_opt_json(&args, "space")?, arg_opt_json(&args, "initialStatus")?, arg_opt_string(&args, "seedSessionId")).await?),
+        "prepare_workspace_from_repo" => to_value(crate::commands::workspace_commands::prepare_workspace_from_repo(app.clone(), arg_string(&args, "repoId")?, arg_opt_string(&args, "sourceBranch"), arg_opt_json(&args, "mode")?, arg_opt_json(&args, "space")?, arg_opt_json(&args, "branchIntent")?, arg_opt_json(&args, "initialStatus")?, arg_opt_string(&args, "seedSessionId")).await?),
         "prewarm_slash_commands_for_repo" => {
             crate::agents::prewarm_slash_commands_for_repo(app.clone(), arg_string(&args, "repoId")?).await?;
             Ok(Value::Null)

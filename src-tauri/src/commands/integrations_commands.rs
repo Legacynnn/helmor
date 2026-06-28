@@ -523,7 +523,11 @@ pub async fn review_task_with_agent(
     let prepared = {
         let _lock = db::WORKSPACE_FS_MUTATION_LOCK.lock().await;
         run_blocking(move || {
-            crate::workspaces::prepare_chat_workspace_impl(WorkspaceStatus::default(), None)
+            crate::workspaces::prepare_chat_workspace_impl(
+                WorkspaceStatus::default(),
+                None,
+                crate::workspace_state::WorkspaceSpace::default(),
+            )
         })
         .await?
     };
@@ -589,6 +593,7 @@ pub async fn create_workspace_from_task(
                 WorkspaceBranchIntent::default(),
                 WorkspaceStatus::default(),
                 None,
+                crate::workspace_state::WorkspaceSpace::default(),
             ),
             WorkspaceMode::Local => crate::workspaces::prepare_local_workspace_impl(
                 &repo_id,

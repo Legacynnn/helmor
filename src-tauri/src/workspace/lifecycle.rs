@@ -14,7 +14,7 @@ use crate::{
     git_ops, helpers,
     models::workspaces as workspace_models,
     repos,
-    workspace_state::{WorkspaceBranchIntent, WorkspaceMode, WorkspaceState},
+    workspace_state::{WorkspaceBranchIntent, WorkspaceMode, WorkspaceSpace, WorkspaceState},
     workspace_status::WorkspaceStatus,
 };
 
@@ -148,6 +148,7 @@ pub fn prepare_workspace_from_repo_impl(
     branch_intent: WorkspaceBranchIntent,
     initial_status: WorkspaceStatus,
     seed_session_id: Option<&str>,
+    space: WorkspaceSpace,
 ) -> Result<PrepareWorkspaceResponse> {
     let repository = repos::load_repository_by_id(repo_id)?
         .with_context(|| format!("Repository not found: {repo_id}"))?;
@@ -214,13 +215,15 @@ pub fn prepare_workspace_from_repo_impl(
     let session_id = resolve_seed_session_id(seed_session_id);
     let timestamp = db::current_timestamp()?;
 
-    workspace_models::insert_initializing_workspace_and_session(
+    workspace_models::insert_initializing_workspace_and_session_with_mode(
         &repository,
         &workspace_id,
         &session_id,
         &directory_name,
         &branch,
         &base_branch,
+        WorkspaceMode::Worktree,
+        space,
         branch_intent,
         initial_status,
         &timestamp,
@@ -430,6 +433,7 @@ pub fn prepare_local_workspace_impl(
 pub fn prepare_chat_workspace_impl(
     initial_status: WorkspaceStatus,
     seed_session_id: Option<&str>,
+    space: WorkspaceSpace,
 ) -> Result<PrepareWorkspaceResponse> {
     // Lazy-upsert the synthetic `__chat__` repo row on first chat
     // creation. Doing it here (rather than at schema migration time)
@@ -457,6 +461,7 @@ pub fn prepare_chat_workspace_impl(
         &workspace_id,
         &session_id,
         &directory_name,
+        space,
         initial_status,
         &timestamp,
     ) {
@@ -937,6 +942,7 @@ pub fn create_workspace_from_repo_impl(repo_id: &str) -> Result<CreateWorkspaceR
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::default(),
         None,
+        WorkspaceSpace::default(),
     )?;
     let finalized = finalize_workspace_from_repo_impl(&prepared.workspace_id)?;
 
@@ -983,6 +989,7 @@ pub fn create_stacked_workspace_impl(parent_workspace_id: &str) -> Result<Create
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::default(),
         None,
+        WorkspaceSpace::default(),
     )?;
 
     // Record the stack link before finalize so the row is fully shaped

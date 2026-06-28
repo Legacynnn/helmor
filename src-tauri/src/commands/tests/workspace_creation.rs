@@ -941,6 +941,7 @@ fn prepare_workspace_inserts_initializing_row_without_creating_worktree() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -1011,6 +1012,7 @@ fn finalize_workspace_transitions_initializing_to_ready_and_creates_worktree() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     let workspace_dir = harness.workspace_dir(&prepared.directory_name);
@@ -1060,6 +1062,7 @@ fn finalize_workspace_reports_setup_pending_when_helmor_json_has_setup() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     let finalized = workspaces::finalize_workspace_from_repo_impl(&prepared.workspace_id).unwrap();
@@ -1083,6 +1086,7 @@ fn finalize_workspace_stays_ready_when_helmor_json_has_setup_but_auto_run_disabl
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     let finalized = workspaces::finalize_workspace_from_repo_impl(&prepared.workspace_id).unwrap();
@@ -1105,6 +1109,7 @@ fn finalize_workspace_cleans_up_row_on_worktree_failure() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -1423,6 +1428,7 @@ fn move_local_workspace_to_worktree_rejects_worktree_mode_workspace() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     workspaces::finalize_workspace_from_repo_impl(&prepared.workspace_id).unwrap();
@@ -1482,6 +1488,7 @@ fn finalize_workspace_is_idempotent_for_ready_workspace() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     let first = workspaces::finalize_workspace_from_repo_impl(&prepared.workspace_id).unwrap();
@@ -1512,6 +1519,7 @@ fn cleanup_orphaned_initializing_workspaces_purges_old_rows_and_cascades_session
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     let connection = Connection::open(harness.db_path()).unwrap();
@@ -1529,6 +1537,7 @@ fn cleanup_orphaned_initializing_workspaces_purges_old_rows_and_cascades_session
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -1583,6 +1592,7 @@ fn git_action_status_returns_fresh_defaults_for_initializing_workspace() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -1623,9 +1633,12 @@ fn git_action_status_returns_quiet_status_for_chat_workspace() {
     // Chat workspaces are scratch dirs with no git binding. A naive
     // `git status` call would emit `WorkspaceBroken` on every poll;
     // the short-circuit must catch chat mode before running git.
-    let prepared =
-        crate::workspace::lifecycle::prepare_chat_workspace_impl(WorkspaceStatus::InProgress, None)
-            .unwrap();
+    let prepared = crate::workspace::lifecycle::prepare_chat_workspace_impl(
+        WorkspaceStatus::InProgress,
+        None,
+        crate::workspace_state::WorkspaceSpace::default(),
+    )
+    .unwrap();
 
     let status = tauri::async_runtime::block_on(
         crate::commands::editor_commands::get_workspace_git_action_status(
@@ -1658,6 +1671,7 @@ fn pr_lookups_short_circuit_for_initializing_workspace_without_network() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -1714,6 +1728,7 @@ fn load_repo_scripts_priority_1_worktree_helmor_json_wins() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     workspaces::finalize_workspace_from_repo_impl(&prepared.workspace_id).unwrap();
@@ -1764,6 +1779,7 @@ fn load_repo_scripts_priority_2_repo_root_wins_when_worktree_missing() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     let worktree_dir = harness.workspace_dir(&prepared.directory_name);
@@ -1807,6 +1823,7 @@ fn load_repo_scripts_priority_3_falls_through_to_db_when_no_helmor_json_anywhere
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     workspaces::finalize_workspace_from_repo_impl(&prepared.workspace_id).unwrap();
@@ -1841,6 +1858,7 @@ fn delete_session_removes_session_plan_state() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     workspaces::finalize_workspace_from_repo_impl(&workspace.workspace_id).unwrap();
@@ -1891,6 +1909,7 @@ fn delete_workspace_and_session_rows_leaves_other_workspaces_intact() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     workspaces::finalize_workspace_from_repo_impl(&keep.workspace_id).unwrap();
@@ -1900,6 +1919,7 @@ fn delete_workspace_and_session_rows_leaves_other_workspaces_intact() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     workspaces::finalize_workspace_from_repo_impl(&drop.workspace_id).unwrap();
@@ -1986,6 +2006,7 @@ fn cleanup_orphaned_initializing_workspaces_skips_non_initializing_states() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     workspaces::finalize_workspace_from_repo_impl(&prepared.workspace_id).unwrap();
@@ -2058,6 +2079,7 @@ fn prepare_workspace_from_repo_with_backlog_initial_status_lands_in_backlog() {
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::Backlog,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -2090,6 +2112,7 @@ fn prepare_workspace_use_branch_stores_existing_branch_verbatim() {
         WorkspaceBranchIntent::UseBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -2128,6 +2151,7 @@ fn prepare_workspace_use_branch_errors_when_branch_missing() {
         WorkspaceBranchIntent::UseBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap_err();
 
@@ -2150,6 +2174,7 @@ fn prepare_workspace_use_branch_errors_when_branch_already_checked_out_elsewhere
         WorkspaceBranchIntent::UseBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     workspaces::finalize_workspace_from_repo_impl(&prior.workspace_id).unwrap();
@@ -2160,6 +2185,7 @@ fn prepare_workspace_use_branch_errors_when_branch_already_checked_out_elsewhere
         WorkspaceBranchIntent::UseBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap_err();
 
@@ -2185,6 +2211,7 @@ fn prepare_workspace_use_branch_errors_when_source_branch_omitted() {
         WorkspaceBranchIntent::UseBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap_err();
 
@@ -2207,6 +2234,7 @@ fn finalize_workspace_use_branch_attaches_worktree_to_existing_branch() {
         WorkspaceBranchIntent::UseBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     let finalized = workspaces::finalize_workspace_from_repo_impl(&prepared.workspace_id).unwrap();
@@ -2235,6 +2263,7 @@ fn finalize_workspace_use_branch_does_not_delete_branch_on_failure() {
         WorkspaceBranchIntent::UseBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
 
@@ -2295,6 +2324,7 @@ fn finalize_workspace_from_branch_falls_back_to_local_ref_when_remote_missing() 
         WorkspaceBranchIntent::FromBranch,
         WorkspaceStatus::InProgress,
         None,
+        crate::workspace_state::WorkspaceSpace::default(),
     )
     .unwrap();
     let finalized = workspaces::finalize_workspace_from_repo_impl(&prepared.workspace_id).unwrap();

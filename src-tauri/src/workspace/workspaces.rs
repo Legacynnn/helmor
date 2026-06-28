@@ -2343,6 +2343,7 @@ mod tests {
         let response = super::super::lifecycle::prepare_chat_workspace_impl(
             crate::workspace_status::WorkspaceStatus::InProgress,
             None,
+            crate::workspace_state::WorkspaceSpace::default(),
         )
         .unwrap();
 
@@ -2395,6 +2396,7 @@ mod tests {
         let response = super::super::lifecycle::prepare_chat_workspace_impl(
             crate::workspace_status::WorkspaceStatus::InProgress,
             None,
+            crate::workspace_state::WorkspaceSpace::default(),
         )
         .unwrap();
 
@@ -2440,11 +2442,13 @@ mod tests {
         let a = super::super::lifecycle::prepare_chat_workspace_impl(
             crate::workspace_status::WorkspaceStatus::InProgress,
             None,
+            crate::workspace_state::WorkspaceSpace::default(),
         )
         .unwrap();
         let b = super::super::lifecycle::prepare_chat_workspace_impl(
             crate::workspace_status::WorkspaceStatus::InProgress,
             None,
+            crate::workspace_state::WorkspaceSpace::default(),
         )
         .unwrap();
 
@@ -2479,6 +2483,7 @@ mod tests {
         let response = super::super::lifecycle::prepare_chat_workspace_impl(
             crate::workspace_status::WorkspaceStatus::InProgress,
             None,
+            crate::workspace_state::WorkspaceSpace::default(),
         )
         .unwrap();
         let scratch_dir = response.working_directory.clone().unwrap();
@@ -2559,6 +2564,7 @@ mod tests {
         let response = super::super::lifecycle::prepare_chat_workspace_impl(
             crate::workspace_status::WorkspaceStatus::InProgress,
             None,
+            crate::workspace_state::WorkspaceSpace::default(),
         )
         .unwrap();
         let scratch_dir = response.working_directory.clone().unwrap();
@@ -2588,6 +2594,7 @@ mod tests {
         let response = super::super::lifecycle::prepare_chat_workspace_impl(
             crate::workspace_status::WorkspaceStatus::InProgress,
             None,
+            crate::workspace_state::WorkspaceSpace::default(),
         )
         .unwrap();
 
