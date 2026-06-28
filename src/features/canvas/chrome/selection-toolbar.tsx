@@ -43,13 +43,7 @@ export function CanvasSelectionToolbar() {
 	};
 
 	return (
-		<div
-			className="-translate-x-1/2 pointer-events-auto absolute top-3 left-1/2 z-20 flex items-center gap-1.5 rounded-[18px] border border-white/15 bg-app-base/65 px-2.5 py-1.5 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl"
-			style={{
-				borderColor: `color-mix(in oklab, ${SELECTED_COLOR} 55%, transparent)`,
-				boxShadow: `0 12px 32px -10px rgba(0,0,0,0.6), 0 0 0 1px color-mix(in oklab, ${SELECTED_COLOR} 35%, transparent), 0 0 22px -6px color-mix(in oklab, ${SELECTED_COLOR} 45%, transparent)`,
-			}}
-		>
+		<div className="-translate-x-1/2 pointer-events-auto absolute top-3 left-1/2 z-20 flex items-center gap-1.5 rounded-[18px] border border-white/15 bg-app-base/90 px-2.5 py-1.5 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl">
 			<RenameField
 				key={id}
 				initial={selected.data.title}
