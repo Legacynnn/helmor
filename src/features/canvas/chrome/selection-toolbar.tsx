@@ -45,7 +45,7 @@ export function CanvasSelectionToolbar() {
 
 	return (
 		<div
-			className="-translate-x-1/2 pointer-events-auto absolute top-3 left-1/2 z-20 flex items-center gap-1 rounded-[16px] border bg-popover/95 px-1.5 py-1 backdrop-blur-xl"
+			className="-translate-x-1/2 pointer-events-auto absolute top-3 left-1/2 z-20 flex items-center gap-1.5 rounded-[18px] border border-white/15 bg-app-base/65 px-2.5 py-1.5 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl"
 			style={{
 				borderColor: `color-mix(in oklab, ${SELECTED_COLOR} 55%, transparent)`,
 				boxShadow: `0 12px 32px -10px rgba(0,0,0,0.6), 0 0 0 1px color-mix(in oklab, ${SELECTED_COLOR} 35%, transparent), 0 0 22px -6px color-mix(in oklab, ${SELECTED_COLOR} 45%, transparent)`,
@@ -60,7 +60,7 @@ export function CanvasSelectionToolbar() {
 			<Popover>
 				<PopoverTrigger asChild>
 					<ToolbarButton label="Translucency">
-						<Droplets className="size-3.5" />
+						<Droplets className="size-4" />
 					</ToolbarButton>
 				</PopoverTrigger>
 				<PopoverContent align="center" className="w-48 p-3">
@@ -84,16 +84,16 @@ export function CanvasSelectionToolbar() {
 				onClick={() => setConnecting((c) => !c)}
 				active={connecting}
 			>
-				<Cable className="size-3.5" />
+				<Cable className="size-4" />
 			</ToolbarButton>
 			<ToolbarButton
 				label={selected.data.locked ? "Unlock" : "Lock"}
 				onClick={() => actions.setLocked(id, !selected.data.locked)}
 			>
 				{selected.data.locked ? (
-					<Unlock className="size-3.5" />
+					<Unlock className="size-4" />
 				) : (
-					<Lock className="size-3.5" />
+					<Lock className="size-4" />
 				)}
 			</ToolbarButton>
 			<ToolbarButton
@@ -102,7 +102,7 @@ export function CanvasSelectionToolbar() {
 					void actions.duplicateNode(id);
 				}}
 			>
-				<Copy className="size-3.5" />
+				<Copy className="size-4" />
 			</ToolbarButton>
 			<Divider />
 			<ToolbarButton
@@ -110,7 +110,7 @@ export function CanvasSelectionToolbar() {
 				onClick={() => actions.removeNode(id)}
 				danger
 			>
-				<Trash2 className="size-3.5" />
+				<Trash2 className="size-4" />
 			</ToolbarButton>
 		</div>
 	);
@@ -160,7 +160,7 @@ function ToolbarButton({
 			title={label}
 			onClick={onClick}
 			className={cn(
-				"flex size-6 cursor-pointer items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground",
+				"flex size-7 cursor-pointer items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground",
 				danger && "hover:bg-destructive/15 hover:text-destructive",
 			)}
 			style={
