@@ -167,6 +167,73 @@ impl ToSql for WorkspaceMode {
     }
 }
 
+/// Which "space" a workspace lives in. `Normal` = the classic 3-column
+/// chat/inspector layout. `Canvas` = the full-bleed infinite-canvas world.
+/// Strictly 1:1 with a workspace, chosen at creation. Distinct from
+/// [`WorkspaceMode`] (filesystem provisioning) — a Canvas workspace can
+/// still be worktree/local/chat under the hood.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceSpace {
+    #[default]
+    Normal,
+    Canvas,
+}
+
+impl WorkspaceSpace {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Normal => "normal",
+            Self::Canvas => "canvas",
+        }
+    }
+}
+
+impl fmt::Display for WorkspaceSpace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug)]
+pub struct UnknownWorkspaceSpace(pub String);
+
+impl fmt::Display for UnknownWorkspaceSpace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown workspace space: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for UnknownWorkspaceSpace {}
+
+impl FromStr for WorkspaceSpace {
+    type Err = UnknownWorkspaceSpace;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "normal" => Ok(Self::Normal),
+            "canvas" => Ok(Self::Canvas),
+            other => Err(UnknownWorkspaceSpace(other.to_string())),
+        }
+    }
+}
+
+impl FromSql for WorkspaceSpace {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        let s = value.as_str()?;
+        s.parse()
+            .map_err(|e: UnknownWorkspaceSpace| FromSqlError::Other(Box::new(e)))
+    }
+}
+
+impl ToSql for WorkspaceSpace {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::Borrowed(ValueRef::Text(
+            self.as_str().as_bytes(),
+        )))
+    }
+}
+
 /// `FromBranch`: fork a new branch off the picker selection.
 /// `UseBranch`: attach the worktree to the picker selection as-is.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -371,6 +438,23 @@ mod tests {
                 WorkspaceBranchIntent::FromBranch,
                 WorkspaceBranchIntent::UseBranch,
             ]
+        );
+    }
+
+    #[test]
+    fn workspace_space_round_trips() {
+        use super::WorkspaceSpace;
+        assert_eq!(WorkspaceSpace::default(), WorkspaceSpace::Normal);
+        assert_eq!(WorkspaceSpace::Normal.as_str(), "normal");
+        assert_eq!(WorkspaceSpace::Canvas.as_str(), "canvas");
+        assert_eq!(
+            "canvas".parse::<WorkspaceSpace>().unwrap(),
+            WorkspaceSpace::Canvas
+        );
+        assert!("bogus".parse::<WorkspaceSpace>().is_err());
+        assert_eq!(
+            serde_json::to_string(&WorkspaceSpace::Canvas).unwrap(),
+            "\"canvas\""
         );
     }
 
