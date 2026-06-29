@@ -185,6 +185,9 @@ export function ShellSidebarPane({
 						<TrafficLightSpacer side="left" width={94} />
 						<div data-tauri-drag-region className="h-full flex-1" />
 					</div>
+					<div className="px-2 pb-2">
+						<SpaceSwitch />
+					</div>
 					<nav aria-label="Screens" className="flex flex-col gap-0.5 px-2 pb-2">
 						{SCREEN_NAV_ITEMS.map(({ id, label, Icon }) => {
 							const active = activeScreen === id;
@@ -206,9 +209,6 @@ export function ShellSidebarPane({
 							);
 						})}
 					</nav>
-					<div className="px-2 pb-2">
-						<SpaceSwitch />
-					</div>
 					<div className="min-h-0 flex-1">
 						<WorkspacesSidebarContainer
 							selectedWorkspaceId={highlightedWorkspaceId}
