@@ -5,6 +5,7 @@
 // start composer to create a workspace.
 import { type QueryClient, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSpaceStore } from "@/features/canvas/use-space-store";
 import type { StartSubmitMode } from "@/features/composer/start-submit-mode";
 import type {
 	ComposerCreatePrepareOutcome,
@@ -33,6 +34,7 @@ import {
 	type WorkspaceBranchIntent,
 	type WorkspaceDetail,
 	type WorkspaceMode,
+	type WorkspaceSpace,
 } from "@/lib/api";
 import { extractError } from "@/lib/errors";
 import { helmorQueryKeys } from "@/lib/query-client";
@@ -60,6 +62,7 @@ export type StartSurfaceState = {
 	startRepository: RepositoryCreateOption | null;
 	startSourceBranch: string;
 	startMode: WorkspaceMode;
+	startSpace: WorkspaceSpace;
 	/** Worktree mode only; backend ignores in local mode. */
 	startBranchIntent: WorkspaceBranchIntent;
 	startPendingNewBranch: string | null;
@@ -80,6 +83,7 @@ export type StartSurfaceActions = {
 	selectRepository(repository: RepositoryCreateOption): void;
 	selectSourceBranch(branch: string): void;
 	selectMode(mode: WorkspaceMode): void;
+	selectSpace(space: WorkspaceSpace): void;
 	selectBranchIntent(intent: WorkspaceBranchIntent): void;
 	stashPendingNewBranch(branch: string): void;
 	refetchBranches(): void;
@@ -156,6 +160,21 @@ export function useStartSurfaceController(
 	>(null);
 	const [startPendingLinkedDirectories, setStartPendingLinkedDirectories] =
 		useState<readonly string[]>(EMPTY_STRING_LIST);
+	// Which space the new workspace lands in. Defaults to `normal`; "+ New
+	// canvas" in the Canvas world seeds `pendingCreateSpace`, consumed once here.
+	const [startSpace, setStartSpace] = useState<WorkspaceSpace>("normal");
+	const pendingCreateSpace = useSpaceStore((s) => s.pendingCreateSpace);
+	const setPendingCreateSpace = useSpaceStore((s) => s.setPendingCreateSpace);
+	useEffect(() => {
+		if (pendingCreateSpace) {
+			setStartSpace(pendingCreateSpace);
+			setPendingCreateSpace(null);
+		}
+	}, [pendingCreateSpace, setPendingCreateSpace]);
+	const selectSpace = useCallback(
+		(space: WorkspaceSpace) => setStartSpace(space),
+		[],
+	);
 	// One-shot mode override set by the `Cmd+N` / `Cmd+Shift+N` shortcuts
 	// (carried via the `open-new-workspace` event's `mode` payload). Wins
 	// over the persisted preference for the lifetime of the current visit
@@ -520,6 +539,7 @@ export function useStartSurfaceController(
 					repoId: startRepository?.id ?? "",
 					sourceBranch: startMode === "chat" ? "" : startSourceBranch,
 					mode: startMode,
+					space: startSpace,
 					// Only worktree mode honors branchIntent.
 					branchIntent:
 						startMode === "worktree" ? startBranchIntent : undefined,
@@ -743,6 +763,7 @@ export function useStartSurfaceController(
 			queryClient,
 			startBranchIntent,
 			startMode,
+			startSpace,
 			startPendingLinkedDirectories,
 			startPendingNewBranch,
 			startRepository?.id,
@@ -782,6 +803,7 @@ export function useStartSurfaceController(
 		selectRepository,
 		selectSourceBranch,
 		selectMode,
+		selectSpace,
 		selectBranchIntent,
 		stashPendingNewBranch,
 		refetchBranches,
@@ -800,6 +822,7 @@ export function useStartSurfaceController(
 			startRepository,
 			startSourceBranch,
 			startMode,
+			startSpace,
 			startBranchIntent,
 			startPendingNewBranch,
 			startInboxProviderTab,
@@ -822,6 +845,7 @@ export function useStartSurfaceController(
 			startInboxStateFilterBySource,
 			startLinkedDirectoriesController,
 			startMode,
+			startSpace,
 			startPendingNewBranch,
 			startRepository,
 			startRepositoryId,

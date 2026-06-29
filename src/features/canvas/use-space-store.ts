@@ -32,13 +32,20 @@ function loadSelected(): Partial<Record<WorkspaceSpace, string>> {
 type SpaceStore = {
 	activeSpace: WorkspaceSpace;
 	lastSelected: Partial<Record<WorkspaceSpace, string>>;
+	/** When a create flow is opened from a specific space (e.g. "+ New canvas"
+	 *  in mission control hops to the normal start surface), this carries the
+	 *  intended space so the create tab's toggle defaults to it. Consumed once. */
+	pendingCreateSpace: WorkspaceSpace | null;
 	setActiveSpace: (space: WorkspaceSpace) => void;
 	rememberSelection: (space: WorkspaceSpace, workspaceId: string) => void;
+	setPendingCreateSpace: (space: WorkspaceSpace | null) => void;
 };
 
 export const useSpaceStore = create<SpaceStore>((set) => ({
 	activeSpace: loadActive(),
 	lastSelected: loadSelected(),
+	pendingCreateSpace: null,
+	setPendingCreateSpace: (space) => set({ pendingCreateSpace: space }),
 	setActiveSpace: (space) =>
 		set((s) => {
 			if (s.activeSpace === space) return s;

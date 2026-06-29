@@ -88,6 +88,7 @@ describe("createWorkspaceFromStartComposer", () => {
 			"worktree",
 			null,
 			null,
+			null,
 			undefined,
 		);
 		expect(apiMocks.finalizeWorkspaceFromRepo).toHaveBeenCalledWith(
@@ -154,6 +155,7 @@ describe("createWorkspaceFromStartComposer", () => {
 			"origin/dev",
 			"worktree",
 			null,
+			null,
 			"backlog",
 			undefined,
 		);
@@ -197,6 +199,7 @@ describe("createWorkspaceFromStartComposer", () => {
 			"worktree",
 			null,
 			null,
+			null,
 			undefined,
 		);
 		expect(apiMocks.finalizeWorkspaceFromRepo).toHaveBeenCalledWith(
@@ -235,5 +238,28 @@ describe("createWorkspaceFromStartComposer", () => {
 		});
 
 		expect(result.preparedWorkingDirectory).toBe("/Users/me/repos/local-only");
+	});
+
+	it("forwards the canvas space to prepareWorkspaceFromRepo", async () => {
+		resetMocks();
+
+		await createWorkspaceFromStartComposer({
+			repoId: "repo-1",
+			sourceBranch: "main",
+			mode: "worktree",
+			space: "canvas",
+			submitMode: "startNow",
+			editorStateSnapshot,
+		});
+
+		expect(apiMocks.prepareWorkspaceFromRepo).toHaveBeenCalledWith(
+			"repo-1",
+			"main",
+			"worktree",
+			"canvas",
+			null,
+			null,
+			undefined,
+		);
 	});
 });

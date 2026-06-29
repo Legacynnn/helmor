@@ -11,6 +11,7 @@ import {
 	updateSessionSettings,
 	type WorkspaceBranchIntent,
 	type WorkspaceMode,
+	type WorkspaceSpace,
 } from "@/lib/api";
 import { getComposerContextKey } from "@/lib/workspace-helpers";
 
@@ -30,6 +31,7 @@ export async function createWorkspaceFromStartComposer({
 	repoId,
 	sourceBranch,
 	mode,
+	space,
 	branchIntent,
 	submitMode,
 	editorStateSnapshot,
@@ -42,6 +44,8 @@ export async function createWorkspaceFromStartComposer({
 	/** Ignored in `chat` mode. */
 	sourceBranch: string;
 	mode: WorkspaceMode;
+	/** Which space the new workspace belongs to. Defaults to `normal`. */
+	space?: WorkspaceSpace;
 	/** Defaults to `from_branch` when omitted. */
 	branchIntent?: WorkspaceBranchIntent;
 	submitMode: StartSubmitMode;
@@ -75,12 +79,12 @@ export async function createWorkspaceFromStartComposer({
 	// Chat mode has no repo/branch — single-phase create.
 	const prepared =
 		mode === "chat"
-			? await prepareChatWorkspace(initialStatus, seedSessionId)
+			? await prepareChatWorkspace(initialStatus, seedSessionId, space ?? null)
 			: await prepareWorkspaceFromRepo(
 					repoId,
 					sourceBranch,
 					mode,
-					null,
+					space ?? null,
 					branchIntent ?? null,
 					initialStatus,
 					seedSessionId,
