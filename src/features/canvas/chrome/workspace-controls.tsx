@@ -7,12 +7,12 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSpaceStore } from "@/features/canvas/use-space-store";
 import {
 	workspaceDetailQueryOptions,
 	workspaceGroupsQueryOptions,
 } from "@/lib/query-client";
 import { usePanelsListStore } from "../bindings/panels-list-store";
-import { useCanvasModeStore } from "../use-canvas-mode";
 
 /** Top-left workspace control region: identity + open-workspaces dropdown
  * (jump between canvases). Exiting the canvas is handled by the left rail's
@@ -28,7 +28,9 @@ export function CanvasWorkspaceControls({
 	const { data: groups = [] } = useQuery(workspaceGroupsQueryOptions());
 	const title = detail?.title ?? "Workspace";
 
-	const rows = groups.flatMap((g) => g.rows);
+	const rows = groups
+		.flatMap((g) => g.rows)
+		.filter((r) => r.space === "canvas");
 
 	return (
 		<div className="pointer-events-auto absolute top-3 left-3 z-10 flex items-center gap-1 rounded-[16px] border border-white/15 bg-app-base/40 p-1 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl">
@@ -60,7 +62,9 @@ export function CanvasWorkspaceControls({
 							<DropdownMenuItem
 								key={row.id}
 								onClick={() => {
-									useCanvasModeStore.getState().setMode(row.id, true);
+									const store = useSpaceStore.getState();
+									store.rememberSelection("canvas", row.id);
+									store.setActiveSpace("canvas");
 									if (row.id !== workspaceId) onSelectWorkspace?.(row.id);
 								}}
 							>

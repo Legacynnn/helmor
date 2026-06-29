@@ -69,7 +69,6 @@ import { AccountPanel } from "./panels/account";
 import { AppUpdatesPanel } from "./panels/app-updates";
 import { AppearancePanel } from "./panels/appearance";
 import { ArchiveCleanupPanel } from "./panels/archive-cleanup";
-import { CanvasModePanel } from "./panels/canvas-mode";
 import { ComponentsPanel } from "./panels/components";
 import { ConductorImportPanel } from "./panels/conductor-import";
 import { CustomizedPanel } from "./panels/customized";
@@ -640,10 +639,6 @@ export const SettingsDialog = memo(function SettingsDialog({
 
 							{activeSection === "experimental" && (
 								<SettingsGroup>
-									<CanvasModePanel
-										settings={settings}
-										updateSettings={updateSettings}
-									/>
 									<LocalLlmPanel
 										settings={settings}
 										updateSettings={updateSettings}

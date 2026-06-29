@@ -5,17 +5,15 @@ import {
 	Palette,
 	SquareTerminal,
 } from "lucide-react";
+import { useSpaceStore } from "@/features/canvas/use-space-store";
 import { useCanvasCreateStore } from "../canvas-create-store";
 import { useCanvasInteractionStore } from "../canvas-interaction-store";
-import { useCanvasModeStore } from "../use-canvas-mode";
 import { GlassRail, RailButton } from "./glass-rail";
 
 export function CanvasLeftRail({
-	workspaceId,
 	onCustomize,
 	customizeOpen,
 }: {
-	workspaceId: string;
 	onCustomize: () => void;
 	customizeOpen: boolean;
 }) {
@@ -27,10 +25,8 @@ export function CanvasLeftRail({
 		<GlassRail side="left">
 			<RailButton
 				icon={ArrowLeft}
-				label="Back to workspace"
-				onClick={() =>
-					useCanvasModeStore.getState().setMode(workspaceId, false)
-				}
+				label="Back to workspaces"
+				onClick={() => useSpaceStore.getState().setActiveSpace("normal")}
 			/>
 			<RailButton
 				icon={MousePointer2}

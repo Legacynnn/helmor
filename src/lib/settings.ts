@@ -352,9 +352,6 @@ export type AppSettings = {
 	autoArchiveOnMerge: boolean;
 	/** Experimental: when true, plan mode writes `.mdx` plan files. */
 	mdxPlanningEnabled: boolean;
-	/** Experimental: when true, workspaces can be toggled into Infinite Canvas
-	 * mode (epic #61). Off hides the canvas entry affordance entirely. */
-	canvasModeEnabled: boolean;
 	/** Days after which log files are pruned by the daily auto-cleanup
 	 *  pass. `0` disables log pruning. */
 	autoCleanLogsDays: number;
@@ -464,7 +461,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
 	showUsageStats: true,
 	autoArchiveOnMerge: false,
 	mdxPlanningEnabled: false,
-	canvasModeEnabled: false,
 	autoCleanLogsDays: 0,
 	autoDeleteDeadWorkspaceFiles: false,
 	onboardingCompleted: false,
@@ -660,7 +656,6 @@ export const SETTINGS_KEY_MAP: Record<
 	showUsageStats: "app.show_usage_stats",
 	autoArchiveOnMerge: "app.auto_archive_on_merge",
 	mdxPlanningEnabled: "app.mdx_planning_enabled",
-	canvasModeEnabled: "app.canvas_mode_enabled",
 	autoCleanLogsDays: "app.auto_clean_logs_days",
 	autoDeleteDeadWorkspaceFiles: "app.auto_delete_dead_workspace_files",
 	onboardingCompleted: "app.onboarding_completed",
@@ -1462,10 +1457,6 @@ export async function loadSettings(): Promise<AppSettings> {
 				raw[SETTINGS_KEY_MAP.mdxPlanningEnabled] !== undefined
 					? raw[SETTINGS_KEY_MAP.mdxPlanningEnabled] === "true"
 					: DEFAULT_SETTINGS.mdxPlanningEnabled,
-			canvasModeEnabled:
-				raw[SETTINGS_KEY_MAP.canvasModeEnabled] !== undefined
-					? raw[SETTINGS_KEY_MAP.canvasModeEnabled] === "true"
-					: DEFAULT_SETTINGS.canvasModeEnabled,
 			autoCleanLogsDays: readClampedInt(
 				raw[SETTINGS_KEY_MAP.autoCleanLogsDays],
 				{ min: 0, max: 365, fallback: DEFAULT_SETTINGS.autoCleanLogsDays },

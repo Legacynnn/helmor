@@ -364,7 +364,6 @@ function CanvasInner({
 							onSelectWorkspace={onSelectWorkspace}
 						/>
 						<CanvasLeftRail
-							workspaceId={workspaceId}
 							customizeOpen={customizeOpen}
 							onCustomize={() => setCustomizeOpen((v) => !v)}
 						/>
