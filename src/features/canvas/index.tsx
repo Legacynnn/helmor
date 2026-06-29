@@ -285,7 +285,7 @@ function CanvasInner({
 					// Activates the `canvas` shortcut scope (⌘1–⌘9, ⌘/) while focus is
 					// inside the surface, so they don't double-fire with chat shortcuts.
 					data-focus-scope="canvas"
-					className="relative size-full overflow-hidden bg-app-base"
+					className="relative size-full overflow-hidden bg-background"
 					// The canvas accent (selected-panel border, resize handles,
 					// connection cables, selection toolbar) reads `--color-selected`,
 					// which is otherwise undefined and falls back to a hardcoded blue.

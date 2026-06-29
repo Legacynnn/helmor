@@ -53,7 +53,7 @@ export function CanvasWorld({
 				{selected ? (
 					<Suspense
 						fallback={
-							<div className="flex size-full items-center justify-center bg-app-base text-app-muted-foreground text-sm">
+							<div className="flex size-full items-center justify-center bg-background text-muted-foreground text-sm">
 								Loading canvas…
 							</div>
 						}
@@ -61,7 +61,7 @@ export function CanvasWorld({
 						<CanvasSurface key={selected} workspaceId={selected} />
 					</Suspense>
 				) : (
-					<div className="flex size-full flex-col items-center justify-center gap-3 bg-app-base text-app-muted-foreground">
+					<div className="flex size-full flex-col items-center justify-center gap-3 bg-background text-muted-foreground">
 						<LayoutGrid className="size-10 opacity-40" />
 						<p className="text-sm">
 							{canvasRows.length === 0

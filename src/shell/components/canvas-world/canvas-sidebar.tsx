@@ -63,7 +63,7 @@ export function CanvasSidebar({
 	};
 
 	return (
-		<aside className="flex h-full w-[260px] shrink-0 flex-col gap-2 border-app-border border-r bg-app-base/60 p-2 backdrop-blur">
+		<aside className="flex h-full w-[260px] shrink-0 flex-col gap-2 border-border border-r bg-sidebar p-2">
 			<div className="h-6 shrink-0" />
 			<SpaceSwitch />
 			<button
