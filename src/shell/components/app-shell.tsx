@@ -7,7 +7,10 @@
 // the `useAppShellState` result (`s` + its `sel` / `data` / `chrome` / `panels`
 // groups).
 import { useCallback, useMemo } from "react";
-import { useIsCanvasMode } from "@/features/canvas/use-canvas-mode";
+import {
+	useActiveSpace,
+	useSpaceStore,
+} from "@/features/canvas/use-space-store";
 import type { SettingsSection } from "@/features/settings";
 import { useScreenController } from "@/shell/controllers/use-screen-controller";
 import { useAppShellState } from "@/shell/hooks/use-app-shell-state";
@@ -31,13 +34,12 @@ export function AppShell({
 	// threads into the data/chrome layers, so the P1-A header memo deps below
 	// see byte-identical values, just sourced from the router.
 	const selectedWorkspaceId = s.selectedWorkspaceId;
-	// Infinite Canvas mode (epic #61): when active for the selected workspace
-	// AND the experimental opt-in is on, the canvas surface goes full-bleed —
-	// replacing the center + inspector AND hiding the left sidebar (the canvas
-	// carries its own workspace switcher). Disabling the opt-in forces any
-	// canvas-active workspace back to the normal layout.
-	const canvasActive =
-		useIsCanvasMode(selectedWorkspaceId) && s.appSettings.canvasModeEnabled;
+	// Canvas is now a first-class workspace *space*. When the active space is
+	// "canvas" the full-bleed Canvas world (mission control + per-workspace
+	// canvas) replaces the normal 3-column layout entirely; the sidebar slides
+	// away. The space is toggled from the sidebar's Workspaces|Canvas switch.
+	const canvasActive = useActiveSpace() === "canvas";
+	const setActiveSpace = useSpaceStore((store) => store.setActiveSpace);
 	// Top-level screen state (Dashboard/Tasks/History), also router-backed now —
 	// it lives in the `?screen` search param (see `useScreenController`).
 	const screen = useScreenController();
@@ -52,6 +54,15 @@ export function AppShell({
 	);
 	const inspectorCollapsed = sel.contextPanel.inspectorCollapsed;
 	const setInspectorCollapsed = sel.contextPanelActions.setInspectorCollapsed;
+
+	// "+ New canvas" from mission control: hop to the normal start surface to
+	// run the create flow (the create tab's inline toggle defaults to canvas
+	// while we're coming from the Canvas world). The new canvas workspace then
+	// surfaces as a tile back in mission control.
+	const handleNewCanvas = useCallback(() => {
+		setActiveSpace("normal");
+		s.handleOpenWorkspaceStart();
+	}, [setActiveSpace, s.handleOpenWorkspaceStart]);
 
 	// P1-A: React Compiler bailed out on this ~1650-line AppShell, so it does
 	// NOT memoize these inline header JSX nodes — they get a fresh element
@@ -122,7 +133,7 @@ export function AppShell({
 			workspaceViewMode={s.workspaceViewMode}
 			activeScreen={screen.activeScreen}
 			canvasActive={canvasActive}
-			selectedWorkspaceId={selectedWorkspaceId}
+			onNewCanvas={handleNewCanvas}
 			onSelectWorkspace={handleSelectWorkspace}
 			sidebar={{
 				activeScreen: screen.activeScreen,

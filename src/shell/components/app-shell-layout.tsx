@@ -5,31 +5,22 @@
 // is pure structure + wiring, no state of its own. Lifted verbatim out of
 // AppShell's return; the header memo nodes stay computed upstream and ride in
 // via `workspacePane`.
-import {
-	type ComponentProps,
-	type KeyboardEvent,
-	lazy,
-	type PointerEvent,
-	Suspense,
-} from "react";
+import type { ComponentProps, KeyboardEvent, PointerEvent } from "react";
 import { FeedbackDialog } from "@/features/feedback";
 import type { WorkspaceDetail } from "@/lib/api";
 import type { ActiveScreen } from "@/shell/controllers/use-screen-controller";
 import type { ShellViewMode } from "@/shell/controllers/use-selection-controller";
 import { AppOverlays } from "./app-overlays";
 import { AppShellProviderStack } from "./app-shell-provider-stack";
+// CanvasWorld is light at import time; the heavy tldraw canvas it renders is
+// itself lazy-loaded inside CanvasWorld, so it stays out of the main bundle and
+// out of shell tests' module graph until a canvas workspace is actually opened.
+import { CanvasWorld } from "./canvas-world";
 import { ScreenHost } from "./screen-host";
 import { ShellInspectorPane } from "./shell-inspector-pane";
 import { ShellResizeSeparator } from "./shell-resize-separator";
 import { ShellSidebarPane } from "./shell-sidebar-pane";
 import { WorkspacePaneSurface } from "./workspace-pane-surface";
-
-// Lazy: tldraw is heavy and pulled in only when canvas mode is active. Keeps it
-// out of the main bundle AND out of every shell test's module graph (tldraw
-// touches CSS.supports at import, which jsdom lacks).
-const CanvasSurface = lazy(() =>
-	import("@/features/canvas").then((m) => ({ default: m.CanvasSurface })),
-);
 
 type ResizeTarget = "sidebar" | "inspector";
 
@@ -43,10 +34,10 @@ type Props = {
 	>["onSubmitPrompt"];
 	workspaceViewMode: ShellViewMode;
 	activeScreen: ActiveScreen;
-	// Infinite Canvas mode (epic #61): replaces the center + inspector with a
-	// full-bleed canvas surface when active for the selected workspace.
+	// Canvas space: when active, the full-bleed Canvas world replaces the normal
+	// 3-column layout and the sidebar slides away.
 	canvasActive: boolean;
-	selectedWorkspaceId: string | null;
+	onNewCanvas?: () => void;
 	onSelectWorkspace: (workspaceId: string | null) => void;
 	// Left sidebar + its resize separator.
 	sidebar: ComponentProps<typeof ShellSidebarPane>;
@@ -80,7 +71,7 @@ export function AppShellLayout({
 	workspaceViewMode,
 	activeScreen,
 	canvasActive,
-	selectedWorkspaceId,
+	onNewCanvas,
 	onSelectWorkspace,
 	sidebar,
 	sidebarCollapsed,
@@ -119,42 +110,33 @@ export function AppShellLayout({
 				aria-label="Application shell"
 				className="relative h-dvh overflow-hidden bg-background font-sans text-foreground antialiased"
 			>
-				<div className="relative flex h-full min-h-0 bg-background">
-					{/* Canvas mode is full-bleed: it hides the left sidebar entirely
-					 *  (the canvas carries its own workspace switcher + Exit control),
-					 *  so opening a canvas always closes the sidebar. */}
-					{workspaceViewMode !== "editor" && !canvasActive && (
-						<>
-							<ShellSidebarPane {...sidebar} />
-							<ShellResizeSeparator
-								side="sidebar"
-								collapsed={sidebarCollapsed}
-								resizing={isSidebarResizing}
-								width={sidebarWidth}
-								onPointerDown={handleResizeStart("sidebar")}
-								onKeyDown={handleResizeKeyDown("sidebar")}
-							/>
-						</>
-					)}
+				{/* Two worlds on one horizontal track: the normal 3-column layout and
+				 *  the full-bleed Canvas world. The track slides between them when the
+				 *  active space flips (the sidebar's Workspaces|Canvas switch). Both
+				 *  panes stay mounted so switching back is instant. */}
+				<div className="relative h-full min-h-0 overflow-hidden bg-background">
+					<div
+						className="flex h-full w-[200%] transition-transform duration-300 ease-out"
+						style={{
+							transform: canvasActive ? "translateX(-50%)" : "translateX(0)",
+						}}
+					>
+						{/* Normal world */}
+						<div className="flex h-full w-1/2 min-w-0">
+							{workspaceViewMode !== "editor" && (
+								<>
+									<ShellSidebarPane {...sidebar} />
+									<ShellResizeSeparator
+										side="sidebar"
+										collapsed={sidebarCollapsed}
+										resizing={isSidebarResizing}
+										width={sidebarWidth}
+										onPointerDown={handleResizeStart("sidebar")}
+										onKeyDown={handleResizeKeyDown("sidebar")}
+									/>
+								</>
+							)}
 
-					{canvasActive && selectedWorkspaceId ? (
-						<div className="relative min-w-0 flex-1">
-							<Suspense
-								fallback={
-									<div className="flex size-full items-center justify-center bg-app-base text-app-muted-foreground text-sm">
-										Loading canvas…
-									</div>
-								}
-							>
-								<CanvasSurface
-									key={selectedWorkspaceId}
-									workspaceId={selectedWorkspaceId}
-									onSelectWorkspace={onSelectWorkspace}
-								/>
-							</Suspense>
-						</div>
-					) : (
-						<>
 							{activeScreen === "none" ? (
 								<WorkspacePaneSurface {...workspacePane} />
 							) : (
@@ -180,8 +162,16 @@ export function AppShellLayout({
 										<ShellInspectorPane {...inspector} />
 									</>
 								)}
-						</>
-					)}
+						</div>
+
+						{/* Canvas world */}
+						<div className="h-full w-1/2 min-w-0">
+							<CanvasWorld
+								onSelectWorkspace={onSelectWorkspace}
+								onNewCanvas={onNewCanvas}
+							/>
+						</div>
+					</div>
 				</div>
 			</main>
 			<AppOverlays {...overlays} />
