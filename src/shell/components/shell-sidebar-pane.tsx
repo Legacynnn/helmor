@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/tooltip";
 import { FeedbackButton } from "@/features/feedback";
 import { WorkspacesSidebarContainer } from "@/features/navigation/container";
+import { SpaceSwitch } from "@/features/navigation/space-switch";
 import { ResourceWidget } from "@/features/resources";
 import { SettingsButton } from "@/features/settings";
 import { getShortcut } from "@/features/shortcuts/registry";
@@ -205,6 +206,9 @@ export function ShellSidebarPane({
 							);
 						})}
 					</nav>
+					<div className="px-2 pb-2">
+						<SpaceSwitch />
+					</div>
 					<div className="min-h-0 flex-1">
 						<WorkspacesSidebarContainer
 							selectedWorkspaceId={highlightedWorkspaceId}

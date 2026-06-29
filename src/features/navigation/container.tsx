@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { openWorkspaceInFinder } from "@/lib/api";
 import { extractError } from "@/lib/errors";
 import { useWorkspacesSidebarController } from "./hooks/use-controller";
@@ -79,9 +79,20 @@ export const WorkspacesSidebarContainer = memo(
 			onAddRepositoryNeedsStart,
 			pushWorkspaceToast,
 		});
+		// Canvas workspaces live exclusively in the Canvas world (mission
+		// control), never the normal sidebar. Drop them from every group so the
+		// two spaces stay strictly separated. Treat a missing `space` as normal.
+		const normalGroups = useMemo(
+			() =>
+				groups.map((group) => ({
+					...group,
+					rows: group.rows.filter((row) => row.space !== "canvas"),
+				})),
+			[groups],
+		);
 		return (
 			<WorkspacesSidebar
-				groups={groups}
+				groups={normalGroups}
 				archivedRows={archivedRows}
 				availableRepositories={availableRepositories}
 				sidebarGrouping={sidebarGrouping}
