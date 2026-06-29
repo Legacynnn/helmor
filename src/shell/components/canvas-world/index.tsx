@@ -17,10 +17,8 @@ const CanvasSurface = lazy(() =>
  */
 export function CanvasWorld({
 	onSelectWorkspace,
-	onNewCanvas,
 }: {
 	onSelectWorkspace?: (workspaceId: string) => void;
-	onNewCanvas?: () => void;
 }) {
 	const remembered = useSpaceStore((s) => s.lastSelected.canvas ?? null);
 	const remember = useSpaceStore((s) => s.rememberSelection);
@@ -47,7 +45,6 @@ export function CanvasWorld({
 				workspaces={canvasRows}
 				selectedId={selected}
 				onSelect={openCanvas}
-				onNewCanvas={onNewCanvas}
 			/>
 			<div className="relative min-w-0 flex-1">
 				{selected ? (

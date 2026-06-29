@@ -37,7 +37,6 @@ type Props = {
 	// Canvas space: when active, the full-bleed Canvas world replaces the normal
 	// 3-column layout and the sidebar slides away.
 	canvasActive: boolean;
-	onNewCanvas?: () => void;
 	onSelectWorkspace: (workspaceId: string | null) => void;
 	// Left sidebar + its resize separator.
 	sidebar: ComponentProps<typeof ShellSidebarPane>;
@@ -71,7 +70,6 @@ export function AppShellLayout({
 	workspaceViewMode,
 	activeScreen,
 	canvasActive,
-	onNewCanvas,
 	onSelectWorkspace,
 	sidebar,
 	sidebarCollapsed,
@@ -166,10 +164,7 @@ export function AppShellLayout({
 
 						{/* Canvas world */}
 						<div className="h-full w-1/2 min-w-0">
-							<CanvasWorld
-								onSelectWorkspace={onSelectWorkspace}
-								onNewCanvas={onNewCanvas}
-							/>
+							<CanvasWorld onSelectWorkspace={onSelectWorkspace} />
 						</div>
 					</div>
 				</div>

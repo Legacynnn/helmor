@@ -7,10 +7,7 @@
 // the `useAppShellState` result (`s` + its `sel` / `data` / `chrome` / `panels`
 // groups).
 import { useCallback, useMemo } from "react";
-import {
-	useActiveSpace,
-	useSpaceStore,
-} from "@/features/canvas/use-space-store";
+import { useActiveSpace } from "@/features/canvas/use-space-store";
 import type { SettingsSection } from "@/features/settings";
 import { useScreenController } from "@/shell/controllers/use-screen-controller";
 import { useAppShellState } from "@/shell/hooks/use-app-shell-state";
@@ -39,10 +36,6 @@ export function AppShell({
 	// canvas) replaces the normal 3-column layout entirely; the sidebar slides
 	// away. The space is toggled from the sidebar's Workspaces|Canvas switch.
 	const canvasActive = useActiveSpace() === "canvas";
-	const setActiveSpace = useSpaceStore((store) => store.setActiveSpace);
-	const setPendingCreateSpace = useSpaceStore(
-		(store) => store.setPendingCreateSpace,
-	);
 	// Top-level screen state (Dashboard/Tasks/History), also router-backed now —
 	// it lives in the `?screen` search param (see `useScreenController`).
 	const screen = useScreenController();
@@ -57,16 +50,6 @@ export function AppShell({
 	);
 	const inspectorCollapsed = sel.contextPanel.inspectorCollapsed;
 	const setInspectorCollapsed = sel.contextPanelActions.setInspectorCollapsed;
-
-	// "+ New canvas" from mission control: hop to the normal start surface to
-	// run the create flow (the create tab's inline toggle defaults to canvas
-	// while we're coming from the Canvas world). The new canvas workspace then
-	// surfaces as a tile back in mission control.
-	const handleNewCanvas = useCallback(() => {
-		setPendingCreateSpace("canvas");
-		setActiveSpace("normal");
-		s.handleOpenWorkspaceStart();
-	}, [setPendingCreateSpace, setActiveSpace, s.handleOpenWorkspaceStart]);
 
 	// P1-A: React Compiler bailed out on this ~1650-line AppShell, so it does
 	// NOT memoize these inline header JSX nodes — they get a fresh element
@@ -137,7 +120,6 @@ export function AppShell({
 			workspaceViewMode={s.workspaceViewMode}
 			activeScreen={screen.activeScreen}
 			canvasActive={canvasActive}
-			onNewCanvas={handleNewCanvas}
 			onSelectWorkspace={handleSelectWorkspace}
 			sidebar={{
 				activeScreen: screen.activeScreen,
