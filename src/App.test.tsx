@@ -134,7 +134,9 @@ describe("App", () => {
 		expect(safeAreas[0]).toHaveClass("max-[960px]:hidden");
 		expect(groupsScrollRegion).toHaveClass("overflow-y-auto");
 		expect(groupsScrollRegion).toHaveClass("flex-1");
-		expect(screen.getByText("Workspaces")).toBeInTheDocument();
+		// "Workspaces" now appears both as the space-switch tab and the sidebar
+		// label, so assert presence without requiring uniqueness.
+		expect(screen.getAllByText("Workspaces").length).toBeGreaterThan(0);
 		expect(doneGroup).toBeInTheDocument();
 		expect(progressGroup).toBeInTheDocument();
 

@@ -406,6 +406,7 @@ describe("App create workspace flow", () => {
 				"repo-1",
 				"main",
 				"worktree",
+				"normal",
 				"from_branch",
 				null,
 				// Composer-minted provisional session id; opaque UUID.
@@ -466,6 +467,7 @@ describe("App create workspace flow", () => {
 				"repo-1",
 				"main",
 				"worktree",
+				"normal",
 				"from_branch",
 				null,
 				// Composer-minted provisional session id; opaque UUID.
