@@ -1,5 +1,6 @@
 import { Handle, type NodeProps, NodeResizer, Position } from "@xyflow/react";
 import {
+	FileCode,
 	FolderTree,
 	GitBranch,
 	LayoutGrid,
@@ -10,17 +11,28 @@ import {
 	X,
 } from "lucide-react";
 import { type ComponentType, useState } from "react";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { CanvasPanelType } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { formatBinding } from "./bindings/panel-bindings";
+import { usePanelBindingDigit } from "./bindings/panel-bindings-context";
 import { useCanvasActions } from "./canvas-actions-context";
 import { useCanvasInteractionStore } from "./canvas-interaction-store";
 import { useCanvasViewStore } from "./canvas-view-store";
+import { accentDivider } from "./chrome/panel-accent";
+import { PanelFooter } from "./chrome/panel-footer";
 import { PanelConnections } from "./connections/panel-connections";
 import { parsePanelConfig } from "./panel-config";
 import { PanelErrorBoundary } from "./panel-error-boundary";
 import { ConversationPanelBody } from "./panels/conversation-panel";
 import { DrawingPanelBody } from "./panels/drawing-panel";
 import { EditorPanelBody } from "./panels/editor-panel";
+import { FilesPanelBody } from "./panels/files-panel";
 import { GitPanelBody } from "./panels/git-panel-body";
 import { NotesPanelBody } from "./panels/notes-panel";
 import { TerminalPanelBody } from "./panels/terminal-panel";
@@ -41,8 +53,8 @@ export const PANEL_META: Record<
 	terminal: { label: "Terminal", icon: SquareTerminal },
 	notes: { label: "Notes", icon: NotebookPen },
 	drawing: { label: "Drawing", icon: Pencil },
-	"file-manager": { label: "Editor", icon: FolderTree },
-	editor: { label: "Editor", icon: FolderTree },
+	"file-manager": { label: "Files", icon: FolderTree },
+	editor: { label: "Editor", icon: FileCode },
 	git: { label: "Git", icon: GitBranch },
 };
 
@@ -99,6 +111,12 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 	// wrapping scrolling content makes WebKit drop the content entirely.
 	const bodyAlpha = ownsSurface ? 0 : alpha;
 	const headerAlpha = Math.max(alpha, 0.55);
+	// Per-type identity color for the framing accent bars (header underline +
+	// footer top divider). Persistent — shown regardless of focus.
+	const accent = accentDivider(data.panelType);
+	// Footer shares the header's surface + legibility floor so it never dissolves
+	// on own-surface (conversation/terminal) panels.
+	const footerBg = surface("--canvas-pane-header-bg", headerAlpha);
 	const blur = translucent && !ownsSurface ? "blur(16px)" : undefined;
 	// In select mode the body becomes a drag surface (whole-panel move); in
 	// interact mode it stays `nodrag` so chats/terminals receive their own input.
@@ -107,6 +125,39 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 	// doesn't select the node, so selection alone would hide them and make
 	// panels feel un-resizable.
 	const [hovered, setHovered] = useState(false);
+
+	// Effective ⌘-digit focus shortcut for this panel (undefined for the 10th+),
+	// surfaced as a header tooltip on hover.
+	const bindingDigit = usePanelBindingDigit(id);
+
+	// The header doubles as the drag handle. Lifted into a variable so it can be
+	// rendered bare or wrapped in a tooltip without duplicating the markup.
+	const header = (
+		<div
+			className={cn(
+				PANEL_DRAG_HANDLE_CLASS,
+				"flex h-9 shrink-0 cursor-grab items-center gap-2 border-b px-2.5 active:cursor-grabbing",
+			)}
+			style={{
+				backgroundColor: surface("--canvas-pane-header-bg", headerAlpha),
+				borderBottomColor: accent,
+			}}
+		>
+			<Icon className="size-3.5 shrink-0 opacity-70" />
+			<span className="min-w-0 flex-1 truncate font-medium text-xs">
+				{data.title || meta.label}
+			</span>
+			<PanelConnections nodeId={id} panelType={data.panelType} />
+			<button
+				type="button"
+				aria-label="Close panel"
+				className="nodrag flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-app-muted-foreground hover:bg-app-muted hover:text-app-foreground"
+				onClick={() => removeNode(id)}
+			>
+				<X className="size-3.5" />
+			</button>
+		</div>
+	);
 
 	return (
 		<div
@@ -122,18 +173,18 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 				// over the cream. Inline so it can't lose to a base utility.
 				borderColor:
 					"color-mix(in srgb, var(--canvas-pane-bg, #fff) 70%, currentColor 30%)",
-				// Selection indicator: a thick dashed border in a SATURATED amber.
-				// The theme's `--primary` is a pale, low-chroma amber (≈ oklch 85% .08)
-				// that reads as near-white — especially as a thin line on a dark
-				// (Vesper) panel — and mixing it toward the text colour only made it
-				// whiter. So pin an explicit vivid amber: lightness 0.7 keeps it
-				// visible on both the dark panels and the light/cream ones, and the
-				// strong chroma makes it unmistakably coloured, never white.
+				// Selection indicator: a dashed outline in a soft, muted amber, drawn
+				// with a negative offset so it sits *inside* the panel's footprint.
+				// Using `outline` (not a thicker border) means selection adds nothing
+				// to the box model — the panel never grows, shrinks, or shifts when
+				// selected. The theme's `--primary` is a pale, low-chroma amber that
+				// reads as near-white on dark panels, so we pin an explicit amber:
+				// lightness 0.74 keeps it visible on both dark and cream panels, with a
+				// low chroma (0.045) so it reads as a quiet accent, not a vivid orange.
 				...(selected
 					? {
-							borderColor: "oklch(0.7 0.17 65)",
-							borderStyle: "dashed",
-							borderWidth: "3px",
+							outline: "3px dashed oklch(0.74 0.045 70)",
+							outlineOffset: "-3px",
 							boxShadow: "0 12px 24px -8px rgba(0,0,0,0.45)",
 						}
 					: null),
@@ -167,32 +218,22 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 				isConnectable={!data.locked}
 			/>
 
-			{/* Header is the drag handle. */}
-			<div
-				className={cn(
-					PANEL_DRAG_HANDLE_CLASS,
-					"flex h-9 shrink-0 cursor-grab items-center gap-2 border-b px-2.5 active:cursor-grabbing",
-				)}
-				style={{
-					backgroundColor: surface("--canvas-pane-header-bg", headerAlpha),
-					borderBottomColor:
-						"color-mix(in srgb, var(--canvas-pane-header-bg, #fff) 70%, currentColor 30%)",
-				}}
-			>
-				<Icon className="size-3.5 shrink-0 opacity-70" />
-				<span className="min-w-0 flex-1 truncate font-medium text-xs">
-					{data.title || meta.label}
-				</span>
-				<PanelConnections nodeId={id} panelType={data.panelType} />
-				<button
-					type="button"
-					aria-label="Close panel"
-					className="nodrag flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-app-muted-foreground hover:bg-app-muted hover:text-app-foreground"
-					onClick={() => removeNode(id)}
-				>
-					<X className="size-3.5" />
-				</button>
-			</div>
+			{/* Header is the drag handle; on hover it reveals the panel's focus
+			 *  shortcut (⌘+digit), matching the panels list. The 10th+ panel has no
+			 *  digit, so it renders bare. */}
+			{bindingDigit ? (
+				<TooltipProvider delayDuration={500}>
+					<Tooltip>
+						<TooltipTrigger asChild>{header}</TooltipTrigger>
+						<TooltipContent side="top" sideOffset={6} className="gap-1.5">
+							<span>Focus panel</span>
+							<span className="font-mono">{formatBinding(bindingDigit)}</span>
+						</TooltipContent>
+					</Tooltip>
+				</TooltipProvider>
+			) : (
+				header
+			)}
 
 			{/* Body is interactive — nodrag/nowheel so React Flow doesn't pan,
 			 *  drag, or zoom while the user works inside it. */}
@@ -211,6 +252,12 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 					/>
 				</PanelErrorBoundary>
 			</div>
+			<PanelFooter
+				panelType={data.panelType}
+				config={data.config}
+				accent={accent}
+				background={footerBg}
+			/>
 		</div>
 	);
 }
@@ -249,10 +296,10 @@ function PanelBody({
 			return <NotesPanelBody nodeId={nodeId} config={configRaw} />;
 		case "drawing":
 			return <DrawingPanelBody nodeId={nodeId} config={configRaw} />;
-		// Files + editor are one panel now (tree on the right, content on the
-		// left). `file-manager` stays mapped for any legacy panels created before
-		// the merge — they reopen as the combined editor.
+		// Files panel = tree + embedded editor. The plain Editor panel is
+		// tree-less (just Monaco) so the file tree lives in one place only.
 		case "file-manager":
+			return <FilesPanelBody nodeId={nodeId} config={configRaw} />;
 		case "editor":
 			return <EditorPanelBody nodeId={nodeId} config={configRaw} />;
 		case "git":
