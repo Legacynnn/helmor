@@ -25,10 +25,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import type { CanvasState } from "@/lib/api";
 import { convertFileSrc } from "@/lib/ipc";
 import {
+	canvasRepositoryStyleQueryOptions,
 	canvasStateQueryOptions,
 	workspaceDetailQueryOptions,
 } from "@/lib/query-client";
+import { cn } from "@/lib/utils";
 import { resolveBackgroundUrl } from "./backgrounds";
+import { resolvePanelBindings } from "./bindings/panel-bindings";
+import { PanelBindingsContext } from "./bindings/panel-bindings-context";
 import { usePanelBindingShortcuts } from "./bindings/use-panel-binding-shortcuts";
 import { CableOverlay } from "./cable/cable-overlay";
 import { CanvasActionsProvider } from "./canvas-actions-context";
@@ -50,9 +54,12 @@ import {
 	connectionMeta,
 	useConnectionsStore,
 } from "./connections/connections-store";
+import { parsePanelConfig } from "./panel-config";
 import { PanelNode } from "./panel-node";
 import type { PanelNode as PanelNodeType } from "./types";
+import { useCanvasCreateShortcuts } from "./use-canvas-create-shortcuts";
 import { useCanvasGraph } from "./use-canvas-graph";
+import { useCanvasSidebarStore } from "./use-canvas-sidebar-store";
 import { usePinchZoom } from "./use-pinch-zoom";
 
 const NODE_TYPES = { panel: PanelNode };
@@ -104,8 +111,12 @@ function CanvasInner({
 	initial: CanvasState;
 }) {
 	const { data: detail } = useQuery(workspaceDetailQueryOptions(workspaceId));
+	const repoId = detail?.repoId ?? null;
 	const wrapperRef = useRef<HTMLDivElement>(null);
 	const [customizeOpen, setCustomizeOpen] = useState(false);
+	// The customize popover anchors next to the left rail's customize button, so
+	// it tracks the rail when it shifts right to clear the open workspaces sidebar.
+	const sidebarOpen = useCanvasSidebarStore((s) => s.open);
 	const selectMode = useCanvasInteractionStore((s) => s.selectMode);
 	const pendingType = useCanvasCreateStore((s) => s.pendingType);
 
@@ -128,13 +139,26 @@ function CanvasInner({
 		[workspaceId, detail?.repoId, detail?.rootPath, detail?.state],
 	);
 
-	// Hydrate the transient stores once from the initial snapshot.
+	// Hydrate the transient stores once from the initial snapshot. Camera is
+	// per-workspace; appearance is per-repo and hydrated separately below.
 	const hydrated = useRef(false);
 	if (!hydrated.current) {
 		hydrated.current = true;
 		useConnectionsStore.getState().hydrate(workspaceId, initial.connections);
-		useCanvasViewStore.getState().hydrate(initial.viewState);
+		useCanvasViewStore.getState().hydrateCamera(initial.viewState);
 	}
+
+	// The repo's shared appearance. Keyed per-repo, so every open workspace of
+	// the repo reads one cache entry — a sibling's edit invalidates it and this
+	// effect restyles the surface live (no reload).
+	const { data: repoStyle } = useQuery(
+		canvasRepositoryStyleQueryOptions(repoId),
+	);
+	useEffect(() => {
+		if (repoId && repoStyle) {
+			useCanvasViewStore.getState().hydrateAppearance(repoId, repoStyle);
+		}
+	}, [repoId, repoStyle]);
 
 	const { nodes, onNodesChange, actions, reconcile } = useCanvasGraph(
 		workspaceId,
@@ -145,6 +169,8 @@ function CanvasInner({
 	// ⌘1–⌘9 focus a panel by its binding; ⌘/ toggles the panels list. Scoped to
 	// the canvas via `data-focus-scope="canvas"` on the wrapper below.
 	usePanelBindingShortcuts(nodes);
+	// ⌘⌥C/N/D/E/G + ⌘⇧T arm the new-panel create flow (same as the rail buttons).
+	useCanvasCreateShortcuts();
 
 	// The canvas is its own surface: it never imports the workspace's existing
 	// (normal-tab) conversations. A canvas only ever shows panels the user
@@ -224,6 +250,19 @@ function CanvasInner({
 		[nodes, selectMode],
 	);
 
+	// Effective ⌘-digit focus binding per panel, shared with every PanelNode via
+	// context so each can show its own shortcut on hover (mirrors the panels list).
+	const panelBindings = useMemo(
+		() =>
+			resolvePanelBindings(
+				nodes.map((n) => ({
+					id: n.id,
+					binding: parsePanelConfig(n.data.config).binding,
+				})),
+			),
+		[nodes],
+	);
+
 	const onMoveEnd = useCallback(
 		(_e: unknown, vp: Viewport) => setCamera(vp.x, vp.y, vp.zoom),
 		[setCamera],
@@ -285,7 +324,10 @@ function CanvasInner({
 					// Activates the `canvas` shortcut scope (⌘1–⌘9, ⌘/) while focus is
 					// inside the surface, so they don't double-fire with chat shortcuts.
 					data-focus-scope="canvas"
-					className="relative size-full overflow-hidden bg-background"
+					// Plain neutral canvas surface (black in dark, white in light) —
+					// intentionally NOT the themed `bg-background`, which picks up the
+					// active theme's tint. Keeps the empty canvas monochrome.
+					className="relative size-full overflow-hidden bg-white dark:bg-neutral-950"
 					// The canvas accent (selected-panel border, resize handles,
 					// connection cables, selection toolbar) reads `--color-selected`,
 					// which is otherwise undefined and falls back to a hardcoded blue.
@@ -313,50 +355,52 @@ function CanvasInner({
 							</div>
 						</>
 					) : null}
-					<ReactFlow<PanelNodeType>
-						nodes={rfNodes}
-						edges={edges}
-						style={
-							backgroundUrl ? { backgroundColor: "transparent" } : undefined
-						}
-						onNodesChange={onNodesChange}
-						onConnect={onConnect}
-						onEdgesDelete={onEdgesDelete}
-						onMove={onMove}
-						onMoveEnd={onMoveEnd}
-						nodeTypes={NODE_TYPES}
-						colorMode={theme as ColorMode}
-						snapToGrid={snapToGrid}
-						snapGrid={[16, 16]}
-						defaultViewport={{
-							x: initial.viewState.panX,
-							y: initial.viewState.panY,
-							zoom: initial.viewState.zoom || 1,
-						}}
-						minZoom={MIN_ZOOM}
-						maxZoom={MAX_ZOOM}
-						proOptions={{ hideAttribution: true }}
-						deleteKeyCode={["Backspace", "Delete"]}
-						panOnScroll
-						zoomOnScroll={false}
-						panOnDrag={selectMode ? [1, 2] : true}
-						selectionOnDrag={selectMode}
-						selectNodesOnDrag={false}
-						selectionMode={SelectionMode.Partial}
-					>
-						{pattern !== "blank" ? (
-							<Background
-								variant={
-									pattern === "lines"
-										? BackgroundVariant.Lines
-										: BackgroundVariant.Dots
-								}
-								gap={16}
-							/>
-						) : null}
-						<Controls showInteractive={false} />
-						<MiniMap pannable zoomable />
-					</ReactFlow>
+					<PanelBindingsContext.Provider value={panelBindings}>
+						<ReactFlow<PanelNodeType>
+							nodes={rfNodes}
+							edges={edges}
+							style={
+								backgroundUrl ? { backgroundColor: "transparent" } : undefined
+							}
+							onNodesChange={onNodesChange}
+							onConnect={onConnect}
+							onEdgesDelete={onEdgesDelete}
+							onMove={onMove}
+							onMoveEnd={onMoveEnd}
+							nodeTypes={NODE_TYPES}
+							colorMode={theme as ColorMode}
+							snapToGrid={snapToGrid}
+							snapGrid={[16, 16]}
+							defaultViewport={{
+								x: initial.viewState.panX,
+								y: initial.viewState.panY,
+								zoom: initial.viewState.zoom || 1,
+							}}
+							minZoom={MIN_ZOOM}
+							maxZoom={MAX_ZOOM}
+							proOptions={{ hideAttribution: true }}
+							deleteKeyCode={["Backspace", "Delete"]}
+							panOnScroll
+							zoomOnScroll={false}
+							panOnDrag={selectMode ? [1, 2] : true}
+							selectionOnDrag={selectMode}
+							selectNodesOnDrag={false}
+							selectionMode={SelectionMode.Partial}
+						>
+							{pattern !== "blank" ? (
+								<Background
+									variant={
+										pattern === "lines"
+											? BackgroundVariant.Lines
+											: BackgroundVariant.Dots
+									}
+									gap={16}
+								/>
+							) : null}
+							<Controls showInteractive={false} />
+							<MiniMap pannable zoomable />
+						</ReactFlow>
+					</PanelBindingsContext.Provider>
 					<CanvasCreateOverlay />
 					<TooltipProvider delayDuration={300}>
 						<CanvasWorkspaceControls
@@ -373,11 +417,16 @@ function CanvasInner({
 						<PanelsListPopover nodes={nodes} />
 					</TooltipProvider>
 					<CustomizePopover
-						workspaceId={workspaceId}
+						repositoryId={repoId}
 						open={customizeOpen}
 						onOpenChange={setCustomizeOpen}
 						anchor={
-							<span className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-14 block h-0 w-0" />
+							<span
+								className={cn(
+									"-translate-y-1/2 pointer-events-none absolute top-1/2 block h-0 w-0 transition-[left] duration-200 ease-out",
+									sidebarOpen ? "left-[328px]" : "left-14",
+								)}
+							/>
 						}
 					/>
 				</div>

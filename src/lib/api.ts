@@ -2667,7 +2667,8 @@ export type UiMutationEvent =
 			workspaceId: string;
 			sessionId: string | null;
 	  }
-	| { type: "canvasChanged"; workspaceId: string };
+	| { type: "canvasChanged"; workspaceId: string }
+	| { type: "canvasStyleChanged"; repositoryId: string };
 
 export type TriageConfig = {
 	enabled: boolean;
@@ -5991,12 +5992,20 @@ export type CanvasConnection = {
 export type CanvasBackgroundPattern = "blank" | "dots" | "lines";
 export type CanvasBackgroundTheme = "light" | "dark" | "system";
 
-/** Per-workspace viewport + appearance. */
+/** Per-workspace canvas camera (pan/zoom). Appearance is shared per-repository —
+ * see {@link CanvasRepositoryStyle}. */
 export type CanvasViewState = {
 	workspaceId: string;
 	panX: number;
 	panY: number;
 	zoom: number;
+	updatedAt: string;
+};
+
+/** Shared canvas appearance for a repository. Every workspace of the repo renders
+ * this same style; editing it in one workspace restyles them all. */
+export type CanvasRepositoryStyle = {
+	repositoryId: string;
 	/** Global DOM-panel translucency, 0..=1 (1 = opaque). */
 	translucency: number;
 	backgroundPattern: CanvasBackgroundPattern;
@@ -6034,22 +6043,40 @@ export async function deleteCanvasPanel(
 	return invoke<void>("delete_canvas_panel", { workspaceId, panelId });
 }
 
-/** Persist viewport + appearance. Broadcasts `canvasChanged`. */
+/** Persist the per-workspace camera (pan/zoom). Broadcasts `canvasChanged`. */
 export async function saveCanvasViewState(
 	view: CanvasViewState,
 ): Promise<void> {
 	return invoke<void>("save_canvas_view_state", { view });
 }
 
+/** Load a repository's shared canvas appearance (defaults when never customized). */
+export async function loadCanvasRepositoryStyle(
+	repositoryId: string,
+): Promise<CanvasRepositoryStyle> {
+	return invoke<CanvasRepositoryStyle>("load_canvas_repository_style", {
+		repositoryId,
+	});
+}
+
+/** Persist a repository's shared canvas appearance. Broadcasts `canvasStyleChanged`
+ * so every open workspace of that repo restyles in step. */
+export async function saveCanvasRepositoryStyle(
+	style: CanvasRepositoryStyle,
+): Promise<void> {
+	return invoke<void>("save_canvas_repository_style", { style });
+}
+
 /** Persist an uploaded canvas background image to the data dir; returns the
- * absolute file path to store in `backgroundImage` and render via convertFileSrc. */
+ * absolute file path to store in `backgroundImage` and render via convertFileSrc.
+ * Keyed by repository — the background is part of the repo's shared style. */
 export async function saveCanvasBackground(
-	workspaceId: string,
+	repositoryId: string,
 	bytes: Uint8Array,
 	ext: string,
 ): Promise<string> {
 	return invoke<string>("save_canvas_background", {
-		workspaceId,
+		repositoryId,
 		bytes: Array.from(bytes),
 		ext,
 	});

@@ -41,6 +41,7 @@ import {
 	loadArchivedWorkspaces,
 	loadAutoCloseActionKinds,
 	loadAutoCloseOptInAsked,
+	loadCanvasRepositoryStyle,
 	loadCanvasState,
 	loadProviderCapabilities,
 	loadSessionThreadMessages,
@@ -175,6 +176,8 @@ export const helmorQueryKeys = {
 		["workspaceCandidateDirectories", excludeWorkspaceId ?? ""] as const,
 	activeStreams: ["activeStreams"] as const,
 	canvasState: (workspaceId: string) => ["canvasState", workspaceId] as const,
+	canvasRepositoryStyle: (repositoryId: string) =>
+		["canvasRepositoryStyle", repositoryId] as const,
 	slackWorkspaces: ["slackWorkspaces"] as const,
 	slackInbox: (teamId: string) => ["slackInbox", teamId] as const,
 	slackSearch: (teamId: string, query: string, sort: string) =>
@@ -656,6 +659,19 @@ export function canvasStateQueryOptions(workspaceId: string) {
 	return queryOptions({
 		queryKey: helmorQueryKeys.canvasState(workspaceId),
 		queryFn: () => loadCanvasState(workspaceId),
+		staleTime: Number.POSITIVE_INFINITY,
+		gcTime: 5 * 60_000,
+	});
+}
+
+/** A repository's shared canvas appearance. Keyed by repo so every open workspace
+ * of the repo reads the same cache entry — a `canvasStyleChanged` invalidation
+ * restyles them all together. `enabled` guards workspaces with no linked repo. */
+export function canvasRepositoryStyleQueryOptions(repositoryId: string | null) {
+	return queryOptions({
+		queryKey: helmorQueryKeys.canvasRepositoryStyle(repositoryId ?? ""),
+		queryFn: () => loadCanvasRepositoryStyle(repositoryId ?? ""),
+		enabled: Boolean(repositoryId),
 		staleTime: Number.POSITIVE_INFINITY,
 		gcTime: 5 * 60_000,
 	});

@@ -979,6 +979,60 @@ fn run_migrations(connection: &Connection) -> Result<()> {
         add_column_if_missing(connection, "canvas_view_state", "background_image", "TEXT")?;
     }
 
+    // Canvas appearance moved from per-workspace (`canvas_view_state`) to
+    // per-repository (`canvas_repository_style`). One-shot backfill: seed each
+    // repo's shared style from its most-recently-updated workspace's old style.
+    seed_canvas_repository_style(connection)?;
+
+    Ok(())
+}
+
+/// One-shot backfill for the per-workspace → per-repository canvas style move.
+/// Runs only while `canvas_repository_style` is still empty, so it never clobbers
+/// styles a user has since set. For each repository, adopts the appearance of its
+/// most-recently-updated workspace canvas (matching the "share last-edited style"
+/// migration decision); repos with no customized workspace fall back to defaults
+/// by simply having no row.
+fn seed_canvas_repository_style(connection: &Connection) -> Result<()> {
+    if !has_table(connection, "canvas_repository_style")
+        || !has_table(connection, "canvas_view_state")
+        || !has_table(connection, "workspaces")
+    {
+        return Ok(());
+    }
+    // Legacy source columns may be absent on very old dev DBs — bail if so.
+    if !has_column(connection, "canvas_view_state", "translucency") {
+        return Ok(());
+    }
+    let already: i64 =
+        connection.query_row("SELECT COUNT(*) FROM canvas_repository_style", [], |r| {
+            r.get(0)
+        })?;
+    if already > 0 {
+        return Ok(());
+    }
+    connection
+        .execute_batch(
+            r#"
+            INSERT INTO canvas_repository_style
+                (repository_id, translucency, background_pattern, background_color,
+                 background_theme, snap_to_grid, background_image, updated_at)
+            SELECT w.repository_id, v.translucency, v.background_pattern, v.background_color,
+                   v.background_theme, v.snap_to_grid, v.background_image, v.updated_at
+            FROM canvas_view_state v
+            JOIN workspaces w ON w.id = v.workspace_id
+            WHERE w.repository_id IS NOT NULL
+              AND v.updated_at = (
+                  SELECT MAX(v2.updated_at)
+                  FROM canvas_view_state v2
+                  JOIN workspaces w2 ON w2.id = v2.workspace_id
+                  WHERE w2.repository_id = w.repository_id
+              )
+            GROUP BY w.repository_id
+            ON CONFLICT(repository_id) DO NOTHING;
+            "#,
+        )
+        .context("Failed to seed canvas_repository_style from legacy view state")?;
     Ok(())
 }
 
@@ -1009,10 +1063,13 @@ CREATE TABLE IF NOT EXISTS session_plan_state (
 );
 "#;
 
-// Infinite Canvas mode (epic #61). Greenfield, per-workspace spatial layout.
-//   - canvas_panels:       every surface placed on the canvas (UUID-keyed).
-//   - canvas_connections:  generic typed edges between panels (chains allowed).
-//   - canvas_view_state:   per-workspace pan/zoom/translucency + background.
+// Infinite Canvas mode (epic #61). Spatial layout persistence.
+//   - canvas_panels:           every surface placed on the canvas (UUID-keyed, per-workspace).
+//   - canvas_connections:      generic typed edges between panels (chains allowed, per-workspace).
+//   - canvas_view_state:       per-workspace pan/zoom camera. (Legacy appearance
+//                              columns remain but are unused — see canvas_repository_style.)
+//   - canvas_repository_style: shared appearance (translucency + background) per repository,
+//                              so every workspace of a repo renders the same canvas style.
 // `config` / `meta` are opaque JSON blobs owned by the frontend so panel and
 // connection kinds can evolve without schema churn. Idempotent CREATE TABLE so
 // existing DBs pick them up on next launch.
@@ -1048,6 +1105,17 @@ CREATE TABLE IF NOT EXISTS canvas_view_state (
     pan_x REAL NOT NULL DEFAULT 0,
     pan_y REAL NOT NULL DEFAULT 0,
     zoom REAL NOT NULL DEFAULT 1,
+    translucency REAL NOT NULL DEFAULT 1,
+    background_pattern TEXT NOT NULL DEFAULT 'dots',
+    background_color TEXT,
+    background_theme TEXT NOT NULL DEFAULT 'system',
+    snap_to_grid INTEGER NOT NULL DEFAULT 0,
+    background_image TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS canvas_repository_style (
+    repository_id TEXT PRIMARY KEY,
     translucency REAL NOT NULL DEFAULT 1,
     background_pattern TEXT NOT NULL DEFAULT 'dots',
     background_color TEXT,
@@ -1528,6 +1596,72 @@ mod tests {
         ensure_schema(&connection).unwrap();
         // Call again — should not error
         ensure_schema(&connection).unwrap();
+    }
+
+    #[test]
+    fn seed_repository_style_adopts_most_recent_workspace_style() {
+        let (conn, _dir) = open_test_db();
+        ensure_schema(&conn).unwrap();
+
+        // Two workspaces in the same repo, each with legacy per-workspace style.
+        conn.execute(
+            "INSERT INTO workspaces (id, repository_id, directory_name, status, display_order)
+             VALUES ('wsOld', 'repoX', 'wsOld', 'in-progress', 0),
+                    ('wsNew', 'repoX', 'wsNew', 'in-progress', 0)",
+            [],
+        )
+        .unwrap();
+        // Older edit: lines / dark.
+        conn.execute(
+            "INSERT INTO canvas_view_state
+                (workspace_id, background_pattern, background_theme, translucency, snap_to_grid, updated_at)
+             VALUES ('wsOld', 'lines', 'dark', 0.4, 1, '2024-01-01 00:00:00')",
+            [],
+        )
+        .unwrap();
+        // Most-recent edit: blank / light — this is the one the repo should adopt.
+        conn.execute(
+            "INSERT INTO canvas_view_state
+                (workspace_id, background_pattern, background_theme, translucency, snap_to_grid, updated_at)
+             VALUES ('wsNew', 'blank', 'light', 0.9, 0, '2024-06-01 00:00:00')",
+            [],
+        )
+        .unwrap();
+
+        // Style table is still empty at this point (nothing to seed on first pass);
+        // run the one-shot backfill now that legacy rows exist.
+        seed_canvas_repository_style(&conn).unwrap();
+
+        let (pattern, theme, translucency): (String, String, f64) = conn
+            .query_row(
+                "SELECT background_pattern, background_theme, translucency
+                 FROM canvas_repository_style WHERE repository_id = 'repoX'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(pattern, "blank");
+        assert_eq!(theme, "light");
+        assert_eq!(translucency, 0.9);
+
+        // One-shot: a second call must not clobber a now-populated table.
+        conn.execute(
+            "UPDATE canvas_repository_style SET background_pattern = 'dots' WHERE repository_id = 'repoX'",
+            [],
+        )
+        .unwrap();
+        seed_canvas_repository_style(&conn).unwrap();
+        let pattern2: String = conn
+            .query_row(
+                "SELECT background_pattern FROM canvas_repository_style WHERE repository_id = 'repoX'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            pattern2, "dots",
+            "seed must not re-run once table is populated"
+        );
     }
 
     fn insert_ws(

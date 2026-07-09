@@ -45,6 +45,18 @@ async fn dispatch(
             settings.retain(|key, _| !is_secret_setting_key(key));
             to_value(settings)
         }
+        // ============ Infinite Canvas (epic #61) ============
+        // Plain DB reads/writes — safe to drive from a paired phone. Camera is
+        // per-workspace; appearance is shared per-repository.
+        "load_canvas_state" => to_value(crate::commands::canvas_commands::load_canvas_state(arg_string(&args, "workspaceId")?).await?),
+        "save_canvas_panel" => to_value(crate::commands::canvas_commands::save_canvas_panel(app.clone(), arg_json(&args, "panel")?).await?),
+        "delete_canvas_panel" => to_value(crate::commands::canvas_commands::delete_canvas_panel(app.clone(), arg_string(&args, "workspaceId")?, arg_string(&args, "panelId")?).await?),
+        "save_canvas_view_state" => to_value(crate::commands::canvas_commands::save_canvas_view_state(app.clone(), arg_json(&args, "view")?).await?),
+        "load_canvas_repository_style" => to_value(crate::commands::canvas_commands::load_canvas_repository_style(arg_string(&args, "repositoryId")?).await?),
+        "save_canvas_repository_style" => to_value(crate::commands::canvas_commands::save_canvas_repository_style(app.clone(), arg_json(&args, "style")?).await?),
+        "save_canvas_connection" => to_value(crate::commands::canvas_commands::save_canvas_connection(app.clone(), arg_json(&args, "connection")?).await?),
+        "delete_canvas_connection" => to_value(crate::commands::canvas_commands::delete_canvas_connection(app.clone(), arg_string(&args, "workspaceId")?, arg_string(&args, "connectionId")?).await?),
+        "save_canvas_background" => to_value(crate::commands::canvas_commands::save_canvas_background(arg_string(&args, "repositoryId")?, arg_json(&args, "bytes")?, arg_string(&args, "ext")?).await?),
         // ============ generated: data + control commands ============
         "add_repository_from_local_path" => to_value(crate::commands::repository_commands::add_repository_from_local_path(arg_string(&args, "folderPath")?).await?),
         "backfill_forge_repo_bindings" => to_value(crate::commands::forge_commands::backfill_forge_repo_bindings(app.clone()).await?),

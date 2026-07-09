@@ -731,6 +731,8 @@ pub fn run() {
             commands::canvas_commands::save_canvas_panel,
             commands::canvas_commands::delete_canvas_panel,
             commands::canvas_commands::save_canvas_view_state,
+            commands::canvas_commands::load_canvas_repository_style,
+            commands::canvas_commands::save_canvas_repository_style,
             commands::canvas_commands::save_canvas_connection,
             commands::canvas_commands::delete_canvas_connection,
             commands::canvas_commands::save_canvas_background,

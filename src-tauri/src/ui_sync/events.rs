@@ -173,6 +173,12 @@ pub enum UiMutationEvent {
     CanvasChanged {
         workspace_id: String,
     },
+    /// A repository's shared canvas appearance changed (translucency, background,
+    /// grid, theme). Scoped per repository so every open workspace of that repo
+    /// invalidates its `canvasRepositoryStyle` query and restyles in step.
+    CanvasStyleChanged {
+        repository_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

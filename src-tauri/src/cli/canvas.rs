@@ -259,19 +259,45 @@ fn disconnect(workspace: &str, id: &str, cli: &Cli) -> Result<()> {
     Ok(())
 }
 
+/// Combined camera (per-workspace) + shared style (per-repository) view for the
+/// CLI `canvas view` command.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CanvasViewReport {
+    #[serde(flatten)]
+    camera: canvas::CanvasViewState,
+    #[serde(flatten)]
+    style: canvas::CanvasRepositoryStyle,
+}
+
 fn view(workspace: &str, cli: &Cli) -> Result<()> {
+    use rusqlite::OptionalExtension;
     let ws = crate::service::resolve_workspace_ref(workspace)?;
-    let state = db::read(|conn| canvas::get_view_state(conn, &ws))?;
-    output::print(cli, &state, |v| {
+    let report = db::read(|conn| {
+        let camera = canvas::get_view_state(conn, &ws)?;
+        let repo_id: Option<String> = conn
+            .query_row(
+                "SELECT repository_id FROM workspaces WHERE id = ?1",
+                [&ws],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let style = match repo_id {
+            Some(rid) => canvas::get_repository_style(conn, &rid)?,
+            None => canvas::CanvasRepositoryStyle::default_for(""),
+        };
+        Ok(CanvasViewReport { camera, style })
+    })?;
+    output::print(cli, &report, |v| {
         format!(
             "pan ({:.0}, {:.0}) · zoom {:.2} · translucency {:.0}% · bg {} ({})\nsnap-to-grid {}",
-            v.pan_x,
-            v.pan_y,
-            v.zoom,
-            v.translucency * 100.0,
-            v.background_pattern,
-            v.background_theme,
-            if v.snap_to_grid { "on" } else { "off" },
+            v.camera.pan_x,
+            v.camera.pan_y,
+            v.camera.zoom,
+            v.style.translucency * 100.0,
+            v.style.background_pattern,
+            v.style.background_theme,
+            if v.style.snap_to_grid { "on" } else { "off" },
         )
     })
 }

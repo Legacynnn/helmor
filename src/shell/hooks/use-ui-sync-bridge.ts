@@ -130,6 +130,15 @@ function handleUiMutation(
 				queryKey: helmorQueryKeys.canvasState(event.workspaceId),
 			});
 			return;
+		case "canvasStyleChanged":
+			// A repo's shared canvas appearance changed. Every open workspace of
+			// the repo reads the same `canvasRepositoryStyle` cache entry, so one
+			// invalidation restyles them all — including sibling workspaces the
+			// user isn't editing (the "edit on one edits all" requirement).
+			void queryClient.invalidateQueries({
+				queryKey: helmorQueryKeys.canvasRepositoryStyle(event.repositoryId),
+			});
+			return;
 		case "sessionTurnPersisted": {
 			// A turn's terminal rows landed in the DB. While THIS client has a
 			// live stream (or an in-flight send) for the session, the local

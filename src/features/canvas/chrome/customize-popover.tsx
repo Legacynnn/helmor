@@ -18,14 +18,15 @@ const SELECTED_RING = "ring-2 ring-[var(--color-selected,#3b82f6)]";
 
 /** Glass popover with canvas appearance controls: background picker (presets,
  * none, upload), translucency, grid pattern, and theme. Controlled by the
- * parent — open state is owned upstream. Wires straight into the view store. */
+ * parent — open state is owned upstream. Appearance is shared per repository, so
+ * every edit here restyles all of the repo's workspaces via the view store. */
 export function CustomizePopover({
-	workspaceId,
+	repositoryId,
 	open,
 	onOpenChange,
 	anchor,
 }: {
-	workspaceId: string;
+	repositoryId: string | null;
 	open: boolean;
 	onOpenChange: (v: boolean) => void;
 	anchor: React.ReactNode;
@@ -38,9 +39,12 @@ export function CustomizePopover({
 	const fileRef = useRef<HTMLInputElement>(null);
 
 	async function onUpload(file: File) {
+		// Backgrounds are stored per-repo; without a linked repo there's nothing
+		// to key the shared style against, so skip the upload.
+		if (!repositoryId) return;
 		const buf = new Uint8Array(await file.arrayBuffer());
 		const ext = file.name.split(".").pop() ?? "png";
-		const path = await saveCanvasBackground(workspaceId, buf, ext);
+		const path = await saveCanvasBackground(repositoryId, buf, ext);
 		set({ backgroundImage: path });
 	}
 

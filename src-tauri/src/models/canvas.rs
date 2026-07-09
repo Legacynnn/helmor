@@ -1,9 +1,10 @@
 //! Persistence for Infinite Canvas mode (epic #61).
 //!
-//! Three greenfield, per-workspace tables backing the spatial canvas:
-//!   - `canvas_panels`      — every surface placed on the canvas (UUID-keyed).
-//!   - `canvas_connections` — generic typed edges between panels (chains OK).
-//!   - `canvas_view_state`  — pan/zoom/translucency + background per workspace.
+//! Tables backing the spatial canvas:
+//!   - `canvas_panels`           — every surface placed on the canvas (UUID-keyed, per-workspace).
+//!   - `canvas_connections`      — generic typed edges between panels (chains OK, per-workspace).
+//!   - `canvas_view_state`       — pan/zoom camera per workspace.
+//!   - `canvas_repository_style` — shared appearance (translucency + background) per repository.
 //!
 //! `config` / `meta` are opaque JSON strings owned by the frontend so panel and
 //! connection kinds can evolve without schema churn. The repo exposes plain
@@ -55,7 +56,9 @@ pub struct CanvasConnection {
     pub created_at: String,
 }
 
-/// Per-workspace canvas viewport + appearance.
+/// Per-workspace canvas viewport (camera only). Visual appearance lives in
+/// [`CanvasRepositoryStyle`], scoped one-per-repository so every workspace of a
+/// repo shares the same look.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasViewState {
@@ -63,6 +66,29 @@ pub struct CanvasViewState {
     pub pan_x: f64,
     pub pan_y: f64,
     pub zoom: f64,
+    pub updated_at: String,
+}
+
+impl CanvasViewState {
+    /// Defaults applied when a workspace has never entered canvas mode.
+    pub fn default_for(workspace_id: &str) -> Self {
+        Self {
+            workspace_id: workspace_id.to_string(),
+            pan_x: 0.0,
+            pan_y: 0.0,
+            zoom: 1.0,
+            updated_at: String::new(),
+        }
+    }
+}
+
+/// Per-repository canvas appearance. Shared across every workspace of the repo:
+/// customizing it in one workspace restyles them all. Camera stays per-workspace
+/// in [`CanvasViewState`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasRepositoryStyle {
+    pub repository_id: String,
     /// Global translucency for all DOM panels, 0.0..=1.0 (1 = opaque).
     pub translucency: f64,
     /// "blank" | "dots" | "lines".
@@ -77,14 +103,11 @@ pub struct CanvasViewState {
     pub updated_at: String,
 }
 
-impl CanvasViewState {
-    /// Defaults applied when a workspace has never entered canvas mode.
-    pub fn default_for(workspace_id: &str) -> Self {
+impl CanvasRepositoryStyle {
+    /// Defaults applied when a repository has never been customized.
+    pub fn default_for(repository_id: &str) -> Self {
         Self {
-            workspace_id: workspace_id.to_string(),
-            pan_x: 0.0,
-            pan_y: 0.0,
-            zoom: 1.0,
+            repository_id: repository_id.to_string(),
             translucency: 1.0,
             background_pattern: "dots".to_string(),
             background_color: None,
@@ -148,17 +171,26 @@ fn map_view_state(row: &rusqlite::Row<'_>) -> rusqlite::Result<CanvasViewState> 
         pan_x: row.get(1)?,
         pan_y: row.get(2)?,
         zoom: row.get(3)?,
-        translucency: row.get(4)?,
-        background_pattern: row.get(5)?,
-        background_color: row.get(6)?,
-        background_theme: row.get(7)?,
-        snap_to_grid: row.get::<_, i64>(8)? != 0,
-        background_image: row.get(9)?,
-        updated_at: row.get(10)?,
+        updated_at: row.get(4)?,
     })
 }
 
-const VIEW_STATE_COLUMNS: &str = "workspace_id, pan_x, pan_y, zoom, translucency, background_pattern, background_color, background_theme, snap_to_grid, background_image, updated_at";
+const VIEW_STATE_COLUMNS: &str = "workspace_id, pan_x, pan_y, zoom, updated_at";
+
+fn map_repository_style(row: &rusqlite::Row<'_>) -> rusqlite::Result<CanvasRepositoryStyle> {
+    Ok(CanvasRepositoryStyle {
+        repository_id: row.get(0)?,
+        translucency: row.get(1)?,
+        background_pattern: row.get(2)?,
+        background_color: row.get(3)?,
+        background_theme: row.get(4)?,
+        snap_to_grid: row.get::<_, i64>(5)? != 0,
+        background_image: row.get(6)?,
+        updated_at: row.get(7)?,
+    })
+}
+
+const REPOSITORY_STYLE_COLUMNS: &str = "repository_id, translucency, background_pattern, background_color, background_theme, snap_to_grid, background_image, updated_at";
 
 // ── Panels ─────────────────────────────────────────────────────────────────
 
@@ -272,16 +304,52 @@ pub fn get_view_state(conn: &Connection, workspace_id: &str) -> Result<CanvasVie
 }
 
 pub fn upsert_view_state(conn: &Connection, view: &CanvasViewState) -> Result<()> {
+    // Only the camera columns are written here — appearance lives per-repo in
+    // `canvas_repository_style`. Legacy style columns keep their (unused) values.
     conn.execute(
         r#"
         INSERT INTO canvas_view_state
-            (workspace_id, pan_x, pan_y, zoom, translucency, background_pattern,
-             background_color, background_theme, snap_to_grid, background_image, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now'))
+            (workspace_id, pan_x, pan_y, zoom, updated_at)
+        VALUES (?1, ?2, ?3, ?4, datetime('now'))
         ON CONFLICT(workspace_id) DO UPDATE SET
             pan_x = excluded.pan_x,
             pan_y = excluded.pan_y,
             zoom = excluded.zoom,
+            updated_at = datetime('now')
+        "#,
+        rusqlite::params![view.workspace_id, view.pan_x, view.pan_y, view.zoom],
+    )?;
+    Ok(())
+}
+
+// ── Repository style ─────────────────────────────────────────────────────────
+
+/// Load a repository's shared canvas appearance, falling back to defaults when
+/// the repo has never been customized.
+pub fn get_repository_style(
+    conn: &Connection,
+    repository_id: &str,
+) -> Result<CanvasRepositoryStyle> {
+    let found = conn
+        .query_row(
+            &format!(
+                "SELECT {REPOSITORY_STYLE_COLUMNS} FROM canvas_repository_style WHERE repository_id = ?1"
+            ),
+            [repository_id],
+            map_repository_style,
+        )
+        .optional()?;
+    Ok(found.unwrap_or_else(|| CanvasRepositoryStyle::default_for(repository_id)))
+}
+
+pub fn upsert_repository_style(conn: &Connection, style: &CanvasRepositoryStyle) -> Result<()> {
+    conn.execute(
+        r#"
+        INSERT INTO canvas_repository_style
+            (repository_id, translucency, background_pattern, background_color,
+             background_theme, snap_to_grid, background_image, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'))
+        ON CONFLICT(repository_id) DO UPDATE SET
             translucency = excluded.translucency,
             background_pattern = excluded.background_pattern,
             background_color = excluded.background_color,
@@ -291,19 +359,22 @@ pub fn upsert_view_state(conn: &Connection, view: &CanvasViewState) -> Result<()
             updated_at = datetime('now')
         "#,
         rusqlite::params![
-            view.workspace_id,
-            view.pan_x,
-            view.pan_y,
-            view.zoom,
-            view.translucency,
-            view.background_pattern,
-            view.background_color,
-            view.background_theme,
-            view.snap_to_grid as i64,
-            view.background_image,
+            style.repository_id,
+            style.translucency,
+            style.background_pattern,
+            style.background_color,
+            style.background_theme,
+            style.snap_to_grid as i64,
+            style.background_image,
         ],
     )?;
     Ok(())
+}
+
+/// Load a repository's shared canvas style in its own read transaction — the
+/// renderer pulls this alongside the per-workspace canvas state on entry.
+pub fn load_repository_style(repository_id: &str) -> Result<CanvasRepositoryStyle> {
+    db::read(|conn| get_repository_style(conn, repository_id))
 }
 
 // ── Aggregate ────────────────────────────────────────────────────────────────
@@ -416,9 +487,7 @@ mod tests {
         let conn = mem_conn();
         let view = get_view_state(&conn, "ws1").unwrap();
         assert_eq!(view.zoom, 1.0);
-        assert_eq!(view.translucency, 1.0);
-        assert_eq!(view.background_pattern, "dots");
-        assert!(!view.snap_to_grid);
+        assert_eq!(view.pan_x, 0.0);
     }
 
     #[test]
@@ -427,17 +496,11 @@ mod tests {
         let mut view = CanvasViewState::default_for("ws1");
         view.pan_x = 100.0;
         view.zoom = 2.0;
-        view.translucency = 0.5;
-        view.background_pattern = "lines".to_string();
-        view.snap_to_grid = true;
         upsert_view_state(&conn, &view).unwrap();
 
         let loaded = get_view_state(&conn, "ws1").unwrap();
         assert_eq!(loaded.pan_x, 100.0);
         assert_eq!(loaded.zoom, 2.0);
-        assert_eq!(loaded.translucency, 0.5);
-        assert_eq!(loaded.background_pattern, "lines");
-        assert!(loaded.snap_to_grid);
 
         view.zoom = 3.0;
         upsert_view_state(&conn, &view).unwrap();
@@ -445,22 +508,64 @@ mod tests {
     }
 
     #[test]
-    fn view_state_round_trips_background_image() {
+    fn repository_style_defaults_when_absent() {
         let conn = mem_conn();
-        let mut view = CanvasViewState::default_for("ws1");
-        view.background_image = Some("aurora".to_string());
-        upsert_view_state(&conn, &view).unwrap();
-        assert_eq!(
-            get_view_state(&conn, "ws1")
-                .unwrap()
-                .background_image
-                .as_deref(),
-            Some("aurora")
-        );
+        let style = get_repository_style(&conn, "repo1").unwrap();
+        assert_eq!(style.translucency, 1.0);
+        assert_eq!(style.background_pattern, "dots");
+        assert_eq!(style.background_theme, "system");
+        assert!(!style.snap_to_grid);
+        assert_eq!(style.background_image, None);
+    }
 
-        view.background_image = None;
-        upsert_view_state(&conn, &view).unwrap();
-        assert_eq!(get_view_state(&conn, "ws1").unwrap().background_image, None);
+    #[test]
+    fn repository_style_upsert_round_trips_and_updates() {
+        let conn = mem_conn();
+        let mut style = CanvasRepositoryStyle::default_for("repo1");
+        style.translucency = 0.5;
+        style.background_pattern = "lines".to_string();
+        style.background_theme = "dark".to_string();
+        style.snap_to_grid = true;
+        style.background_image = Some("aurora".to_string());
+        upsert_repository_style(&conn, &style).unwrap();
+
+        let loaded = get_repository_style(&conn, "repo1").unwrap();
+        assert_eq!(loaded.translucency, 0.5);
+        assert_eq!(loaded.background_pattern, "lines");
+        assert_eq!(loaded.background_theme, "dark");
+        assert!(loaded.snap_to_grid);
+        assert_eq!(loaded.background_image.as_deref(), Some("aurora"));
+
+        style.translucency = 0.8;
+        style.background_image = None;
+        upsert_repository_style(&conn, &style).unwrap();
+        let reloaded = get_repository_style(&conn, "repo1").unwrap();
+        assert_eq!(reloaded.translucency, 0.8);
+        assert_eq!(reloaded.background_image, None);
+    }
+
+    #[test]
+    fn repository_style_is_scoped_per_repository() {
+        let conn = mem_conn();
+        let mut a = CanvasRepositoryStyle::default_for("repoA");
+        a.background_pattern = "lines".to_string();
+        upsert_repository_style(&conn, &a).unwrap();
+        let mut b = CanvasRepositoryStyle::default_for("repoB");
+        b.background_pattern = "blank".to_string();
+        upsert_repository_style(&conn, &b).unwrap();
+
+        assert_eq!(
+            get_repository_style(&conn, "repoA")
+                .unwrap()
+                .background_pattern,
+            "lines"
+        );
+        assert_eq!(
+            get_repository_style(&conn, "repoB")
+                .unwrap()
+                .background_pattern,
+            "blank"
+        );
     }
 
     #[test]
