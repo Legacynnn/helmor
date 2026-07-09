@@ -5,6 +5,11 @@ import {
 	FileTreeFile,
 	FileTreeFolder,
 } from "@/components/ai/file-tree";
+import {
+	FOLDER_ICON_CLASS,
+	getCachedFileIcon,
+	getCachedFolderIcon,
+} from "@/features/inspector/panel/git/shared";
 import type { WorkspaceTreeEntry } from "@/lib/api";
 import { workspaceTreeQueryOptions } from "@/lib/query-client";
 import { useCanvasWorkspace } from "../canvas-workspace-context";
@@ -38,6 +43,13 @@ function renderNodes(nodes: TreeNode[]) {
 				key={node.entry.path}
 				path={node.entry.path}
 				name={node.entry.name}
+				icon={(open) => (
+					<img
+						src={getCachedFolderIcon(open)}
+						alt=""
+						className={FOLDER_ICON_CLASS}
+					/>
+				)}
 			>
 				{renderNodes(node.children)}
 			</FileTreeFolder>
@@ -46,6 +58,13 @@ function renderNodes(nodes: TreeNode[]) {
 				key={node.entry.path}
 				path={node.entry.path}
 				name={node.entry.name}
+				icon={
+					<img
+						src={getCachedFileIcon(node.entry.name)}
+						alt=""
+						className="size-4 shrink-0"
+					/>
+				}
 			/>
 		),
 	);

@@ -96,6 +96,9 @@ const FileTreeFolderContext = createContext<FileTreeFolderContextType>({
 export type FileTreeFolderProps = HTMLAttributes<HTMLDivElement> & {
 	path: string;
 	name: string;
+	/** Optional custom folder icon, given the current open/closed state.
+	 * Defaults to the built-in blue folder icons when omitted. */
+	icon?: (isExpanded: boolean) => ReactNode;
 };
 
 export const FileTreeFolder = ({
@@ -103,6 +106,7 @@ export const FileTreeFolder = ({
 	name,
 	className,
 	children,
+	icon,
 	...props
 }: FileTreeFolderProps) => {
 	const { expandedPaths, togglePath, selectedPath, onSelect } =
@@ -138,7 +142,9 @@ export const FileTreeFolder = ({
 								)}
 							/>
 							<FileTreeIcon>
-								{isExpanded ? (
+								{icon ? (
+									icon(isExpanded)
+								) : isExpanded ? (
 									<FolderOpenIcon className="size-4 text-blue-500" />
 								) : (
 									<FolderIcon className="size-4 text-blue-500" />
