@@ -10,7 +10,7 @@ import {
 	SquareTerminal,
 	X,
 } from "lucide-react";
-import { type ComponentType, useState } from "react";
+import { type ComponentType, type CSSProperties, useState } from "react";
 import {
 	Tooltip,
 	TooltipContent,
@@ -78,6 +78,79 @@ function surface(token: string, alpha: number): string {
 }
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+
+// Selection accent. A bright focus blue — reads as a crisp, native "targeting
+// frame" on both dark and cream panels, distinct from the panels' own amber
+// identity accents so selection never blends into the chrome.
+const SELECT_ACCENT = "#4d9fff";
+// Soft glow that lifts the brackets off the surface for a native focus-ring feel
+// — a low-opacity drop-shadow in the same blue, so it reads as a halo rather than
+// a hard second line.
+const SELECT_GLOW = `drop-shadow(0 0 3px color-mix(in srgb, ${SELECT_ACCENT} 55%, transparent))`;
+
+// Bracket geometry. Drawn as an SVG stroke (not CSS borders) so both the free
+// arm ends AND the corner join are rounded — a CSS-border bracket leaves the arm
+// tips cut square, which reads as sharp and unfinished.
+const CORNER_SIZE = 48; // px — long, thin arms for a confident targeting frame
+const CORNER_STROKE = 2;
+const CORNER_RADIUS = 12;
+// The brackets sit just *outside* the panel edge (like a focus frame around it),
+// so each corner is nudged out by this much. They render outside the panel's
+// `overflow-hidden` container (see PanelNode) so the outward part isn't clipped.
+const CORNER_OFFSET = 7;
+// Path for the top-left bracket: up the left edge, round the corner, along the
+// top edge. Inset by half the stroke so the line stays inside the box. The other
+// three corners reuse this exact path, rotated 90°/180°/270° about the box
+// centre — the L is symmetric under those rotations.
+const CORNER_INSET = CORNER_STROKE / 2;
+const CORNER_PATH = `M ${CORNER_INSET} ${CORNER_SIZE} L ${CORNER_INSET} ${
+	CORNER_INSET + CORNER_RADIUS
+} A ${CORNER_RADIUS} ${CORNER_RADIUS} 0 0 1 ${
+	CORNER_INSET + CORNER_RADIUS
+} ${CORNER_INSET} L ${CORNER_SIZE} ${CORNER_INSET}`;
+
+/** Corner-bracket selection marker. Four L-shaped brackets in a
+ * `pointer-events-none` overlay, so selection adds nothing to the box model — the
+ * panel never grows, shrinks, or shifts when clicked, and the brackets never
+ * intercept pointer input.
+ *
+ * Each bracket is an SVG stroke with rounded line caps + joins (soft arm ends,
+ * not sharp), nudged just outside the panel edge to read as a focus frame. A
+ * bright blue + soft glow give it a stylish, native targeting feel. */
+function SelectionCorners() {
+	const corner = (position: CSSProperties, rotate: number) => (
+		<svg
+			width={CORNER_SIZE}
+			height={CORNER_SIZE}
+			viewBox={`0 0 ${CORNER_SIZE} ${CORNER_SIZE}`}
+			fill="none"
+			aria-hidden="true"
+			style={{
+				position: "absolute",
+				filter: SELECT_GLOW,
+				transform: `rotate(${rotate}deg)`,
+				...position,
+			}}
+		>
+			<path
+				d={CORNER_PATH}
+				stroke={SELECT_ACCENT}
+				strokeWidth={CORNER_STROKE}
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			/>
+		</svg>
+	);
+	const o = -CORNER_OFFSET;
+	return (
+		<div className="pointer-events-none absolute inset-0 z-10">
+			{corner({ top: o, left: o }, 0)}
+			{corner({ top: o, right: o }, 90)}
+			{corner({ bottom: o, right: o }, 180)}
+			{corner({ bottom: o, left: o }, 270)}
+		</div>
+	);
+}
 
 export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 	const { removeNode } = useCanvasActions();
@@ -160,105 +233,105 @@ export function PanelNode({ id, data, selected }: NodeProps<PanelNodeType>) {
 	);
 
 	return (
-		<div
-			className="flex size-full flex-col overflow-hidden rounded-[10px] border text-app-foreground shadow-lg"
-			style={{
-				backgroundColor: surface("--canvas-pane-bg", bodyAlpha),
-				backdropFilter: blur,
-				WebkitBackdropFilter: blur,
-				// Border derived from the pane's own colour, nudged 30% toward the
-				// text colour. This is theme-adaptive (darker than the cream surface
-				// in light mode, lighter than the near-black in dark mode) and always
-				// resolves — the generic --border token is a near-white that vanished
-				// over the cream. Inline so it can't lose to a base utility.
-				borderColor:
-					"color-mix(in srgb, var(--canvas-pane-bg, #fff) 70%, currentColor 30%)",
-				// Selection indicator: a dashed outline in a soft, muted amber, drawn
-				// with a negative offset so it sits *inside* the panel's footprint.
-				// Using `outline` (not a thicker border) means selection adds nothing
-				// to the box model — the panel never grows, shrinks, or shifts when
-				// selected. The theme's `--primary` is a pale, low-chroma amber that
-				// reads as near-white on dark panels, so we pin an explicit amber:
-				// lightness 0.74 keeps it visible on both dark and cream panels, with a
-				// low chroma (0.045) so it reads as a quiet accent, not a vivid orange.
-				...(selected
-					? {
-							outline: "3px dashed oklch(0.74 0.045 70)",
-							outlineOffset: "-3px",
-							boxShadow: "0 12px 24px -8px rgba(0,0,0,0.45)",
-						}
-					: null),
-			}}
-			onPointerEnter={() => setHovered(true)}
-			onPointerLeave={() => setHovered(false)}
-		>
-			<NodeResizer
-				isVisible={(selected || hovered) && !data.locked}
-				minWidth={PANEL_MIN_WIDTH}
-				minHeight={PANEL_MIN_HEIGHT}
-				// Selection is shown purely by the panel container's dashed primary
-				// border (above). Keep the resizer's own line AND corner handles
-				// visually invisible — no squares — while preserving their hit areas
-				// so the panel stays resizable from the edges and corners.
-				lineClassName="!border-transparent"
-				handleClassName="!size-2 !border-transparent !bg-transparent"
-			/>
-			{/* Edge endpoints — drag from the right (source) to another panel's
-			 *  left (target). Each panel is both, so chains compose. */}
-			<Handle
-				type="target"
-				position={Position.Left}
-				className={HANDLE_CLASS}
-				isConnectable={!data.locked}
-			/>
-			<Handle
-				type="source"
-				position={Position.Right}
-				className={HANDLE_CLASS}
-				isConnectable={!data.locked}
-			/>
-
-			{/* Header is the drag handle; on hover it reveals the panel's focus
-			 *  shortcut (⌘+digit), matching the panels list. The 10th+ panel has no
-			 *  digit, so it renders bare. */}
-			{bindingDigit ? (
-				<TooltipProvider delayDuration={500}>
-					<Tooltip>
-						<TooltipTrigger asChild>{header}</TooltipTrigger>
-						<TooltipContent side="top" sideOffset={6} className="gap-1.5">
-							<span>Focus panel</span>
-							<span className="font-mono">{formatBinding(bindingDigit)}</span>
-						</TooltipContent>
-					</Tooltip>
-				</TooltipProvider>
-			) : (
-				header
-			)}
-
-			{/* Body is interactive — nodrag/nowheel so React Flow doesn't pan,
-			 *  drag, or zoom while the user works inside it. */}
+		<>
 			<div
-				className={cn(
-					"nowheel min-h-0 flex-1 overflow-hidden",
-					!selectMode && "nodrag",
-				)}
+				className="relative flex size-full flex-col overflow-hidden rounded-[10px] border text-app-foreground shadow-lg"
+				style={{
+					backgroundColor: surface("--canvas-pane-bg", bodyAlpha),
+					backdropFilter: blur,
+					WebkitBackdropFilter: blur,
+					// Border derived from the pane's own colour, nudged 30% toward the
+					// text colour. This is theme-adaptive (darker than the cream surface
+					// in light mode, lighter than the near-black in dark mode) and always
+					// resolves — the generic --border token is a near-white that vanished
+					// over the cream. Inline so it can't lose to a base utility.
+					borderColor:
+						"color-mix(in srgb, var(--canvas-pane-bg, #fff) 70%, currentColor 30%)",
+					// Selection lift: a slightly deeper shadow reads as "raised" without
+					// touching the box model. The corner brackets (below) carry the actual
+					// selection affordance — nothing here changes the panel's footprint, so
+					// it never grows, shrinks, or shifts when clicked.
+					...(selected
+						? { boxShadow: "0 12px 24px -8px rgba(0,0,0,0.45)" }
+						: null),
+				}}
+				onPointerEnter={() => setHovered(true)}
+				onPointerLeave={() => setHovered(false)}
 			>
-				<PanelErrorBoundary>
-					<PanelBody
-						nodeId={id}
-						panelType={data.panelType}
-						config={data.config}
-						nodeTitle={data.title}
-					/>
-				</PanelErrorBoundary>
+				<NodeResizer
+					isVisible={(selected || hovered) && !data.locked}
+					minWidth={PANEL_MIN_WIDTH}
+					minHeight={PANEL_MIN_HEIGHT}
+					// Selection is shown purely by the corner-bracket overlay (above).
+					// Keep the resizer's own line AND corner handles
+					// visually invisible — no squares — while preserving their hit areas
+					// so the panel stays resizable from the edges and corners.
+					lineClassName="!border-transparent"
+					handleClassName="!size-2 !border-transparent !bg-transparent"
+				/>
+				{/* Edge endpoints — drag from the right (source) to another panel's
+				 *  left (target). Each panel is both, so chains compose. */}
+				<Handle
+					type="target"
+					position={Position.Left}
+					className={HANDLE_CLASS}
+					isConnectable={!data.locked}
+				/>
+				<Handle
+					type="source"
+					position={Position.Right}
+					className={HANDLE_CLASS}
+					isConnectable={!data.locked}
+				/>
+
+				{/* Header is the drag handle; on hover it reveals the panel's focus
+				 *  shortcut (⌘+digit), matching the panels list. The 10th+ panel has no
+				 *  digit, so it renders bare. */}
+				{bindingDigit ? (
+					<TooltipProvider delayDuration={500}>
+						<Tooltip>
+							<TooltipTrigger asChild>{header}</TooltipTrigger>
+							<TooltipContent side="top" sideOffset={6} className="gap-1.5">
+								<span>Focus panel</span>
+								<span className="font-mono">{formatBinding(bindingDigit)}</span>
+							</TooltipContent>
+						</Tooltip>
+					</TooltipProvider>
+				) : (
+					header
+				)}
+
+				{/* Body is interactive — nodrag/nowheel so React Flow doesn't pan,
+				 *  drag, or zoom while the user works inside it. */}
+				<div
+					className={cn(
+						"nowheel min-h-0 flex-1 overflow-hidden",
+						!selectMode && "nodrag",
+					)}
+				>
+					<PanelErrorBoundary>
+						<PanelBody
+							nodeId={id}
+							panelType={data.panelType}
+							config={data.config}
+							nodeTitle={data.title}
+						/>
+					</PanelErrorBoundary>
+				</div>
+				<PanelFooter
+					panelType={data.panelType}
+					config={data.config}
+					accent={accent}
+					background={footerBg}
+				/>
 			</div>
-			<PanelFooter
-				panelType={data.panelType}
-				config={data.config}
-				accent={accent}
-				background={footerBg}
-			/>
-		</div>
+			{/* Corner-bracket selection marker. Rendered OUTSIDE the panel container so
+			 *  its slight outward offset isn't clipped by the container's
+			 *  `overflow-hidden`. It's a `pointer-events-none` overlay pinned to the
+			 *  panel footprint, so selection never resizes/shifts the panel or
+			 *  intercepts pointer input. */}
+			{selected ? <SelectionCorners /> : null}
+		</>
 	);
 }
 

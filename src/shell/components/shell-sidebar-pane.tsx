@@ -1,27 +1,16 @@
 // Left workspace sidebar — top-level screen nav (Dashboard/Tasks/History),
 // workspaces list, mini-mode + app-update + collapse controls, and the
 // settings/feedback/resource footer.
-import {
-	Columns3,
-	History as HistoryIcon,
-	ListTodo,
-	PanelLeftClose,
-} from "lucide-react";
+import { Columns3, History as HistoryIcon, ListTodo } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
-import { TrafficLightSpacer } from "@/components/chrome/traffic-light-spacer";
 import { Button } from "@/components/ui/button";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { FeedbackButton } from "@/features/feedback";
 import { WorkspacesSidebarContainer } from "@/features/navigation/container";
+import { SidebarChromeBar } from "@/features/navigation/sidebar-chrome-bar";
 import { SpaceSwitch } from "@/features/navigation/space-switch";
 import { ResourceWidget } from "@/features/resources";
 import { SettingsButton } from "@/features/settings";
 import { getShortcut } from "@/features/shortcuts/registry";
-import { InlineShortcutDisplay } from "@/features/shortcuts/shortcut-display";
 import { AppUpdateButton } from "@/features/updater/app-update-button";
 import type { AppUpdateStatus } from "@/lib/api";
 import type { AppSettings } from "@/lib/settings";
@@ -178,13 +167,12 @@ export function ShellSidebarPane({
 							: "translate-x-0 opacity-100",
 					)}
 				>
-					<div
-						data-slot="window-safe-top"
-						className="flex h-9 shrink-0 items-center pr-3 max-[960px]:hidden"
-					>
-						<TrafficLightSpacer side="left" width={94} />
-						<div data-tauri-drag-region className="h-full flex-1" />
-					</div>
+					<SidebarChromeBar
+						onToggleCollapse={onCollapseSidebar}
+						collapseLabel="Collapse left sidebar"
+						collapseShortcut={leftSidebarToggleShortcut}
+						className="max-[960px]:hidden"
+					/>
 					<div className="px-2 pb-2">
 						<SpaceSwitch />
 					</div>
@@ -227,31 +215,6 @@ export function ShellSidebarPane({
 					</div>
 					<div className="absolute right-[12px] top-[6px] z-20 flex items-center gap-[2px]">
 						<AppUpdateButton status={appUpdateStatus} />
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<Button
-									aria-label="Collapse left sidebar"
-									onClick={onCollapseSidebar}
-									variant="ghost"
-									size="icon-xs"
-									className="text-muted-foreground hover:text-foreground max-[960px]:hidden"
-								>
-									<PanelLeftClose className="size-4" strokeWidth={1.8} />
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent
-								side="bottom"
-								className="flex h-[24px] items-center gap-2 rounded-md px-2 text-small leading-none"
-							>
-								<span>Collapse left sidebar</span>
-								{leftSidebarToggleShortcut ? (
-									<InlineShortcutDisplay
-										hotkey={leftSidebarToggleShortcut}
-										className="text-background/60"
-									/>
-								) : null}
-							</TooltipContent>
-						</Tooltip>
 					</div>
 					<div className="flex shrink-0 items-center px-3 pb-3 pt-1">
 						<SettingsButton

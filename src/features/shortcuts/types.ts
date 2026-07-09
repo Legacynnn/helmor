@@ -72,7 +72,14 @@ export type ShortcutId =
 	| "canvas.panel7"
 	| "canvas.panel8"
 	| "canvas.panel9"
-	| "canvas.panelList";
+	| "canvas.panelList"
+	| "canvas.newConversation"
+	| "canvas.newTerminal"
+	| "canvas.newNotes"
+	| "canvas.newDrawing"
+	| "canvas.newEditor"
+	| "canvas.newFiles"
+	| "canvas.newGit";
 
 export type ShortcutGroup =
 	| "Navigation"
@@ -83,7 +90,8 @@ export type ShortcutGroup =
 	| "Composer"
 	| "Start surface"
 	| "Editor"
-	| "Terminal";
+	| "Terminal"
+	| "Canvas";
 
 // Scopes a shortcut can live in. "app" = always active regardless of focus.
 // All others gate on [data-focus-scope] DOM ancestors of the active element;

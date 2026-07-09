@@ -615,6 +615,65 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
 		scopes: ["canvas"],
 		editable: false,
 	},
+	{
+		id: "canvas.newConversation",
+		title: "New conversation panel",
+		group: "Canvas",
+		defaultHotkey: "Mod+Alt+C",
+		scopes: ["canvas"],
+		editable: true,
+	},
+	{
+		id: "canvas.newTerminal",
+		title: "New terminal panel",
+		group: "Canvas",
+		// Reuses ⌘⇧T — bound to the chat-scoped "new session picker" elsewhere,
+		// which never overlaps the canvas scope, so the two coexist. (⌘⌥T, the
+		// mnemonic match, is the global theme toggle.)
+		defaultHotkey: "Mod+Shift+T",
+		scopes: ["canvas"],
+		editable: true,
+	},
+	{
+		id: "canvas.newNotes",
+		title: "New notes panel",
+		group: "Canvas",
+		defaultHotkey: "Mod+Alt+N",
+		scopes: ["canvas"],
+		editable: true,
+	},
+	{
+		id: "canvas.newDrawing",
+		title: "New drawing panel",
+		group: "Canvas",
+		defaultHotkey: "Mod+Alt+D",
+		scopes: ["canvas"],
+		editable: true,
+	},
+	{
+		id: "canvas.newEditor",
+		title: "New editor panel",
+		group: "Canvas",
+		defaultHotkey: "Mod+Alt+E",
+		scopes: ["canvas"],
+		editable: true,
+	},
+	{
+		id: "canvas.newFiles",
+		title: "New files panel",
+		group: "Canvas",
+		defaultHotkey: "Mod+Alt+F",
+		scopes: ["canvas"],
+		editable: true,
+	},
+	{
+		id: "canvas.newGit",
+		title: "New git panel",
+		group: "Canvas",
+		defaultHotkey: "Mod+Alt+G",
+		scopes: ["canvas"],
+		editable: true,
+	},
 ];
 
 export const SHORTCUT_DEFINITION_BY_ID = new Map(

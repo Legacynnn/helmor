@@ -12,7 +12,7 @@ describe("SpaceSwitch", () => {
 
 	it("marks the active space tab selected", () => {
 		render(<SpaceSwitch />);
-		expect(screen.getByRole("tab", { name: /workspaces/i })).toHaveAttribute(
+		expect(screen.getByRole("tab", { name: /threads/i })).toHaveAttribute(
 			"aria-selected",
 			"true",
 		);

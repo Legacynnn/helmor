@@ -36,6 +36,7 @@ import { useThemeApplication } from "@/shell/hooks/use-theme-application";
 import { useThreadFocusBackstop } from "@/shell/hooks/use-thread-focus-backstop";
 import { useUiSyncBridge } from "@/shell/hooks/use-ui-sync-bridge";
 import { useVesperWindow } from "@/shell/hooks/use-vesper-window";
+import { useWindowFullscreen } from "@/shell/hooks/use-window-fullscreen";
 import { useWorkspaceActionControllers } from "@/shell/hooks/use-workspace-action-controllers";
 import { useWorkspaceDataControllers } from "@/shell/hooks/use-workspace-data-controllers";
 import { useWorkspaceToast } from "@/shell/hooks/use-workspace-toast";
@@ -204,6 +205,9 @@ export function useAppShellState({
 		lightTheme: appSettings.lightTheme,
 		darkTheme: appSettings.darkTheme,
 	});
+	// Theme-independent fullscreen tracking (root `app-fullscreen` class) so
+	// sidebar chrome can reposition once the traffic lights disappear.
+	useWindowFullscreen();
 
 	const [planSurfaceActive, setPlanSurfaceActive] = useState(false);
 	useShellEvent("plan-surface-changed", (e) => setPlanSurfaceActive(e.active));

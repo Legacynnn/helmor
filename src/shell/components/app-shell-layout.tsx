@@ -20,6 +20,7 @@ import { ScreenHost } from "./screen-host";
 import { ShellInspectorPane } from "./shell-inspector-pane";
 import { ShellResizeSeparator } from "./shell-resize-separator";
 import { ShellSidebarPane } from "./shell-sidebar-pane";
+import { shouldShowInspector } from "./should-show-inspector";
 import { WorkspacePaneSurface } from "./workspace-pane-surface";
 
 type ResizeTarget = "sidebar" | "inspector";
@@ -145,21 +146,29 @@ export function AppShellLayout({
 								/>
 							)}
 
-							{activeScreen === "none" &&
-								rightSidebarAvailable &&
-								selectedWorkspaceDetail?.mode !== "chat" && (
-									<>
-										<ShellResizeSeparator
-											side="inspector"
-											collapsed={inspectorCollapsed}
-											resizing={isInspectorResizing}
-											width={inspectorWidth}
-											onPointerDown={handleResizeStart("inspector")}
-											onKeyDown={handleResizeKeyDown("inspector")}
-										/>
-										<ShellInspectorPane {...inspector} />
-									</>
-								)}
+							{/* Gated on `!canvasActive`: the inspector's resize separator is
+							 *  `position: absolute`, and the canvas world's `translateX(-50%)`
+							 *  track transform would otherwise make its `right` offset resolve
+							 *  against the full track and float a ghost draggable strip over the
+							 *  canvas (which also swallowed pan/scroll). See shouldShowInspector. */}
+							{shouldShowInspector({
+								canvasActive,
+								activeScreen,
+								rightSidebarAvailable,
+								workspaceMode: selectedWorkspaceDetail?.mode,
+							}) && (
+								<>
+									<ShellResizeSeparator
+										side="inspector"
+										collapsed={inspectorCollapsed}
+										resizing={isInspectorResizing}
+										width={inspectorWidth}
+										onPointerDown={handleResizeStart("inspector")}
+										onKeyDown={handleResizeKeyDown("inspector")}
+									/>
+									<ShellInspectorPane {...inspector} />
+								</>
+							)}
 						</div>
 
 						{/* Canvas world */}

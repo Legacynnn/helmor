@@ -57,12 +57,6 @@ function makeState(panels: CanvasPanel[]): CanvasState {
 			panX: 0,
 			panY: 0,
 			zoom: 1,
-			translucency: 1,
-			backgroundPattern: "dots",
-			backgroundColor: null,
-			backgroundTheme: "system",
-			backgroundImage: null,
-			snapToGrid: false,
 			updatedAt: "",
 		},
 	};

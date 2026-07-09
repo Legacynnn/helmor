@@ -5,6 +5,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { InlineShortcutDisplay } from "@/features/shortcuts/shortcut-display";
 import { cn } from "@/lib/utils";
 
 const SELECTED_COLOR = "var(--color-selected, #3b82f6)";
@@ -13,21 +14,26 @@ const SELECTED_COLOR = "var(--color-selected, #3b82f6)";
  * canvas interior (away from the edge), so a right-edge rail tooltips left. */
 const RailSideContext = createContext<"left" | "right">("left");
 
-/** Vertically-centered Apple liquid-glass rail pinned to a screen edge. */
+/** Vertically-centered Apple liquid-glass rail pinned to a screen edge. The
+ * optional `className` is merged last, so callers can override the edge inset
+ * (e.g. shift a left rail right to clear the floating workspaces sidebar). */
 export function GlassRail({
 	side,
+	className,
 	children,
 }: {
 	side: "left" | "right";
+	className?: string;
 	children: ReactNode;
 }) {
 	return (
 		<RailSideContext.Provider value={side}>
 			<div
 				className={cn(
-					"-translate-y-1/2 pointer-events-auto absolute top-1/2 z-10 flex flex-col gap-1 rounded-[20px] p-1.5",
+					"-translate-y-1/2 pointer-events-auto absolute top-1/2 z-10 flex flex-col gap-1 rounded-[20px] p-1.5 transition-[left] duration-200 ease-out",
 					"border border-white/15 bg-app-base/40 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl",
 					side === "left" ? "left-3" : "right-3",
+					className,
 				)}
 			>
 				{children}
@@ -42,12 +48,15 @@ export function RailButton({
 	label,
 	armed = false,
 	disabled = false,
+	shortcut,
 	onClick,
 }: {
 	icon: ComponentType<{ className?: string }>;
 	label: string;
 	armed?: boolean;
 	disabled?: boolean;
+	/** Resolved hotkey string (e.g. "Mod+Alt+C") shown in the tooltip. */
+	shortcut?: string | null;
 	onClick?: () => void;
 }) {
 	const railSide = useContext(RailSideContext);
@@ -77,7 +86,15 @@ export function RailButton({
 					<Icon className="size-4.5" />
 				</button>
 			</TooltipTrigger>
-			<TooltipContent side={tooltipSide}>{label}</TooltipContent>
+			<TooltipContent side={tooltipSide} className="flex items-center gap-2">
+				<span>{label}</span>
+				{shortcut ? (
+					<InlineShortcutDisplay
+						hotkey={shortcut}
+						className="text-background/60"
+					/>
+				) : null}
+			</TooltipContent>
 		</Tooltip>
 	);
 }

@@ -279,10 +279,13 @@
 	   industry-standard AI-inbox accent (Linear / Notion AI / Copilot). */
 	--workspace-sidebar-status-triage: #3a8fae;
 	--workspace-sidebar-branch: #718687;
+	/* Selected row: the sidebar surface lifted a touch toward the foreground, so
+	 * the active item reads as *slightly lighter* than the sidebar background
+	 * (and stays distinct from the hover state, which sits at --bg-elevated). */
 	--workspace-sidebar-selected-bg: color-mix(
 		in oklch,
-		var(--sidebar-item-hover-bg) 98.5%,
-		var(--sidebar-fg) 1.5%
+		var(--sidebar-bg) 88%,
+		var(--sidebar-fg) 12%
 	);
 	--workspace-branch-status-working: var(--workspace-pr-open-accent);
 	--workspace-branch-status-open: var(--workspace-sidebar-status-review);

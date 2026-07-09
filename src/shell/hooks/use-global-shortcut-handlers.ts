@@ -1,4 +1,5 @@
 import { type Dispatch, type SetStateAction, useMemo } from "react";
+import { useCanvasSidebarStore } from "@/features/canvas/use-canvas-sidebar-store";
 import type { WorkspaceCommitButtonMode } from "@/features/commit/button";
 import type { QuickSwitchControls } from "@/features/quick-switch";
 import type { ShortcutId } from "@/features/shortcuts/types";
@@ -247,7 +248,16 @@ export function useGlobalShortcutHandlers({
 			},
 			{
 				id: "sidebar.left.toggle" as const,
-				callback: () => setSidebarCollapsed((collapsed) => !collapsed),
+				// "Toggle the left sidebar" follows the active world: under the canvas
+				// it toggles the floating workspaces sidebar; otherwise the normal
+				// left sidebar. Same key (⌘B), world-appropriate target.
+				callback: () => {
+					if (canvasActive) {
+						useCanvasSidebarStore.getState().toggle();
+						return;
+					}
+					setSidebarCollapsed((collapsed) => !collapsed);
+				},
 			},
 			{
 				id: "sidebar.right.toggle" as const,

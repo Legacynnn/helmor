@@ -7,11 +7,17 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+	CANVAS_SIDEBAR_OPEN_LEFT,
+	useCanvasSidebarStore,
+} from "@/features/canvas/use-canvas-sidebar-store";
 import { useSpaceStore } from "@/features/canvas/use-space-store";
+import { WorkspaceAvatar } from "@/features/navigation/avatar";
 import {
 	workspaceDetailQueryOptions,
 	workspaceGroupsQueryOptions,
 } from "@/lib/query-client";
+import { cn } from "@/lib/utils";
 import { usePanelsListStore } from "../bindings/panels-list-store";
 
 /** Top-left workspace control region: identity + open-workspaces dropdown
@@ -27,13 +33,19 @@ export function CanvasWorkspaceControls({
 	const { data: detail } = useQuery(workspaceDetailQueryOptions(workspaceId));
 	const { data: groups = [] } = useQuery(workspaceGroupsQueryOptions());
 	const title = detail?.title ?? "Workspace";
+	const sidebarOpen = useCanvasSidebarStore((s) => s.open);
 
 	const rows = groups
 		.flatMap((g) => g.rows)
 		.filter((r) => r.space === "canvas");
 
 	return (
-		<div className="pointer-events-auto absolute top-3 left-3 z-10 flex items-center gap-1 rounded-[16px] border border-white/15 bg-app-base/40 p-1 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl">
+		<div
+			className={cn(
+				"pointer-events-auto absolute top-3 left-3 z-10 flex items-center gap-1 rounded-[16px] border border-white/15 bg-app-base/40 p-1 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl transition-[left] duration-200 ease-out",
+				sidebarOpen && CANVAS_SIDEBAR_OPEN_LEFT,
+			)}
+		>
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<button
@@ -61,6 +73,7 @@ export function CanvasWorkspaceControls({
 						rows.map((row) => (
 							<DropdownMenuItem
 								key={row.id}
+								className="gap-2"
 								onClick={() => {
 									const store = useSpaceStore.getState();
 									store.rememberSelection("canvas", row.id);
@@ -68,6 +81,14 @@ export function CanvasWorkspaceControls({
 									if (row.id !== workspaceId) onSelectWorkspace?.(row.id);
 								}}
 							>
+								<WorkspaceAvatar
+									repoIconSrc={row.repoIconSrc}
+									repoInitials={row.repoInitials}
+									repoName={row.repoName}
+									title={row.title}
+									className="size-5 rounded-md"
+									fallbackClassName="text-nano"
+								/>
 								<span className="min-w-0 flex-1 truncate">{row.title}</span>
 								{row.id === workspaceId ? (
 									<Check className="ml-auto size-3.5 text-app-muted-foreground" />

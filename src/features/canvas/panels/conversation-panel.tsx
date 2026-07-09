@@ -8,9 +8,7 @@ import {
 	sessionThreadMessagesQueryOptions,
 } from "@/lib/query-client";
 import { useCanvasActions } from "../canvas-actions-context";
-import { useCanvasViewStore } from "../canvas-view-store";
 import { useCanvasWorkspace } from "../canvas-workspace-context";
-import { READABLE_PANEL_MIN_ALPHA } from "../types";
 
 const noop = () => {};
 
@@ -26,17 +24,6 @@ function firstUserPrompt(messages: ThreadMessageLike[] | undefined): string {
 		.map((p) => p.text)
 		.join(" ")
 		.trim();
-}
-
-/** Translucent fill for the conversation surface — the (opaque) canvas pane
- * token mixed toward transparent at the given alpha. The token carries a defined
- * fallback (`--bg-elevated`) so the surface never collapses to `transparent` if
- * `--canvas-pane-bg` isn't resolved yet (an undefined `var()` inside `color-mix`
- * voids the whole declaration). At full strength no `color-mix` is needed. */
-const PANE_COLOR = "var(--canvas-pane-bg, var(--bg-elevated))";
-function paneSurface(alpha: number): string {
-	if (alpha >= 1) return PANE_COLOR;
-	return `color-mix(in srgb, ${PANE_COLOR} ${Math.round(alpha * 100)}%, transparent)`;
 }
 
 /** Live conversation inside a canvas panel. Reuses the full conversation
@@ -80,26 +67,27 @@ export function ConversationPanelBody({
 		patchNodeData(nodeId, { title: buildTitleSeed(prompt) });
 	}, [hasTitle, messages, nodeId, patchNodeData]);
 
-	// The conversation paints its OWN translucent surface here (the panel-node
-	// container stays transparent for conversation panels), so the thread ("main
-	// canvas") and the strip behind the composer share one explicit, always-
-	// present translucency. The thread viewport's `bg-panel` resolves to
-	// `var(--panel-bg)` (= `--bg-base`); inside the canvas, React Flow's own
-	// `.dark` container re-asserts the base (opaque) `--bg-base`, shadowing the
-	// glass theme's transparent one — which painted the middle of the thread
-	// solid black. Zeroing `--panel-bg` here (and `--color-panel`, which mirrors
-	// it) drops that opaque fill so our single translucent surface shows through
-	// the whole thread. The composer keeps its `bg-sidebar` fill, so the input
-	// stays fully colored. Conversation translucents gently (floor) for legibility.
-	const translucency = useCanvasViewStore((s) => s.translucency);
-	const alpha = Math.min(1, Math.max(READABLE_PANEL_MIN_ALPHA, translucency));
-
+	// The conversation panel renders the SAME neutral, opaque background as a
+	// normal (non-canvas) conversation, so opening a session on the canvas never
+	// switches its background colour. Normal threads paint `bg-panel`
+	// (= `--color-panel` → `--panel-bg` → `--bg-base`); we paint that resolved
+	// base directly as a single opaque surface for the whole panel.
+	//
+	// We still zero `--panel-bg`/`--color-panel` on this element: inside the
+	// canvas, React Flow's own `.dark` container re-asserts an opaque `--bg-base`
+	// for the inner thread viewport, which would paint a second fill over the
+	// middle of the thread. Dropping those vars lets our single surface show
+	// through the whole thread. The composer keeps its `bg-sidebar` fill.
+	//
+	// Unlike the other canvas panels, the conversation intentionally ignores the
+	// translucency slider — matching a normal conversation exactly was preferred
+	// over the translucent "glass over canvas" look here.
 	return (
 		<div
 			className="flex size-full flex-col"
 			style={
 				{
-					backgroundColor: paneSurface(alpha),
+					backgroundColor: "var(--bg-base)",
 					"--panel-bg": "transparent",
 					"--color-panel": "transparent",
 				} as CSSProperties

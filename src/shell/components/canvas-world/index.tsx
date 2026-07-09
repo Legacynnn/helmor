@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { LayoutGrid } from "lucide-react";
 import { lazy, Suspense } from "react";
+import { useCanvasSidebarStore } from "@/features/canvas/use-canvas-sidebar-store";
 import { useSpaceStore } from "@/features/canvas/use-space-store";
 import { workspaceGroupsQueryOptions } from "@/lib/query-client";
 import { CanvasSidebar } from "./canvas-sidebar";
@@ -11,9 +12,11 @@ const CanvasSurface = lazy(() =>
 
 /**
  * The Canvas world. Replaces the normal 3-column layout when the active space is
- * "canvas". A dedicated canvas sidebar (list + hover previews + management) on
- * the left; the selected workspace's full canvas fills the rest. Owns its own
- * selection, independent of the normal sidebar/router.
+ * "canvas". A dedicated canvas sidebar (list + hover previews + management)
+ * floats over the left; the selected workspace's full canvas fills the whole
+ * area behind it. Owns its own selection, independent of the normal
+ * sidebar/router. The sidebar toggles (rail button / ⌘B) and hides entirely
+ * when collapsed so the canvas runs edge-to-edge.
  */
 export function CanvasWorld({
 	onSelectWorkspace,
@@ -22,6 +25,7 @@ export function CanvasWorld({
 }) {
 	const remembered = useSpaceStore((s) => s.lastSelected.canvas ?? null);
 	const remember = useSpaceStore((s) => s.rememberSelection);
+	const sidebarOpen = useCanvasSidebarStore((s) => s.open);
 	const { data } = useQuery(workspaceGroupsQueryOptions());
 
 	const canvasRows = (data ?? [])
@@ -40,34 +44,30 @@ export function CanvasWorld({
 	};
 
 	return (
-		<div className="flex size-full min-w-0">
-			<CanvasSidebar
-				workspaces={canvasRows}
-				selectedId={selected}
-				onSelect={openCanvas}
-			/>
-			<div className="relative min-w-0 flex-1">
-				{selected ? (
-					<Suspense
-						fallback={
-							<div className="flex size-full items-center justify-center bg-background text-muted-foreground text-sm">
-								Loading canvas…
-							</div>
-						}
-					>
-						<CanvasSurface key={selected} workspaceId={selected} />
-					</Suspense>
-				) : (
-					<div className="flex size-full flex-col items-center justify-center gap-3 bg-background text-muted-foreground">
-						<LayoutGrid className="size-10 opacity-40" />
-						<p className="text-sm">
-							{canvasRows.length === 0
-								? "Create a canvas to get started."
-								: "Select a canvas from the sidebar, or create a new one."}
-						</p>
-					</div>
-				)}
-			</div>
+		<div className="relative size-full min-w-0">
+			{selected ? (
+				<Suspense
+					fallback={
+						<div className="flex size-full items-center justify-center bg-background text-muted-foreground text-sm">
+							Loading canvas…
+						</div>
+					}
+				>
+					<CanvasSurface key={selected} workspaceId={selected} />
+				</Suspense>
+			) : (
+				<div className="flex size-full flex-col items-center justify-center gap-3 bg-white text-muted-foreground dark:bg-neutral-950">
+					<LayoutGrid className="size-10 opacity-40" />
+					<p className="text-sm">
+						{canvasRows.length === 0
+							? "Create a canvas to get started."
+							: "Select a canvas from the sidebar, or create a new one."}
+					</p>
+				</div>
+			)}
+			{sidebarOpen ? (
+				<CanvasSidebar selectedId={selected} onSelect={openCanvas} />
+			) : null}
 		</div>
 	);
 }

@@ -78,8 +78,11 @@ describe("App", () => {
 		const newWorkspaceButton = screen.getByRole("button", {
 			name: "New workspace",
 		});
+		// Scope to the normal sidebar pane: the Canvas sidebar now renders its own
+		// shared chrome bar (also `window-safe-top`), so a container-wide query
+		// would match both.
 		const safeAreas = container.querySelectorAll(
-			'[data-slot="window-safe-top"]',
+			'[data-shell-pane="sidebar"] [data-slot="window-safe-top"]',
 		);
 		const groupsScrollRegion = container.querySelector(
 			'[data-slot="workspace-groups-scroll"]',
@@ -322,8 +325,12 @@ describe("App", () => {
 			"max-[960px]:overflow-visible",
 			"max-[960px]:pointer-events-auto",
 		);
+		// The collapse control now lives in the shared chrome bar; that whole bar
+		// is what hides on narrow screens, so assert on its container.
 		expect(
-			screen.getByRole("button", { name: "Collapse left sidebar" }),
+			screen
+				.getByRole("button", { name: "Collapse left sidebar" })
+				.closest('[data-slot="window-safe-top"]'),
 		).toHaveClass("max-[960px]:hidden");
 		expect(
 			screen.getByRole("separator", { name: "Resize sidebar" }),

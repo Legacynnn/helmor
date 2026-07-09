@@ -35,7 +35,7 @@ import type { RepositoryCreateOption } from "@/lib/api";
 import type { SidebarGrouping, SidebarSort } from "@/lib/settings";
 import { WorkspaceAvatar } from "./avatar";
 
-interface SidebarSortOption {
+export interface SidebarSortOption {
 	value: SidebarSort;
 	label: string;
 	icon: LucideIcon;
@@ -55,12 +55,15 @@ interface SidebarViewPopoverProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	shortcut?: string | null;
+	/** Sort choices to offer. Defaults to the full set; surfaces without
+	 * drag-reorder (e.g. the canvas sidebar) pass a list that omits "custom". */
+	sortOptions?: SidebarSortOption[];
 	onGroupingChange?: (grouping: SidebarGrouping) => void;
 	onRepoFilterChange?: (repoIds: string[]) => void;
 	onSortChange?: (sort: SidebarSort) => void;
 }
 
-const SIDEBAR_SORT_OPTIONS: SidebarSortOption[] = [
+export const SIDEBAR_SORT_OPTIONS: SidebarSortOption[] = [
 	{ value: "custom", label: "Draggable order", icon: GripVertical },
 	{ value: "repoName", label: "Repository name", icon: ArrowDownAZ },
 	{ value: "updatedAt", label: "Last updated", icon: Clock3 },
@@ -174,6 +177,7 @@ export function SidebarViewPopover({
 	open,
 	onOpenChange,
 	shortcut,
+	sortOptions = SIDEBAR_SORT_OPTIONS,
 	onGroupingChange,
 	onRepoFilterChange,
 	onSortChange,
@@ -255,7 +259,7 @@ export function SidebarViewPopover({
 					Sort by
 				</div>
 				<div className="grid gap-0.5">
-					{SIDEBAR_SORT_OPTIONS.map((option) => {
+					{sortOptions.map((option) => {
 						const Icon = option.icon;
 						const checked = sort === option.value;
 						return (
