@@ -37,6 +37,10 @@ export type ShellEvent =
 	// App-scoped ⌘⇧T — the mounted composer flips its terminalMode.
 	| { type: "toggle-terminal-mode" }
 	| { type: "plan-surface-changed"; active: boolean }
+	// Split-canvas: a closeable pane is focused (so ⌘W closes the pane).
+	| { type: "canvas-pane-closeable-changed"; active: boolean }
+	// Split-canvas: request closing the currently-focused pane (⌘W).
+	| { type: "close-focused-canvas-pane" }
 	// Imperative archive from surfaces outside the sidebar controller (reuses its optimistic path).
 	| { type: "request-archive-workspace"; workspaceId: string }
 	// Composer Terminal-Mode submit: create a terminal session in the current

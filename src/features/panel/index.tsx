@@ -13,7 +13,11 @@ import { HelmorProfiler } from "@/lib/dev-react-profiler";
 import type { ContextCard } from "@/lib/sources/types";
 import { cn } from "@/lib/utils";
 import type { WorkspaceScriptType } from "@/lib/workspace-script-actions";
-import { type PlanTab, WorkspacePanelHeader } from "./header";
+import {
+	type CanvasGroupTab,
+	type PlanTab,
+	WorkspacePanelHeader,
+} from "./header";
 import { EmptyState, preloadStreamdown } from "./message-components";
 import {
 	ActiveThreadViewport,
@@ -66,6 +70,17 @@ type WorkspacePanelProps = {
 	newSessionMenuShortcut?: string | null;
 	missingScriptTypes?: WorkspaceScriptType[];
 	onInitializeScript?: (scriptType: WorkspaceScriptType) => void;
+	/** Split-canvas: collapse the listed sessions into one "split" tab. */
+	canvasGroup?: CanvasGroupTab | null;
+	/** Split-canvas: split the current conversation (header control). */
+	onCanvasSplit?: (direction: "row" | "col") => void;
+	canvasSplitDisabled?: boolean;
+	/** Render ONLY the header (no thread/composer body) — used as the single
+	 *  shared tab bar above a multi-pane canvas. */
+	headerOnly?: boolean;
+	/** Render the body but NOT the header — used by each canvas pane so the tab
+	 *  bar isn't duplicated per pane. */
+	hideHeader?: boolean;
 };
 
 export const WorkspacePanel = memo(function WorkspacePanel({
@@ -105,6 +120,11 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	newSessionMenuShortcut,
 	missingScriptTypes = [],
 	onInitializeScript,
+	canvasGroup = null,
+	onCanvasSplit,
+	canvasSplitDisabled = false,
+	headerOnly = false,
+	hideHeader = false,
 }: WorkspacePanelProps) {
 	const planActive = activePlanSlug != null && !contextPreviewActive;
 	const selectedSession =
@@ -169,99 +189,112 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 	return (
 		<HelmorProfiler id="WorkspacePanel">
 			<div
-				className="flex min-h-0 flex-1 flex-col bg-panel"
+				className={cn(
+					"flex flex-col bg-panel",
+					// Header-only host (split-canvas shared tab bar) must shrink to
+					// the header's own height — NOT grow to flex-1, or it would eat
+					// half the column and push the panes into the bottom half.
+					headerOnly ? "shrink-0" : "min-h-0 flex-1",
+				)}
 				// Vesper opens a transparent "blur tunnel" to the center terminal only
 				// while a terminal session is the visible surface; chat/editor keep
 				// their protective opaque viewport. See color-theme.css.
 				data-center-surface={visibleTerminalId ? "terminal" : undefined}
 			>
-				<WorkspacePanelHeader
-					workspace={workspace}
-					changeRequest={changeRequest}
-					sessions={sessions}
-					selectedSessionId={selectedSessionId}
-					sessionDisplayProviders={sessionDisplayProviders}
-					sending={sending}
-					busySessionIds={busySessionIds}
-					interactionRequiredSessionIds={interactionRequiredSessionIds}
-					loadingWorkspace={loadingWorkspace}
-					contextPreviewCard={contextPreviewCard}
-					contextPreviewActive={contextPreviewActive}
-					planTabs={planTabs}
-					activePlanSlug={activePlanSlug}
-					headerActions={headerActions}
-					headerLeading={headerLeading}
-					onSelectSession={onSelectSession}
-					onSelectWorkspace={onSelectWorkspace}
-					onSelectPlan={onSelectPlan}
-					onClosePlanTab={onClosePlanTab}
-					onSelectContextPreview={onSelectContextPreview}
-					onCloseContextPreview={onCloseContextPreview}
-					onPrefetchSession={onPrefetchSession}
-					onSessionsChanged={onSessionsChanged}
-					onSessionRenamed={onSessionRenamed}
-					onWorkspaceChanged={onWorkspaceChanged}
-					onRequestCloseSession={onRequestCloseSession}
-					newSessionShortcut={newSessionShortcut}
-					newSessionMenuShortcut={newSessionMenuShortcut}
-				/>
+				{hideHeader ? null : (
+					<WorkspacePanelHeader
+						workspace={workspace}
+						changeRequest={changeRequest}
+						sessions={sessions}
+						selectedSessionId={selectedSessionId}
+						sessionDisplayProviders={sessionDisplayProviders}
+						sending={sending}
+						busySessionIds={busySessionIds}
+						interactionRequiredSessionIds={interactionRequiredSessionIds}
+						loadingWorkspace={loadingWorkspace}
+						contextPreviewCard={contextPreviewCard}
+						contextPreviewActive={contextPreviewActive}
+						planTabs={planTabs}
+						activePlanSlug={activePlanSlug}
+						headerActions={headerActions}
+						headerLeading={headerLeading}
+						onSelectSession={onSelectSession}
+						onSelectWorkspace={onSelectWorkspace}
+						onSelectPlan={onSelectPlan}
+						onClosePlanTab={onClosePlanTab}
+						onSelectContextPreview={onSelectContextPreview}
+						onCloseContextPreview={onCloseContextPreview}
+						onPrefetchSession={onPrefetchSession}
+						onSessionsChanged={onSessionsChanged}
+						onSessionRenamed={onSessionRenamed}
+						onWorkspaceChanged={onWorkspaceChanged}
+						onRequestCloseSession={onRequestCloseSession}
+						newSessionShortcut={newSessionShortcut}
+						newSessionMenuShortcut={newSessionMenuShortcut}
+						canvasGroup={canvasGroup}
+						onCanvasSplit={onCanvasSplit}
+						canvasSplitDisabled={canvasSplitDisabled}
+					/>
+				)}
 
-				<div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-					{terminalSessions.map((session) => (
-						<div
-							key={session.id}
-							className={cn(
-								"min-h-0 flex-1 flex-col",
-								session.id === visibleTerminalId ? "flex" : "hidden",
-							)}
-						>
-							<TerminalSessionPanel
-								repoId={workspace?.repoId ?? null}
-								workspaceId={session.workspaceId}
-								sessionId={session.id}
-								agentKind={session.agentType}
-								providerSessionId={session.providerSessionId}
-								isActive={session.id === visibleTerminalId}
-								workspaceReady={Boolean(
-									workspace && workspace.state !== "initializing",
+				{headerOnly ? null : (
+					<div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+						{terminalSessions.map((session) => (
+							<div
+								key={session.id}
+								className={cn(
+									"min-h-0 flex-1 flex-col",
+									session.id === visibleTerminalId ? "flex" : "hidden",
 								)}
-							/>
-						</div>
-					))}
-					{planActive && activePlanSlug && planSessionId && workspace ? (
-						<PlanErrorBoundary key={activePlanSlug} onExit={onClosePlanView}>
-							<PlanViewContainer
-								sessionId={planSessionId}
-								workspaceId={workspace.id}
-								slug={activePlanSlug}
-							/>
-						</PlanErrorBoundary>
-					) : contextPreviewActive && contextPreviewCard ? (
-						<div className="min-h-0 flex-1 overflow-hidden px-0 pt-4 pb-3">
-							<SourceDetailView card={contextPreviewCard} />
-						</div>
-					) : visibleTerminalId ? null : activePane?.hasLoaded ? (
-						<ActiveThreadViewport
-							hasSession={!!selectedSession}
-							workspaceName={workspace?.directoryName ?? null}
-							pane={activePane}
-							missingScriptTypes={missingScriptTypes}
-							onInitializeScript={onInitializeScript}
-						/>
-					) : loadingWorkspace || loadingSession ? (
-						<ConversationColdPlaceholder />
-					) : (
-						<div className="flex min-h-full flex-1 items-center justify-center px-8">
-							<EmptyState
-								workspaceState={workspace?.state ?? null}
+							>
+								<TerminalSessionPanel
+									repoId={workspace?.repoId ?? null}
+									workspaceId={session.workspaceId}
+									sessionId={session.id}
+									agentKind={session.agentType}
+									providerSessionId={session.providerSessionId}
+									isActive={session.id === visibleTerminalId}
+									workspaceReady={Boolean(
+										workspace && workspace.state !== "initializing",
+									)}
+								/>
+							</div>
+						))}
+						{planActive && activePlanSlug && planSessionId && workspace ? (
+							<PlanErrorBoundary key={activePlanSlug} onExit={onClosePlanView}>
+								<PlanViewContainer
+									sessionId={planSessionId}
+									workspaceId={workspace.id}
+									slug={activePlanSlug}
+								/>
+							</PlanErrorBoundary>
+						) : contextPreviewActive && contextPreviewCard ? (
+							<div className="min-h-0 flex-1 overflow-hidden px-0 pt-4 pb-3">
+								<SourceDetailView card={contextPreviewCard} />
+							</div>
+						) : visibleTerminalId ? null : activePane?.hasLoaded ? (
+							<ActiveThreadViewport
 								hasSession={!!selectedSession}
 								workspaceName={workspace?.directoryName ?? null}
+								pane={activePane}
 								missingScriptTypes={missingScriptTypes}
 								onInitializeScript={onInitializeScript}
 							/>
-						</div>
-					)}
-				</div>
+						) : loadingWorkspace || loadingSession ? (
+							<ConversationColdPlaceholder />
+						) : (
+							<div className="flex min-h-full flex-1 items-center justify-center px-8">
+								<EmptyState
+									workspaceState={workspace?.state ?? null}
+									hasSession={!!selectedSession}
+									workspaceName={workspace?.directoryName ?? null}
+									missingScriptTypes={missingScriptTypes}
+									onInitializeScript={onInitializeScript}
+								/>
+							</div>
+						)}
+					</div>
+				)}
 			</div>
 		</HelmorProfiler>
 	);

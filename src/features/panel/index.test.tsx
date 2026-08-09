@@ -181,6 +181,99 @@ describe("WorkspacePanel", () => {
 		expect(screen.getByTestId("thinking-indicator")).toBeInTheDocument();
 	});
 
+	it("collapses canvas-member sessions into a single split tab with a pane-count badge", () => {
+		const sessions: WorkspaceSessionSummary[] = [
+			{ ...SESSIONS[0], id: "session-1", title: "Session 1" },
+			{ ...SESSIONS[0], id: "session-2", title: "Session 2", active: false },
+			{ ...SESSIONS[0], id: "session-3", title: "Session 3", active: false },
+		];
+		render(
+			<TooltipProvider delayDuration={0}>
+				<QueryClientProvider client={createHelmorQueryClient()}>
+					<WorkspacePanel
+						workspace={WORKSPACE}
+						sessions={sessions}
+						selectedSessionId="session-1"
+						sessionPanes={[]}
+						sending={false}
+						onSelectSession={vi.fn()}
+						onSessionsChanged={vi.fn()}
+						canvasGroup={{
+							sessionIds: ["session-1", "session-2"],
+							count: 2,
+							activeSessionId: "session-1",
+						}}
+					/>
+				</QueryClientProvider>
+			</TooltipProvider>,
+		);
+
+		// One merged "split" tab with a badge of 2 …
+		const groupTab = screen.getByLabelText("Split view, 2 panes");
+		expect(groupTab).toBeInTheDocument();
+		expect(within(groupTab).getByText("2")).toBeInTheDocument();
+		// … the second member is NOT shown as its own tab …
+		expect(screen.queryByText("Session 2")).not.toBeInTheDocument();
+		// … but the non-canvas session keeps its own tab.
+		expect(screen.getByText("Session 3")).toBeInTheDocument();
+	});
+
+	it("splits via the header dropdown and hides the history button", async () => {
+		const onCanvasSplit = vi.fn();
+		const user = userEvent.setup();
+		render(
+			<TooltipProvider delayDuration={0}>
+				<QueryClientProvider client={createHelmorQueryClient()}>
+					<WorkspacePanel
+						workspace={WORKSPACE}
+						sessions={SESSIONS}
+						selectedSessionId="session-1"
+						sessionPanes={[]}
+						sending={false}
+						onSelectSession={vi.fn()}
+						onSessionsChanged={vi.fn()}
+						onCanvasSplit={onCanvasSplit}
+					/>
+				</QueryClientProvider>
+			</TooltipProvider>,
+		);
+
+		// A single split button (with a dropdown) — and NO history button while
+		// the split control is present.
+		expect(screen.getByLabelText("Split conversation")).toBeInTheDocument();
+		expect(screen.queryByLabelText("Session history")).not.toBeInTheDocument();
+
+		await user.click(screen.getByLabelText("Split conversation"));
+		await user.click(await screen.findByText("Split right"));
+		expect(onCanvasSplit).toHaveBeenCalledWith("row");
+
+		await user.click(screen.getByLabelText("Split conversation"));
+		await user.click(await screen.findByText("Split down"));
+		expect(onCanvasSplit).toHaveBeenCalledWith("col");
+	});
+
+	it("shows the history button and no split control when onCanvasSplit is absent", () => {
+		render(
+			<TooltipProvider delayDuration={0}>
+				<QueryClientProvider client={createHelmorQueryClient()}>
+					<WorkspacePanel
+						workspace={WORKSPACE}
+						sessions={SESSIONS}
+						selectedSessionId="session-1"
+						sessionPanes={[]}
+						sending={false}
+						onSelectSession={vi.fn()}
+						onSessionsChanged={vi.fn()}
+					/>
+				</QueryClientProvider>
+			</TooltipProvider>,
+		);
+		expect(
+			screen.queryByLabelText("Split conversation"),
+		).not.toBeInTheDocument();
+		expect(screen.getByLabelText("Session history")).toBeInTheDocument();
+	});
+
 	it("keeps conversation header actions outside Tauri drag regions", () => {
 		render(
 			<TooltipProvider delayDuration={0}>

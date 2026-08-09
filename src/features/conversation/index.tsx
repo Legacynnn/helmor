@@ -10,6 +10,7 @@ import { WorkspaceComposerContainer } from "@/features/composer/container";
 import type { StartSubmitMode } from "@/features/composer/start-submit-mode";
 import type { UserInputResponseHandler } from "@/features/composer/user-input";
 import { WorkspacePanelContainer } from "@/features/panel/container";
+import type { CanvasGroupTab } from "@/features/panel/header";
 import { FileLinkProvider } from "@/features/panel/message-components/file-link-context";
 import type { SessionCloseRequest } from "@/features/panel/use-confirm-session-close";
 import {
@@ -137,6 +138,21 @@ export type WorkspaceConversationContainerProps = {
 	contextPreviewActive?: boolean;
 	onSelectContextPreview?: () => void;
 	onCloseContextPreview?: () => void;
+	/** Split-canvas: stable getter returning the session IDs of the OTHER
+	 *  panes open alongside this one. Forwarded to `useConversationStreaming`
+	 *  so a send carries its siblings to the backend system-prompt builder.
+	 *  Omitted in the single-pane case. */
+	getSiblingSessionIds?: (sessionId: string) => readonly string[];
+	/** Split-canvas: a pane hides its own header tab strip (the canvas renders
+	 *  one shared tab bar above all panes instead). */
+	hideHeader?: boolean;
+	/** Split-canvas: collapse the listed sessions into a single "split" tab in
+	 *  this conversation's header (used while viewing a non-split session so the
+	 *  user can click back into the persisted split). */
+	canvasGroup?: CanvasGroupTab | null;
+	/** Split-canvas: split the current conversation from its header. */
+	onCanvasSplit?: (direction: "row" | "col") => void;
+	canvasSplitDisabled?: boolean;
 	/** Prompt queued by an external caller (e.g. the inspector Git commit
 	 *  button or a drained CLI send) to be auto-submitted once the displayed
 	 *  session matches. Per-session config (model / effort / fast-mode /
@@ -231,6 +247,11 @@ export const WorkspaceConversationContainer = memo(
 		contextPreviewActive = false,
 		onSelectContextPreview,
 		onCloseContextPreview,
+		getSiblingSessionIds,
+		hideHeader = false,
+		canvasGroup = null,
+		onCanvasSplit,
+		canvasSplitDisabled = false,
 		pendingPromptForSession = null,
 		pendingCreatedWorkspaceSubmit = null,
 		onPendingCreatedWorkspaceSubmitConsumed,
@@ -433,6 +454,7 @@ export const WorkspaceConversationContainer = memo(
 			submitQueue: submitQueueApi,
 			activeStreams,
 			getSessionContextReferences,
+			getSiblingSessionIds,
 			onInteractionSessionsChange,
 			onSessionCompleted,
 			onSessionAborted,
@@ -846,6 +868,10 @@ export const WorkspaceConversationContainer = memo(
 						displayedWorkspaceId={displayedWorkspaceId}
 						selectedSessionId={selectedSessionId}
 						displayedSessionId={displayedSessionId}
+						hideHeader={hideHeader}
+						canvasGroup={canvasGroup}
+						onCanvasSplit={onCanvasSplit}
+						canvasSplitDisabled={canvasSplitDisabled}
 						sessionSelectionHistory={sessionSelectionHistory}
 						sending={sendingForPanel}
 						busySessionIds={panelBusySessionIds}

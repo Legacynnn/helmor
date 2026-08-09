@@ -207,10 +207,16 @@ export function useAppShellState({
 	const [planSurfaceActive, setPlanSurfaceActive] = useState(false);
 	useShellEvent("plan-surface-changed", (e) => setPlanSurfaceActive(e.active));
 
+	const [canvasPaneCloseable, setCanvasPaneCloseable] = useState(false);
+	useShellEvent("canvas-pane-closeable-changed", (e) =>
+		setCanvasPaneCloseable(e.active),
+	);
+
 	useGlobalShortcutHandlers({
 		appSettings,
 		updateSettings,
 		planSurfaceActive,
+		canvasPaneCloseable,
 		onClosePlan: dispatchClosePlan,
 		contextPanelActions: sel.contextPanelActions,
 		canEditEditorSession: data.canEditEditorSession,

@@ -141,6 +141,12 @@ type UseConversationStreamingArgs = {
 	getSessionContextReferences?: (
 		sessionId: string,
 	) => readonly SessionContextReference[];
+	/** Session IDs of the OTHER split-canvas panes open alongside this one.
+	 *  Stable getter (mirrors `getSessionContextReferences`) so it can ride
+	 *  the send without churning the submit callback's identity. Sent to the
+	 *  backend as `siblingSessionIds`, which drives the cross-chat addendum in
+	 *  the agent's system prompt. Absent/empty ⇒ single-pane, no addendum. */
+	getSiblingSessionIds?: (sessionId: string) => readonly string[];
 	onInteractionSessionsChange?: (
 		sessionWorkspaceMap: Map<string, string>,
 		interactionCounts: Map<string, number>,
@@ -160,6 +166,7 @@ export function useConversationStreaming({
 	submitQueue,
 	activeStreams,
 	getSessionContextReferences,
+	getSiblingSessionIds,
 	onInteractionSessionsChange,
 	onSessionCompleted,
 	onSessionAborted,
@@ -972,6 +979,7 @@ export function useConversationStreaming({
 				const { flushStreamMessages, scheduleFlush } = flushers;
 				cleanup = flushers.cleanup;
 
+				const siblingSessionIds = getSiblingSessionIds?.(targetSessionId) ?? [];
 				await startAgentMessageStream(
 					{
 						provider: model.provider,
@@ -988,6 +996,8 @@ export function useConversationStreaming({
 						files: filePaths,
 						images: imagePaths,
 						pastedTexts: pastedTexts.length > 0 ? pastedTexts : null,
+						siblingSessionIds:
+							siblingSessionIds.length > 0 ? [...siblingSessionIds] : null,
 					},
 					createStreamEventDispatcher({
 						contextKey,
@@ -1079,6 +1089,7 @@ export function useConversationStreaming({
 			displayedSessionId,
 			displayedWorkspaceId,
 			getSessionContextReferences,
+			getSiblingSessionIds,
 			invalidateConversationQueries,
 			markSendingState,
 			pushToast,

@@ -36,6 +36,7 @@ export function useGlobalShortcutHandlers({
 	appSettings,
 	updateSettings,
 	planSurfaceActive,
+	canvasPaneCloseable,
 	onClosePlan,
 	contextPanelActions,
 	canEditEditorSession,
@@ -72,6 +73,7 @@ export function useGlobalShortcutHandlers({
 	appSettings: AppSettings;
 	updateSettings: (patch: Partial<AppSettings>) => void | Promise<void>;
 	planSurfaceActive: boolean;
+	canvasPaneCloseable: boolean;
 	onClosePlan: () => void;
 	contextPanelActions: ContextPanelActions;
 	canEditEditorSession: boolean;
@@ -191,6 +193,12 @@ export function useGlobalShortcutHandlers({
 						onClosePlan();
 						return;
 					}
+					// Split-canvas: ⌘W closes the focused pane (removes it from the
+					// split) before falling through to closing the session itself.
+					if (canvasPaneCloseable) {
+						publishShellEvent({ type: "close-focused-canvas-pane" });
+						return;
+					}
 					if (workspacePreviewActive && workspacePreviewCard) {
 						contextPanelActions.closeWorkspaceContextPreview();
 						return;
@@ -201,6 +209,7 @@ export function useGlobalShortcutHandlers({
 				enabled:
 					workspaceViewMode === "conversation" &&
 					(planSurfaceActive ||
+						canvasPaneCloseable ||
 						Boolean(workspacePreviewCard) ||
 						Boolean(getCloseableCurrentSession())),
 			},
@@ -362,6 +371,7 @@ export function useGlobalShortcutHandlers({
 			workspaceViewMode,
 			canEditEditorSession,
 			planSurfaceActive,
+			canvasPaneCloseable,
 			onClosePlan,
 		],
 	);

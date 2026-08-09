@@ -197,6 +197,13 @@ pub struct AgentSendRequest {
     /// text — this never alters the wire payload.
     #[serde(default)]
     pub pasted_texts: Option<Vec<crate::pipeline::types::PastedTextRange>>,
+    /// Session IDs of the OTHER conversation panes sharing this send's
+    /// split-canvas (the frontend owns the canvas layout). When non-empty,
+    /// the Helmor system-prompt preamble gains a "sibling panes" addendum
+    /// listing them + the `helmor` CLI commands to inspect or message them.
+    /// Empty/absent ⇒ single-pane behaviour, no addendum.
+    #[serde(default)]
+    pub sibling_session_ids: Option<Vec<String>>,
 }
 
 #[cfg(test)]

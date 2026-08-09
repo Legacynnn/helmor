@@ -96,6 +96,20 @@ pub struct HelmorSystemPromptContext {
     /// MDX plan-authoring contract so the agent writes its plan as an MDX
     /// file under `.helmor/plans/` instead of an inline plan.
     pub mdx_planning: bool,
+    /// Other conversation panes sharing this session's split-canvas. Empty
+    /// elides the entire "sibling panes" addendum (single-pane case). When
+    /// non-empty, the preamble lists each sibling + the concrete `helmor`
+    /// CLI commands to inspect or hand it work.
+    pub sibling_sessions: Vec<SiblingSessionInfo>,
+}
+
+/// A sibling conversation pane the current agent can reach via the CLI.
+#[derive(Debug, Clone)]
+pub struct SiblingSessionInfo {
+    /// The sibling's Helmor session id (`--session <id>`).
+    pub id: String,
+    /// Human-friendly title, shown so the agent can pick the right pane.
+    pub title: String,
 }
 
 /// Lightweight stacked-PR context injected into the workspace preamble so the
@@ -205,6 +219,22 @@ pub fn build_helmor_system_prompt(ctx: &HelmorSystemPromptContext) -> String {
         "\nIf the user asks for help with Helmor itself, point them at the feedback button at the bottom of Helmor's sidebar.\n",
     );
 
+    if !ctx.sibling_sessions.is_empty() {
+        let cli = &ctx.cli_command_name;
+        out.push_str(
+            "\nYou are one of several conversation panes open together on this workspace. You can inspect or message the sibling panes with the Helmor CLI (already on PATH):\n",
+        );
+        for sibling in &ctx.sibling_sessions {
+            let _ = writeln!(out, "  - \"{}\" — session {}", sibling.title, sibling.id);
+        }
+        let _ = write!(
+            out,
+            "To see which siblings are still working: `{cli} session list --json` (each session's `status` is `idle` or `streaming`).\n\
+             To read what a sibling did: `{cli} session get-messages --session <id> --json`.\n\
+             To hand a sibling work: `{cli} send --session <id> \"<prompt>\"` — this BLOCKS until that pane finishes the turn and prints its reply, so there is no need to poll afterwards.\n",
+        );
+    }
+
     if ctx.permission_mode.as_deref() == Some("plan") && ctx.mdx_planning {
         out.push_str(MDX_PLAN_AUTHORING_BLOCK);
     }
@@ -308,6 +338,7 @@ mod tests {
             stack: None,
             permission_mode: None,
             mdx_planning: false,
+            sibling_sessions: Vec::new(),
         }
     }
 
@@ -318,6 +349,41 @@ mod tests {
         let prompt = build_helmor_system_prompt(&ctx_with_defaults());
         assert!(prompt.contains("`dohooo/feature-x`"));
         assert!(prompt.contains("`/Users/me/helmor/workspaces/dohooo/feature-x`"));
+    }
+
+    /// Single-pane (no siblings) must NOT render the cross-chat addendum,
+    /// so existing one-pane behaviour is byte-for-byte unchanged.
+    #[test]
+    fn omits_sibling_addendum_when_no_siblings() {
+        let prompt = build_helmor_system_prompt(&ctx_with_defaults());
+        assert!(!prompt.contains("several conversation panes"));
+    }
+
+    /// Multi-pane: the addendum lists each sibling and the concrete CLI
+    /// commands, and makes the blocking nature of `send` explicit (no poll).
+    #[test]
+    fn renders_sibling_addendum_with_titles_and_commands() {
+        let mut ctx = ctx_with_defaults();
+        ctx.sibling_sessions = vec![
+            SiblingSessionInfo {
+                id: "a1b2".to_string(),
+                title: "Tests pane".to_string(),
+            },
+            SiblingSessionInfo {
+                id: "c3d4".to_string(),
+                title: "Docs pane".to_string(),
+            },
+        ];
+        let prompt = build_helmor_system_prompt(&ctx);
+        assert!(prompt.contains("several conversation panes"));
+        assert!(prompt.contains("\"Tests pane\" — session a1b2"));
+        assert!(prompt.contains("\"Docs pane\" — session c3d4"));
+        assert!(prompt.contains("session get-messages --session <id>"));
+        assert!(prompt.contains("send --session <id>"));
+        // The blocking contract must be explicit so the agent doesn't poll.
+        assert!(prompt.contains("BLOCKS"));
+        // Addendum stays inside the helmor_context envelope.
+        assert!(prompt.trim_end().ends_with("</helmor_context>"));
     }
 
     /// Resolved target + base branch → the diff/PR commands are

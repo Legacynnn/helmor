@@ -271,6 +271,11 @@ export type AgentSendRequest = {
 	 *  user_prompt so those spans render as tag chips; the agent still
 	 *  receives the full prompt text. */
 	pastedTexts?: PastedTextRange[] | null;
+	/** Session IDs of the OTHER split-canvas panes open alongside this send.
+	 *  Drives the cross-chat "sibling panes" addendum in the agent's system
+	 *  prompt (titles are resolved backend-side). Empty/absent ⇒ single-pane,
+	 *  no addendum. */
+	siblingSessionIds?: string[] | null;
 };
 
 export type WorkspaceSummary = {
